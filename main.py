@@ -8,6 +8,10 @@ from meshtastic_mqtt_json import MeshtasticMQTT
 from app import create_app
 from app.config import settings
 from app.database import get_db
+from app.tracker import Tracker
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
+logger = logging.getLogger("main")
 
 app = create_app()
 
@@ -23,6 +27,8 @@ meshtastic_mqtt.connect(
 )
 
 socketio = SocketIO(app)
+
+app.tracker = Tracker(meshtastic_mqtt)
 
 
 @app.route('/')
