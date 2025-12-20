@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mesh Watcher {{ version }} | Hungary</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="/static/favicon.ico">
+
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Leaflet.markercluster CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+
+    <!-- Socket.IO JS -->
+    <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"></script>
+
+    <!-- Material Design Icons CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/MaterialDesign-Webfont/7.4.47/css/materialdesignicons.min.css">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div id="map"></div>
+    <div id="side-block">
+         <div id="side-block-header">Mesh Monitor</div>
+        <div id="content-container">
+            <div id="top-half">[Top panel]</div>
+            <div id="bottom-half"></div>
+        </div>
+         <div id="side-block-footer">Version {{ version }} | <span id="node-count">0</span> of <span id="node-count-total">0</span> nodes on map</div>
+    </div>
+    <script type="module" src="/static/main.js"></script>
+</body>
+</html>
