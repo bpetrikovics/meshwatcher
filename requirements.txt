@@ -4,4 +4,5 @@ flask-socketio
 pydantic-settings
 sqlalchemy
 pymysql
+sqlmodel
 git+https://github.com/bpetrikovics/meshtastic-mqtt-json.git@multi-channel#egg=meshtastic-mqtt-json

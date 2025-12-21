@@ -1,10 +1,9 @@
 from .config import settings
 
-from typing import Generator
+from contextlib import contextmanager
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
-
-from .models import Base
+from sqlalchemy.orm import sessionmaker
+from sqlmodel import SQLModel, create_engine, Session
 
 
 DATABASE_URL = (
@@ -12,24 +11,27 @@ DATABASE_URL = (
     f"@{settings.mysql_host}:{settings.mysql_port}/{settings.mysql_db}"
 )
 
-SessionLocal = sessionmaker()
-
-def get_engine():
-    """Lazy engine creation per app context"""
-    engine = create_engine(DATABASE_URL, echo=False, future=True)
-    return engine
+engine = create_engine(DATABASE_URL, echo=False, future=True)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
-    """Create tables"""
-    engine = get_engine()
-    Base.metadata.create_all(bind=engine)
+    """Create tables once at startup time"""
+    SQLModel.metadata.create_all(engine)
 
-def get_db() -> Generator[Session, None, None]:
-    """Flask dependency-like pattern"""
-    engine = get_engine()
-    SessionLocal.configure(bind=engine)
-    db = SessionLocal()
+def get_db() -> Session:
+    """
+    FastAPI auto-converts to generator when used with Depends()
+    """
+    return SessionLocal()
+
+@contextmanager
+def db_session():
+    db = get_db()
     try:
         yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
