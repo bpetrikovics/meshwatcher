@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     mysql_db: str = "meshwatcher"
 
     mqtt_server: str = "mqtt.creativo.hu"
+    mqtt_port: int = 1883
     mqtt_username: str = "meshdev"
     mqtt_password: str = "large4cats"
     mqtt_root_topic: str = "msh/EU_868/HU/2/e/"
@@ -23,7 +24,9 @@ class Settings(BaseSettings):
     dup_cleanup_period: int = 60
     dup_cleanup_max_age: int = 120
 
-    packet_json_log: bool  = True
+    packet_json_log: bool  = False
+    packet_sql_log: bool = False
+
     readonly_mode: bool = False
 
     class Config:

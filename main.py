@@ -19,7 +19,7 @@ meshtastic_mqtt = MeshtasticMQTT()
 
 meshtastic_mqtt.connect(
     broker=settings.mqtt_server,
-    port=1883,
+    port=settings.mqtt_port,
     root=settings.mqtt_root_topic,
     channels=settings.mqtt_channels,
     username=settings.mqtt_username,
