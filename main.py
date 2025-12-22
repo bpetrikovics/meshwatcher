@@ -16,6 +16,7 @@ logger = logging.getLogger("main")
 app = create_app()
 
 meshtastic_mqtt = MeshtasticMQTT()
+db_session = get_db()
 
 meshtastic_mqtt.connect(
     broker=settings.mqtt_server,
@@ -28,7 +29,7 @@ meshtastic_mqtt.connect(
 
 socketio = SocketIO(app)
 
-app.tracker = Tracker(meshtastic_mqtt)
+app.tracker = Tracker(mqtt_client=meshtastic_mqtt, db_session=db_session)
 
 
 @app.route('/')

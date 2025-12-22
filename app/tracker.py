@@ -1,17 +1,22 @@
-import time
+import json
 import logging
 
 from typing import Callable, List, Dict, Optional
 from pydantic import ValidationError
+from sqlmodel import Session
+
 from meshtastic_mqtt_json import MeshtasticMQTT
 
 from .config import settings
-from .util import skip_dups, json_log
+from .util import callback_handler
+from .models import MeshtasticPacket, NodeInfo
+
 
 class Tracker:
-    def __init__(self, client: MeshtasticMQTT):
-        self.client = client
+    def __init__(self, mqtt_client: MeshtasticMQTT, db_session: Session):
         self.logger = logging.getLogger(__name__)
+        self.client = mqtt_client
+        self.db = db_session
 
         self.client.register_callback('TEXT_MESSAGE_APP', self.on_text_message)
         self.client.register_callback('POSITION_APP', self.on_position)
@@ -25,30 +30,26 @@ class Tracker:
         self.client.loop_start()
         self.logger.info("Initialized")
 
-    @skip_dups
-    @json_log
     def on_text_message(self, json_data):
         """
-        {'from': 2956776068, 'to': 4294967295, 'channel': 31,
-        'decoded': {
-            portnum': 'TEXT_MESSAGE_APP', 'payload': '🙋', 'replyId': 295099086, 'emoji': 1, 'bitfield': 1
-            },
-        'id': 3272591329, 'rxTime': 1763212101, 'hopLimit': 7, 'priority': 'BACKGROUND', 'hopStart': 7, 'relayNode': 132}}
+        { portnum': 'TEXT_MESSAGE_APP', 'payload': '🙋', 'replyId': 295099086, 'emoji': 1, 'bitfield': 1 }
         """
         pass
 
-    @skip_dups
-    @json_log
     def on_position(self, json_data):
         pass
 
-    @skip_dups
-    @json_log
-    def on_nodeinfo(self, json_data):
-        pass
+    @callback_handler
+    def on_nodeinfo(self, packet: MeshtasticPacket):
+        """
+        { 'portnum': 'NODEINFO_APP', 'payload': {
+            'id': '!d45a9a80', 'longName': '🇭🇺 CzD B2', 'shortName': 'czd4', 'macaddr': 'HNvUWpqA','hwModel': 'SEEED_XIAO_S3',
+            'role': 'CLIENT_BASE', 'publicKey': 'sXwaWsSIxXwHHNtaAumip6sBeajxwGbS5gFrLX5r83U=', 'isUnmessagable': True},
+            'requestId': 5571986, 'bitfield': 1 }
+        """
+        nodeinfo = NodeInfo.model_validate_json(json.dumps(packet.decoded["payload"]))
+        self.logger.info(nodeinfo)
 
-    @skip_dups
-    @json_log
     def on_traceroute(self, json_data):
         """
         {'from': 2956776068, 'to': 2552625594, 'channel': 8,
@@ -77,8 +78,6 @@ class Tracker:
 
         pass
 
-    @skip_dups
-    @json_log
     def on_telemetry(self, json_data):
         """
         {'from': 2922542922, 'to': 4294967295,
@@ -96,23 +95,33 @@ class Tracker:
         """
         pass
 
-    @skip_dups
-    @json_log
     def on_neighborinfo(self, json_data):
-        #  {'from': 3031777281, 'to': 1, 'channel': 8, 'decoded':
-        # {'portnum': 'NEIGHBORINFO_APP', 'payload': {'nodeId': 3031777281, 'lastSentById': 3031777281,
-        # 'nodeBroadcastIntervalSecs': 300, 'neighbors':
-        # [{'nodeId': 3663224352, 'snr': 10.25}]},
-        # 'bitfield': 1},
-        # 'id': 3781190161, 'rxTime': 1734511540, 'priority': 'BACKGROUND', 'hopStart': 7} 
+        """
+        {'from': 3031777281, 'to': 1, 'channel': 8,
+        'decoded': {
+            'portnum': 'NEIGHBORINFO_APP',
+            'payload': {
+              'nodeId': 3031777281, 'lastSentById': 3031777281, 'nodeBroadcastIntervalSecs': 300,
+              'neighbors': [
+                {'nodeId': 3663224352, 'snr': 10.25}
+                ]},
+            'bitfield': 1},
+        'id': 3781190161, 'rxTime': 1734511540, 'priority': 'BACKGROUND', 'hopStart': 7} 
+        """
         pass
 
-    @skip_dups
-    @json_log
     def on_routing(self, json_data):
+        """
+        {'from': 977800444, 'to': 2224788660, 'channel': 31,
+        'decoded': {
+            'portnum': 'ROUTING_APP',
+            'payload': {
+                'errorReason': 'NO_RESPONSE'}, 'requestId': 43532287, 'bitfield': 1},
+            'id': 465935777, 'rxTime': 1766230534, 'rxSnr': 11.75, 'hopLimit': 3,
+            'rxRssi': -54, 'hopStart': 6, 'relayNode': 186, 'transportMechanism': 'TRANSPORT_LORA',
+            'channelName': 'MediumFast'}        
+        """
         pass
 
-    @skip_dups
-    @json_log
     def on_store_forward(self, json_data):
         pass
