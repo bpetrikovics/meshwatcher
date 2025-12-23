@@ -1,8 +1,7 @@
 import logging
 import json
 
-from functools import wraps
-from typing import Type, Any
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -12,22 +11,26 @@ from .statistics import PacketStat
 from .database import get_db
 
 logger = logging.getLogger(__name__)
-stats = PacketStat()
-db = get_db()
 
+# This module will have its own DB session
+db = get_db()
+stats = PacketStat()
 
 def callback_handler(method):
     """
     Multipurpose handler decorator for mqtt callback functions.
+
     - Log raw incoming data
     - Validate packets against schema
     - Perform packet level logging, statistics and deduplication
-    - Extracts and validates app-specific payload and passes it on to the
-      wrapped handler method.
+    - Calls any low packet level callbacks
+    - Passes the packet on to the wrapper callback
+
+        At the end, MQTT callback functions should receive deduplicated packets only.
     """
     def wrapper(self, json_data: Any) -> MeshtasticPacket:
         if settings.packet_json_log:
-            logger.info("Processing raw packet: %s", json_data)
+            logger.info("Raw packet: %s", json_data)
 
         packet = None
         try:
@@ -45,12 +48,13 @@ def callback_handler(method):
                 logger.exception("Packet save transaction failed and was rolled back: %s", exc)
                 db.rollback()
 
-        stats.add_packet(packet)
+        if stats.analyze(packet):
+            logger.info(packet)
+        else:
+            # For duplicates or errors, stop processing here and return
+            return
 
-        # Won't log all - we should do stat, dedup and ONLY THEN
-        logger.info(packet)
-
-        # Call original callback with DataObject instead of raw json_data
+        # Proceed and pass on packet to event manager callback
         return method(self, packet)
     return wrapper
 

@@ -8,26 +8,26 @@ from sqlmodel import Session
 from meshtastic_mqtt_json import MeshtasticMQTT
 
 from .config import settings
-from .util import callback_handler
+from .handler import callback_handler
 from .models import MeshtasticPacket, NodeInfo
 
 
-class Tracker:
+class EventManager:
     def __init__(self, mqtt_client: MeshtasticMQTT, db_session: Session):
         self.logger = logging.getLogger(__name__)
-        self.client = mqtt_client
+        self.mqtt = mqtt_client
         self.db = db_session
 
-        self.client.register_callback('TEXT_MESSAGE_APP', self.on_text_message)
-        self.client.register_callback('POSITION_APP', self.on_position)
-        self.client.register_callback('NODEINFO_APP', self.on_nodeinfo)
-        self.client.register_callback('TRACEROUTE_APP', self.on_traceroute)
-        self.client.register_callback('TELEMETRY_APP', self.on_telemetry)
-        self.client.register_callback('NEIGHBORINFO_APP', self.on_neighborinfo)
-        self.client.register_callback('ROUTING_APP', self.on_routing)
-        self.client.register_callback('STORE_FORWARD_APP', self.on_store_forward)
+        self.mqtt.register_callback('TEXT_MESSAGE_APP', self.on_text_message)
+        self.mqtt.register_callback('POSITION_APP', self.on_position)
+        self.mqtt.register_callback('NODEINFO_APP', self.on_nodeinfo)
+        self.mqtt.register_callback('TRACEROUTE_APP', self.on_traceroute)
+        self.mqtt.register_callback('TELEMETRY_APP', self.on_telemetry)
+        self.mqtt.register_callback('NEIGHBORINFO_APP', self.on_neighborinfo)
+        self.mqtt.register_callback('ROUTING_APP', self.on_routing)
+        self.mqtt.register_callback('STORE_FORWARD_APP', self.on_store_forward)
 
-        self.client.loop_start()
+        self.mqtt.loop_start()
         self.logger.info("Initialized")
 
     def on_text_message(self, json_data):

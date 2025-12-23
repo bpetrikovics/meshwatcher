@@ -9,6 +9,57 @@ from sqlalchemy.types import JSON
 
 from pydantic import ConfigDict, computed_field
 
+"""
+Double check fields!!!
+
+id, request id, dest
+
+
+{'from': 2224738468, 'to': 321385616, 'channel': 31,
+'decoded': {
+    'portnum': 'NODEINFO_APP',
+    'payload': {
+        'id': '!849ad0a4', 'longName': '🇭🇺 HA1ADM HT Mobil', 'shortName': 'ADM4',
+        'macaddr': 'sIGEmtCk', 'hwModel': 'HELTEC_V3', 'role': 'CLIENT_MUTE',
+        'publicKey': '04icuoGGUEY+IsF3BT89Ya2SIKSd8EUMirA/Nc9vHBM='
+        },
+    'wantResponse': True, 'bitfield': 3
+    },
+'id': 1330856275, 'rxTime': 1766442612, 'rxSnr': -3.25, 'hopLimit': 4,
+'rxRssi': -105, 'hopStart': 7, 'nextHop': 112, 'relayNode': 252,
+'uplink': '!a2e19ff0', 'channelName': 'MediumFast'}
+
+{'from': 2956776068, 'to': 382706456, 'channel': 31,
+'decoded': {
+    'portnum': 'NODEINFO_APP',
+    'payload': {
+        'id': '!b03cd284', 'longName': '🇭🇺 Kaszásdűlő 🏢 868', 'shortName': 'KA8B',
+        'hwModel': 'HELTEC_V3', 'role': 'CLIENT_BASE',
+        'publicKey': 'lbIajoQsPuG05U3oAAsmuUO1VEansCoTeNPK0lzMV2g='
+        },
+    'wantResponse': True, 'dest': 382706456, 'requestId': 2384491189, 'bitfield': 3
+    },
+'id': 2468926477, 'rxTime': 1766442726, 'hopLimit': 3, 'wantAck': True,
+'priority': 'RESPONSE', 'hopStart': 3, 'relayNode': 132, 'uplink': '!b03cd284',
+'channelName': 'MediumFast'
+}
+
+{'from': 2956776068, 'to': 3935232448, 'channel': 31,
+'decoded': {
+    'portnum': 'NODEINFO_APP',
+    'payload': {
+        'id': '!b03cd284', 'longName': '🇭🇺 Kaszásdűlő 🏢 868', 'shortName': 'KA8B',
+        'macaddr': 'NM2wPNKE', 'hwModel': 'HELTEC_V3', 'role': 'CLIENT_BASE',
+        'publicKey': 'lbIajoQsPuG05U3oAAsmuUO1VEansCoTeNPK0lzMV2g=',
+        'isUnmessagable': False
+        },
+    'wantResponse': True, 'bitfield': 3
+    },
+'id': 3477936900, 'rxTime': 1766442925, 'hopLimit': 7, 'priority': 'RELIABLE',
+'hopStart': 7, 'relayNode': 132, 'uplink': '!b03cd284', 'channelName': 'MediumFast'
+}
+
+"""
 
 class MeshtasticPacket(SQLModel, table=True):
     __tablename__ = "packets"
@@ -157,14 +208,15 @@ class MeshtasticPacket(SQLModel, table=True):
 
     def __str__(self) -> str:
             to_str = "broadcast" if self.is_broadcast else f"!{self.to:08x}"
-            has_relay = f", relay: {hex(self.relay_node)}" if self.relay_node else ""
-            has_nexthop = f", next_hop: 0x{self.next_hop:08x}" if self.next_hop else ""
-            is_response = f", re: {self.decoded_requestid}" if self.decoded_requestid else ""
+            has_relay = f", relay: 0x{self.relay_node:02x}" if self.relay_node else ""
+            has_nexthop = f", next_hop: 0x{self.next_hop:02x}" if self.next_hop else ""
+            is_response = f", re: {hex(self.decoded_requestid)}" if self.decoded_requestid else ""
             has_uplink = f", uplink: {self.uplink}" if self.uplink else ""
             want_ack = f", want_ack" if self.want_ack else ""
+            want_response = f", want_resp" if self.decoded_wantresponse else ""
 
             return (f"Packet {hex(self.id_)}: {self.decoded_portnum} !{self.from_:08x} -> {to_str}"
-                    f"{has_relay}{has_nexthop}{is_response}{want_ack}{has_uplink}")
+                    f"{has_relay}{has_nexthop}{is_response}{want_ack}{want_response}{has_uplink} on {self.channel_name}/{self.channel}")
 
 
 class NodeInfo(SQLModel, table=True):
@@ -214,24 +266,10 @@ class NodeInfo(SQLModel, table=True):
         )
 
     def __str__(self) -> str:
-        """Human-readable string representation excluding None fields."""
-        parts = [f"id={self.id_!r}"]
 
-        optional_fields = [
-            (self.short_name, "short_name"),
-            (self.long_name, "long_name"), 
-            (self.macaddr, "macaddr"),
-            (self.hw_model, "hw_model"),
-            (self.public_key, "public_key"),
-            (self.role, "role"),
-        ]
-        
-        for value, name in optional_fields:
-            if value is not None:
-                fmt_value = f"{value[:8]}..." if name == "public_key" and value else f"{value!r}"
-                parts.append(f"{name}={fmt_value}")
-        
-        if self.is_unmessagable is not None:
-            parts.append(f"is_unmessagable={self.is_unmessagable}")
-        
-        return f"Node {', '.join(parts)}"
+        short_name = f" [{self.short_name}]" if self.short_name else ""
+        long_name = f" '{self.long_name}'" if self.long_name else ""
+        model = f", {self.hw_model}" if self.hw_model else ""
+        role = f", {self.role}" if self.role else ""
+
+        return f"NodeInfo {self.id_}{short_name}{long_name}{model}{role}"

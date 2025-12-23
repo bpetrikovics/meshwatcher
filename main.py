@@ -1,14 +1,14 @@
 import logging
 
-from flask import render_template
-from flask_socketio import SocketIO
+from flask import render_template, request
+from flask_socketio import SocketIO, emit
 
 from meshtastic_mqtt_json import MeshtasticMQTT
 
 from app import create_app
 from app.config import settings
 from app.database import get_db
-from app.tracker import Tracker
+from app.event_manager import EventManager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
 logger = logging.getLogger("main")
@@ -27,9 +27,21 @@ meshtastic_mqtt.connect(
     password=settings.mqtt_password,
 )
 
-socketio = SocketIO(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-app.tracker = Tracker(mqtt_client=meshtastic_mqtt, db_session=db_session)
+# Main app and all MQTT callbacks will share their separate DB session
+app.manager = EventManager(mqtt_client=meshtastic_mqtt, db_session=db_session)
+
+
+@socketio.on('connect')
+def handle_connect_default():
+    # store the sid so we can later send session specific content
+    sid = request.sid
+
+@socketio.on('connect', namespace="rawdata")
+def handle_connect_rawdata():
+    # store the sid so we can later send session specific content
+    sid = request.sid
 
 
 @app.route('/')
