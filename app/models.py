@@ -10,11 +10,6 @@ from sqlalchemy.types import JSON
 from pydantic import ConfigDict, computed_field
 
 """
-Double check fields!!!
-
-id, request id, dest
-
-
 {'from': 2224738468, 'to': 321385616, 'channel': 31,
 'decoded': {
     'portnum': 'NODEINFO_APP',

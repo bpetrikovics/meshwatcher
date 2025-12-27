@@ -1,22 +1,22 @@
 import json
 import logging
 
-from typing import Callable, List, Dict, Optional
 from pydantic import ValidationError
 from sqlmodel import Session
 
 from meshtastic_mqtt_json import MeshtasticMQTT
 
-from .config import settings
-from .handler import callback_handler
+from .packet_handling import raw_handler
 from .models import MeshtasticPacket, NodeInfo
+from .presenter import Presenter
 
 
 class EventManager:
-    def __init__(self, mqtt_client: MeshtasticMQTT, db_session: Session):
+    def __init__(self, mqtt_client: MeshtasticMQTT, db_session: Session, presenter: Presenter):
         self.logger = logging.getLogger(__name__)
         self.mqtt = mqtt_client
         self.db = db_session
+        self.presenter = presenter
 
         self.mqtt.register_callback('TEXT_MESSAGE_APP', self.on_text_message)
         self.mqtt.register_callback('POSITION_APP', self.on_position)
@@ -27,8 +27,14 @@ class EventManager:
         self.mqtt.register_callback('ROUTING_APP', self.on_routing)
         self.mqtt.register_callback('STORE_FORWARD_APP', self.on_store_forward)
 
+        raw_handler.register_callback("raw", self.presenter.raw_packet_callback)
+
         self.mqtt.loop_start()
         self.logger.info("Initialized")
+
+    @staticmethod
+    def extract_payload(packet: MeshtasticPacket, class_to_extract):
+        return class_to_extract.model_validate_json(json.dumps(packet.decoded["payload"]))
 
     def on_text_message(self, json_data):
         """
@@ -39,7 +45,7 @@ class EventManager:
     def on_position(self, json_data):
         pass
 
-    @callback_handler
+    @raw_handler.validate_packet
     def on_nodeinfo(self, packet: MeshtasticPacket):
         """
         { 'portnum': 'NODEINFO_APP', 'payload': {
@@ -47,7 +53,12 @@ class EventManager:
             'role': 'CLIENT_BASE', 'publicKey': 'sXwaWsSIxXwHHNtaAumip6sBeajxwGbS5gFrLX5r83U=', 'isUnmessagable': True},
             'requestId': 5571986, 'bitfield': 1 }
         """
-        nodeinfo = NodeInfo.model_validate_json(json.dumps(packet.decoded["payload"]))
+        try:
+            nodeinfo = self.extract_payload(packet, NodeInfo)
+        except ValidationError as exc:
+            self.logger.exception(exc)
+            return
+
         self.logger.info(nodeinfo)
 
     def on_traceroute(self, json_data):

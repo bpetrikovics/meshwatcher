@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mesh Watcher {{ version }} | Hungary</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="/static/favicon.ico">
+
+    <!-- Socket.IO JS -->
+    <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"></script>
+    <script type="application/javascript">
+        var socket = io('/rawlog'); // if not mounted on virtualhost root, {path: "/path/to/socket.io"} is needed
+        socket.on("rawlog", function (data) {
+            console.log(data)
+        });
+    </script>
+
+</head>
+<body>
+</body>
+</html>

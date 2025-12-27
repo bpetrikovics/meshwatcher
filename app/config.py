@@ -29,6 +29,8 @@ class Settings(BaseSettings):
 
     readonly_mode: bool = False
 
+    namespace_rawdata: str = "/rawlog"
+
     class Config:
         env_file = ".env"  # Optional: loads environment variables from a .env file
         extra = "ignore"   # Ignore env variables we're unaware of
