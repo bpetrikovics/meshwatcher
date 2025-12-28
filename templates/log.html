@@ -257,20 +257,9 @@
         }
 
         function toHex (n, digits = 8) {
-            const num = Number(n);
-            if (!Number.isFinite(num)) return '0'.repeat(digits);
-            
-            // Use bitwise AND with Number mask (handles up to 32 bits safely)
-            const bits = digits * 4;
-            let masked;
-            if (bits <= 32) {
-                masked = (num >>> 0) & ((1 << bits) - 1);
-            } else {
-                // For >32 bits, use BigInt safely
-                masked = Number((BigInt(num >>> 0) & ((1n << BigInt(bits)) - 1n)));
-            }
-            
-            return masked.toString(16).padStart(digits, '0');
+  const num = +n;
+  if (!num) return '0'.repeat(digits);
+  return (BigInt(num)).toString(16).padStart(digits, '0');
         };
 
         function renderCompact(lineData) {
