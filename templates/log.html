@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Mesh Log</title>
+    <title>Hungarian Mesh - Raw packet log</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="shortcut icon" href="/static/favicon.ico">
@@ -9,6 +9,13 @@
     <style>
         * {
             box-sizing: border-box;
+        }
+        :root {
+            --header-height: 56px;
+            --spacing-xs: 2px;
+            --spacing-sm: 4px;
+            --spacing-md: 6px;
+            --spacing-lg: 8px;
         }
         body {
             margin: 0;
@@ -23,18 +30,21 @@
             color: rgb(255, 244, 229);
             text-align: center;
             font-size: 1.1em;
-            padding: 6px;
+            padding: 8px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
         }
         .header-title {
             flex: 1;
             text-align: center;
+            font-size: clamp(0.9em, 4vw, 1.1em);
         }
         .header-buttons {
             display: flex;
-            gap: 6px;
+            gap: 4px;
         }
         .header-btn {
             background: rgba(255,255,255,0.2);
@@ -43,25 +53,26 @@
             padding: 4px 8px;
             border-radius: 3px;
             font-family: monospace;
-            font-size: 0.8em;
+            font-size: clamp(0.7em, 3vw, 0.8em);
             cursor: pointer;
             transition: all 0.2s;
+            white-space: nowrap;
         }
         .header-btn:hover {
             background: rgba(255,255,255,0.3);
             border-color: rgba(255,255,255,0.5);
         }
         #log {
-            height: calc(100vh - 56px);
-            padding: 4px;
+            height: calc(100vh - var(--header-height));
+            padding: 8px;
             overflow-y: auto;
+            overflow-x: hidden;
         }
         .log-line {
             background: rgba(255,255,255,0.08);
             border: 1px solid rgba(255,255,255,0.15);
             border-radius: 4px;
-            margin-bottom: 4px;
-            padding: 2px 2px;
+            margin-bottom: var(--spacing-sm);
             cursor: pointer;
         }
         .log-line:hover {
@@ -72,26 +83,88 @@
             border-color: rgba(255,255,255,0.3);
         }
         .compact-row {
-            padding: 6px 8px;
+            padding: var(--spacing-md) var(--spacing-lg);
             position: relative;
         }
-        .compact-row table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.95em;
+        /* Color classes */
+        .compact-row table.port-nodeinfo { background: rgba(100, 180, 120, 0.3); }
+        .compact-row table.port-traceroute { background: rgba(180, 120, 100, 0.3); }
+        .compact-row table.port-textmsg { background: rgba(120, 140, 180, 0.3); }
+        .compact-row table.port-position { background: rgba(180, 140, 100, 0.3); }
+        .compact-row table.port-routing { background: rgba(120, 100, 160, 0.3); }
+        
+        /* DESKTOP: Fixed layout table */
+        @media (min-width: 768px) {
+            .compact-row table {
+                table-layout: fixed;
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 0.95em;
+            }
+            .compact-row td {
+                padding: 1px 3px;
+                border: 1px solid rgba(255,255,255,0.1);
+                background: rgba(0,0,0,0.3);
+                vertical-align: top;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .col-received { width: 16%; }
+            .col-id { width: 8%; }
+            .col-from { width: 9%; }
+            .col-to { width: 9%; }
+            .col-channel { width: 12%; }
+            .col-port { width: 8%; }
+            .col-uplink { width: 10%; }
+            .col-relay { width: 10%; }
+            .col-next { width: 10%; }
         }
-        .compact-row td {
-            padding: 1px 3px;
-            border: 1px solid rgba(255,255,255,0.1);
-            background: rgba(0,0,0,0.2);
-            vertical-align: top;
+
+        /* MOBILE: CSS Grid layout - stacks naturally */
+        @media (max-width: 767px) {
+            .compact-row {
+                padding: 6px;
+                display: grid;
+                gap: 4px;
+                font-size: 0.85em;
+            }
+            .compact-row::before {
+                content: attr(data-summary);
+                display: block;
+                font-weight: bold;
+                color: #fff;
+                margin-bottom: 4px;
+                padding: 2px 4px;
+                background: rgba(0,0,0,0.4);
+                border-radius: 2px;
+            }
+            .compact-row > div {
+                display: flex;
+                flex-direction: column;
+                padding: 2px 4px;
+                background: rgba(0,0,0,0.4);
+                border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 2px;
+            }
+            .compact-label {
+                font-size: 0.65em;
+                opacity: 0.9;
+                font-weight: bold;
+                text-transform: uppercase;
+                color: #ccc;
+            }
+            .compact-value {
+                font-family: monospace;
+                color: #fff;
+                font-size: 0.8em;
+                word-break: break-all;
+            }
+            .expand-indicator {
+                display: none;
+            }
         }
-        .compact-row td.received-col {
-            min-width: 140px;
-        }
-        .compact-row td.other-col {
-            min-width: 90px;
-        }
+
         .compact-label {
             font-size: 0.75em;
             opacity: 0.8;
@@ -133,8 +206,9 @@
     </style>
 </head>
 <body>
+    <!-- HTML structure unchanged -->
     <div id="header">
-        <div class="header-title">Mesh log from {{ settings.mqtt_server }} | Raw data without deduplication</div>
+        <div class="header-title">Hungarian Mesh Packet Log via {{ settings.mqtt_server }} | Raw data without deduplication</div>
         <div class="header-buttons">
             <button class="header-btn" id="collapse-all">Collapse All</button>
             <button class="header-btn" id="clear-all">Clear</button>
@@ -148,7 +222,30 @@
         const collapseAllBtn = document.getElementById('collapse-all');
         const clearAllBtn = document.getElementById('clear-all');
 
-        // Convert Unix timestamp to human readable local time
+        const portColors = {
+            'NODEINFO_APP': 'port-nodeinfo',
+            'TRACEROUTE_APP': 'port-traceroute', 
+            'TEXT_MESSAGE_APP': 'port-textmsg',
+            'POSITION_APP': 'port-position',
+            'ROUTING_APP': 'port-routing'
+        };
+
+        function safeParse(rawData) {
+            if (typeof rawData !== 'string') return rawData;
+            try {
+                return JSON.parse(rawData);
+            } catch (e) {
+                console.warn('Invalid JSON received:', rawData?.substring(0, 100));
+                return null;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         function formatTimestamp(unixTime) {
             if (!unixTime || unixTime === null || unixTime === undefined) return 'N/A';
             try {
@@ -162,7 +259,7 @@
         function renderCompact(lineData) {
             const id_ = lineData.id_ !== undefined ? String(lineData.id_) : 'N/A';
             const from_ = lineData.from_ !== undefined ? String(lineData.from_) : 'N/A';
-            const to = lineData.to !== undefined ? String(lineData.to) : 'N/A';
+            const to = lineData.to !== undefined ? (lineData.to === 4294967295 ? 'BROADCAST' : String(lineData.to)) : 'N/A';
             const channel_name = lineData.channel_name || 'N/A';
             const portnum = lineData.decoded?.portnum || 'N/A';
             const uplink = lineData.uplink || 'N/A';
@@ -178,24 +275,37 @@
             const compactRow = document.createElement('div');
             compactRow.className = 'compact-row';
 
+            // MOBILE SUMMARY (shows port + from/to)
+            const mobileSummary = `Port: ${portnum} | ${from_} → ${to}`;
+            compactRow.dataset.summary = mobileSummary;
+
             const table = document.createElement('table');
+            const portColorClass = portColors[portnum] || '';
+            if (portColorClass) {
+                table.classList.add(portColorClass);
+            }
+
             const row = table.insertRow();
             
             const fields = [
-                ['Received', received],
-                ['ID', id_], ['From', from_], ['To', to],
-                ['Channel', channel_name], ['Port', portnum],
-                ['Uplink', uplink], ['Relay', relay_node], ['Next', next_hop]
+                {label: 'Received', value: received, colClass: 'col-received received-col'},
+                {label: 'ID', value: id_, colClass: 'col-id other-col'},
+                {label: 'From', value: from_, colClass: 'col-from other-col'},
+                {label: 'To', value: to, colClass: 'col-to other-col'},
+                {label: 'Channel', value: channel_name, colClass: 'col-channel other-col'},
+                {label: 'Port', value: portnum, colClass: 'col-port other-col'},
+                {label: 'MQTT Uplink', value: uplink, colClass: 'col-uplink other-col'},
+                {label: 'Relay (Last Hop)', value: relay_node, colClass: 'col-relay other-col'},
+                {label: 'Next Hop', value: next_hop, colClass: 'col-next other-col'}
             ];
 
-            fields.forEach(([label, value]) => {
+            fields.forEach(field => {
                 const cell = row.insertCell();
-                if (label === 'Received') {
-                    cell.className = 'received-col';
-                } else {
-                    cell.className = 'other-col';
-                }
-                cell.innerHTML = `<div class="compact-label">${label}</div><div class="compact-value">${value}</div>`;
+                cell.className = field.colClass;
+                cell.innerHTML = `
+                    <div class="compact-label">${escapeHtml(field.label)}</div>
+                    <div class="compact-value">${escapeHtml(field.value)}</div>
+                `;
             });
 
             const indicator = document.createElement('div');
@@ -213,9 +323,9 @@
             return logLine;
         }
 
+        // Rest of functions unchanged (toggleExpand, collapseAll, etc.)
         function toggleExpand(logLine) {
             const isExpanded = logLine.dataset.isExpanded === 'true';
-            
             if (isExpanded) {
                 const jsonBlock = logLine.querySelector('.full-json');
                 if (jsonBlock) jsonBlock.remove();
@@ -232,7 +342,6 @@
             }
         }
 
-        // NEW: Collapse all expanded log lines
         function collapseAll() {
             const expandedLines = logDiv.querySelectorAll('.log-line.expanded');
             expandedLines.forEach(logLine => {
@@ -243,33 +352,23 @@
             });
         }
 
-        // NEW: Clear all log lines
         function clearAll() {
             logDiv.innerHTML = '';
         }
 
-        // Button event listeners
         collapseAllBtn.addEventListener('click', collapseAll);
         clearAllBtn.addEventListener('click', clearAll);
 
         function addLogLine(rawData) {
-            let lineData;
-            try {
-                if (typeof rawData === 'string') {
-                    lineData = JSON.parse(rawData);
-                } else {
-                    lineData = rawData;
-                }
-            } catch (e) {
-                console.error('Failed to parse:', e);
-                return;
-            }
-
+            let lineData = safeParse(rawData);
+            if (!lineData) return;
             const logLine = renderCompact(lineData);
             logDiv.appendChild(logLine);
             logDiv.scrollTop = logDiv.scrollHeight;
         }
 
+        socket.on('connect', () => console.log('Connected'));
+        socket.on('disconnect', () => console.log('Disconnected'));
         socket.on('rawlog', data => addLogLine(data));
     </script>
 </body>
