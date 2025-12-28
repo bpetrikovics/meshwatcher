@@ -264,8 +264,8 @@
 
         function renderCompact(lineData) {
             const id_ = lineData.id_ !== undefined ? String(lineData.id_) : 'N/A';
-            const from_ = lineData.from_ !== undefined ? toHex(lineData.from_) : 'N/A';
-            const to = lineData.to !== undefined ? (lineData.to === 4294967295 ? 'BROADCAST' : toHex(lineData.to)) : 'N/A';
+            const from_ = lineData.from_ !== undefined ? '!'+toHex(lineData.from_) : 'N/A';
+            const to = lineData.to !== undefined ? (lineData.to === 4294967295 ? 'BROADCAST' : '!'+toHex(lineData.to)) : 'N/A';
             const channel_name = lineData.channel_name || 'N/A';
             const portnum = lineData.decoded?.portnum || 'N/A';
             const uplink = lineData.uplink || 'N/A';
