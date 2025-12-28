@@ -256,15 +256,32 @@
             }
         }
 
+        function toHex (n, digits = 8) {
+            const num = Number(n);
+            if (!Number.isFinite(num)) return '0'.repeat(digits);
+            
+            // Use bitwise AND with Number mask (handles up to 32 bits safely)
+            const bits = digits * 4;
+            let masked;
+            if (bits <= 32) {
+                masked = (num >>> 0) & ((1 << bits) - 1);
+            } else {
+                // For >32 bits, use BigInt safely
+                masked = Number((BigInt(num >>> 0) & ((1n << BigInt(bits)) - 1n)));
+            }
+            
+            return masked.toString(16).padStart(digits, '0');
+        };
+
         function renderCompact(lineData) {
             const id_ = lineData.id_ !== undefined ? String(lineData.id_) : 'N/A';
-            const from_ = lineData.from_ !== undefined ? String(lineData.from_) : 'N/A';
-            const to = lineData.to !== undefined ? (lineData.to === 4294967295 ? 'BROADCAST' : String(lineData.to)) : 'N/A';
+            const from_ = lineData.from_ !== undefined ? toHex(lineData.from_) : 'N/A';
+            const to = lineData.to !== undefined ? (lineData.to === 4294967295 ? 'BROADCAST' : toHex(lineData.to)) : 'N/A';
             const channel_name = lineData.channel_name || 'N/A';
             const portnum = lineData.decoded?.portnum || 'N/A';
             const uplink = lineData.uplink || 'N/A';
-            const relay_node = lineData.relay_node !== undefined ? String(lineData.relay_node) : 'N/A';
-            const next_hop = lineData.next_hop !== undefined ? String(lineData.next_hop) : 'N/A';
+            const relay_node = lineData.relay_node !== null ? toHex(lineData.relay_node, 2) : 'N/A';
+            const next_hop = lineData.next_hop !== null ? toHex(lineData.next_hop, 2) : 'N/A';
             const received = formatTimestamp(lineData.rx_time);
 
             const logLine = document.createElement('div');
