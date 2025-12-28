@@ -7,7 +7,7 @@ RUN apt-get update && \
     apt-get -y --no-install-recommends install git && \
     rm -rf /var/lib/apt/lists/*
 
-WORKDIR /meshtracker
+WORKDIR /meshwatcher
 
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
@@ -17,7 +17,7 @@ COPY templates/ ./templates/
 COPY app/ ./app/
 COPY static/ ./static/
 
-RUN chown -R appuser:appuser /meshtracker
+RUN chown -R appuser:appuser /meshwatcher
 
 USER appuser
 
