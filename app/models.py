@@ -261,6 +261,11 @@ class NodeInfo(SQLModel, table=True):
         default=None,
         sa_column=Column("isUnmessagable", Boolean),
         )
+    updated: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column("updated", DateTime, nullable=True),
+        exclude=True
+    )
 
     def __str__(self) -> str:
 

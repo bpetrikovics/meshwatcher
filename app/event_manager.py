@@ -36,11 +36,11 @@ class EventManager:
     def extract_payload(packet: MeshtasticPacket, class_to_extract):
         return class_to_extract.model_validate_json(json.dumps(packet.decoded["payload"]))
 
-    def on_text_message(self, json_data):
+    def on_text_message(self, packet: MeshtasticPacket):
         """
         { portnum': 'TEXT_MESSAGE_APP', 'payload': '🙋', 'replyId': 295099086, 'emoji': 1, 'bitfield': 1 }
         """
-        pass
+        self.logger.info(packet)
 
     def on_position(self, json_data):
         pass
@@ -61,7 +61,11 @@ class EventManager:
 
         self.logger.info(nodeinfo)
 
-    def on_traceroute(self, json_data):
+        self.db.merge(nodeinfo)
+        self.db.commit()
+
+    @raw_handler.validate_packet
+    def on_traceroute(self, packet: MeshtasticPacket):
         """
         {'from': 2956776068, 'to': 2552625594, 'channel': 8,
         'decoded': {
