@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Hungarian Mesh - Raw packet log</title>
+    <title>Mesh Packet Log | Hungary</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="shortcut icon" href="/static/favicon.ico">
@@ -26,7 +26,7 @@
             overflow: hidden;
         }
         #header {
-            background: rgb(74, 114, 223);
+            background: rgba(74, 114, 223, 0.75);
             color: rgb(255, 244, 229);
             text-align: center;
             font-size: 1.1em;
@@ -208,7 +208,7 @@
 <body>
     <!-- HTML structure unchanged -->
     <div id="header">
-        <div class="header-title">Hungarian Mesh Packet Log via {{ settings.mqtt_server }} | Raw data without deduplication</div>
+        <div class="header-title">Mesh packet log via {{ settings.mqtt_server }} | Raw data without deduplication</div>
         <div class="header-buttons">
             <button class="header-btn" id="collapse-all">Collapse All</button>
             <button class="header-btn" id="clear-all">Clear</button>
