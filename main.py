@@ -54,7 +54,7 @@ def index():
 
 @app.route(settings.namespace_rawdata)
 def log():
-    return render_template('log.html')
+    return render_template('log.html', settings=settings)
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=8080)

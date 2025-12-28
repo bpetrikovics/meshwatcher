@@ -1,21 +1,276 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Mesh Watcher {{ version }} | Hungary</title>
+    <title>Mesh Log</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="shortcut icon" href="/static/favicon.ico">
-
-    <!-- Socket.IO JS -->
     <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"></script>
-    <script type="application/javascript">
-        var socket = io('/rawlog'); // if not mounted on virtualhost root, {path: "/path/to/socket.io"} is needed
-        socket.on("rawlog", function (data) {
-            console.log(data)
-        });
-    </script>
-
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            font-family: monospace;
+            background: #414141;
+            color: #eee;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #header {
+            background: rgb(74, 114, 223);
+            color: rgb(255, 244, 229);
+            text-align: center;
+            font-size: 1.1em;
+            padding: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-title {
+            flex: 1;
+            text-align: center;
+        }
+        .header-buttons {
+            display: flex;
+            gap: 6px;
+        }
+        .header-btn {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 0.8em;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .header-btn:hover {
+            background: rgba(255,255,255,0.3);
+            border-color: rgba(255,255,255,0.5);
+        }
+        #log {
+            height: calc(100vh - 56px);
+            padding: 4px;
+            overflow-y: auto;
+        }
+        .log-line {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 4px;
+            margin-bottom: 4px;
+            padding: 2px 2px;
+            cursor: pointer;
+        }
+        .log-line:hover {
+            background: rgba(255,255,255,0.12);
+        }
+        .log-line.expanded {
+            background: rgba(255,255,255,0.14);
+            border-color: rgba(255,255,255,0.3);
+        }
+        .compact-row {
+            padding: 6px 8px;
+            position: relative;
+        }
+        .compact-row table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95em;
+        }
+        .compact-row td {
+            padding: 1px 3px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.2);
+            vertical-align: top;
+        }
+        .compact-row td.received-col {
+            min-width: 140px;
+        }
+        .compact-row td.other-col {
+            min-width: 90px;
+        }
+        .compact-label {
+            font-size: 0.75em;
+            opacity: 0.8;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #ccc;
+        }
+        .compact-value {
+            font-family: monospace;
+            color: #fff;
+            font-size: 0.9em;
+        }
+        .full-json {
+            padding: 8px;
+            background: #2b2b2b;
+            border-top: 1px solid rgba(255,255,255,0.15);
+            margin: 0;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.35;
+            max-height: 250px;
+            overflow-y: auto;
+            border-radius: 0 0 4px 4px;
+        }
+        .expand-indicator {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.05em;
+            opacity: 0.7;
+            pointer-events: none;
+            font-weight: bold;
+        }
+        .log-line.expanded .expand-indicator {
+            transform: translateY(-50%) rotate(180deg);
+        }
+    </style>
 </head>
 <body>
+    <div id="header">
+        <div class="header-title">Mesh log from {{ settings.mqtt_server }} | Raw data without deduplication</div>
+        <div class="header-buttons">
+            <button class="header-btn" id="collapse-all">Collapse All</button>
+            <button class="header-btn" id="clear-all">Clear</button>
+        </div>
+    </div>
+    <div id="log"></div>
+
+    <script type="application/javascript">
+        const socket = io('{{ settings.namespace_rawdata }}');
+        const logDiv = document.getElementById('log');
+        const collapseAllBtn = document.getElementById('collapse-all');
+        const clearAllBtn = document.getElementById('clear-all');
+
+        // Convert Unix timestamp to human readable local time
+        function formatTimestamp(unixTime) {
+            if (!unixTime || unixTime === null || unixTime === undefined) return 'N/A';
+            try {
+                const date = new Date(unixTime * 1000);
+                return date.toLocaleString();
+            } catch (e) {
+                return 'Invalid';
+            }
+        }
+
+        function renderCompact(lineData) {
+            const id_ = lineData.id_ !== undefined ? String(lineData.id_) : 'N/A';
+            const from_ = lineData.from_ !== undefined ? String(lineData.from_) : 'N/A';
+            const to = lineData.to !== undefined ? String(lineData.to) : 'N/A';
+            const channel_name = lineData.channel_name || 'N/A';
+            const portnum = lineData.decoded?.portnum || 'N/A';
+            const uplink = lineData.uplink || 'N/A';
+            const relay_node = lineData.relay_node !== undefined ? String(lineData.relay_node) : 'N/A';
+            const next_hop = lineData.next_hop !== undefined ? String(lineData.next_hop) : 'N/A';
+            const received = formatTimestamp(lineData.rx_time);
+
+            const logLine = document.createElement('div');
+            logLine.className = 'log-line';
+            logLine.dataset.rawData = JSON.stringify(lineData);
+            logLine.dataset.isExpanded = 'false';
+
+            const compactRow = document.createElement('div');
+            compactRow.className = 'compact-row';
+
+            const table = document.createElement('table');
+            const row = table.insertRow();
+            
+            const fields = [
+                ['Received', received],
+                ['ID', id_], ['From', from_], ['To', to],
+                ['Channel', channel_name], ['Port', portnum],
+                ['Uplink', uplink], ['Relay', relay_node], ['Next', next_hop]
+            ];
+
+            fields.forEach(([label, value]) => {
+                const cell = row.insertCell();
+                if (label === 'Received') {
+                    cell.className = 'received-col';
+                } else {
+                    cell.className = 'other-col';
+                }
+                cell.innerHTML = `<div class="compact-label">${label}</div><div class="compact-value">${value}</div>`;
+            });
+
+            const indicator = document.createElement('div');
+            indicator.className = 'expand-indicator';
+            indicator.textContent = '▼';
+            compactRow.appendChild(indicator);
+            compactRow.appendChild(table);
+            logLine.appendChild(compactRow);
+
+            logLine.addEventListener('click', (e) => {
+                if (e.target.closest('.expand-indicator')) return;
+                toggleExpand(logLine);
+            });
+
+            return logLine;
+        }
+
+        function toggleExpand(logLine) {
+            const isExpanded = logLine.dataset.isExpanded === 'true';
+            
+            if (isExpanded) {
+                const jsonBlock = logLine.querySelector('.full-json');
+                if (jsonBlock) jsonBlock.remove();
+                logLine.classList.remove('expanded');
+                logLine.dataset.isExpanded = 'false';
+            } else {
+                const rawData = JSON.parse(logLine.dataset.rawData);
+                const jsonDiv = document.createElement('div');
+                jsonDiv.className = 'full-json';
+                jsonDiv.textContent = JSON.stringify(rawData, null, 2);
+                logLine.appendChild(jsonDiv);
+                logLine.classList.add('expanded');
+                logLine.dataset.isExpanded = 'true';
+            }
+        }
+
+        // NEW: Collapse all expanded log lines
+        function collapseAll() {
+            const expandedLines = logDiv.querySelectorAll('.log-line.expanded');
+            expandedLines.forEach(logLine => {
+                const jsonBlock = logLine.querySelector('.full-json');
+                if (jsonBlock) jsonBlock.remove();
+                logLine.classList.remove('expanded');
+                logLine.dataset.isExpanded = 'false';
+            });
+        }
+
+        // NEW: Clear all log lines
+        function clearAll() {
+            logDiv.innerHTML = '';
+        }
+
+        // Button event listeners
+        collapseAllBtn.addEventListener('click', collapseAll);
+        clearAllBtn.addEventListener('click', clearAll);
+
+        function addLogLine(rawData) {
+            let lineData;
+            try {
+                if (typeof rawData === 'string') {
+                    lineData = JSON.parse(rawData);
+                } else {
+                    lineData = rawData;
+                }
+            } catch (e) {
+                console.error('Failed to parse:', e);
+                return;
+            }
+
+            const logLine = renderCompact(lineData);
+            logDiv.appendChild(logLine);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        socket.on('rawlog', data => addLogLine(data));
+    </script>
 </body>
 </html>
