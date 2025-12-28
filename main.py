@@ -43,10 +43,20 @@ def handle_connect_default():
     # store the sid so we can later send session specific content
     sid = request.sid
 
+@socketio.on('disconnect')
+def handle_disconnect_default():
+    pass
+
 @socketio.on('connect', settings.namespace_rawdata)
 def handle_connect_rawdata():
     # store the sid so we can later send session specific content
     sid = request.sid
+    logger.info("Client connected with sid %s", sid)
+
+@socketio.on('disconnect', settings.namespace_rawdata)
+def handle_disconnect_rawdata():
+    sid = request.sid
+    logger.info("Disconnection from sid %s", sid)
 
 @app.route('/')
 def index():
