@@ -22,7 +22,13 @@ class PacketStat:
         :return: True if packet is unique and should be processed further, False if duplicate
         :rtype: bool
         """
-        self.logger.info("Analyzing packet %s received via %s->%s", hex(packet.id_), hex(packet.relay_node), packet.uplink)
+        # TODO: Add hopStart/hopLimit info, nexthop, snr/rssi
+        self.logger.info(
+            "Packet %s received via %s->%s",
+            hex(packet.id_),
+            hex(packet.relay_node) if packet.relay_node else "N/A",
+            packet.uplink,
+        )
 
         # --- Any further raw packet handling, reporting needs to happen here --- #
         # Such as: relaynode and nexthop analysis, neighbor detection
