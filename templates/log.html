@@ -30,12 +30,12 @@
             color: rgb(255, 244, 229);
             text-align: center;
             font-size: 1.1em;
-            padding: 8px;
+            padding: 6px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 8px;
+            gap: 6px;
         }
         .header-title {
             flex: 1;
@@ -257,9 +257,9 @@
         }
 
         function toHex (n, digits = 8) {
-  const num = +n;
-  if (!num) return '0'.repeat(digits);
-  return (BigInt(num)).toString(16).padStart(digits, '0');
+            const num = +n;
+            if (!num) return '0'.repeat(digits);
+            return (BigInt(num)).toString(16).padStart(digits, '0');
         };
 
         function renderCompact(lineData) {
