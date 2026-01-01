@@ -7,18 +7,20 @@ from meshtastic_mqtt_json import MeshtasticMQTT
 
 from app import create_app
 from app.config import settings
-from app.database import get_db
+from app.database import get_db, get_cleanup_manager
 from app.event_manager import EventManager
 from app.presenter import Presenter
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
 logger = logging.getLogger("main")
 
 app = create_app()
 
-meshtastic_mqtt = MeshtasticMQTT()
 db_session = get_db()
+cleanup_manager = get_cleanup_manager()  # Starts background thread automatically
 
+meshtastic_mqtt = MeshtasticMQTT()
 meshtastic_mqtt.connect(
     broker=settings.mqtt_server,
     port=settings.mqtt_port,
