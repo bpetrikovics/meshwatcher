@@ -206,9 +206,8 @@
     </style>
 </head>
 <body>
-    <!-- HTML structure unchanged -->
     <div id="header">
-        <div class="header-title">Mesh packet log via {{ settings.mqtt_server }} | Raw data without deduplication</div>
+        <div class="header-title">Real-time mesh packet log via {{ settings.mqtt_server }} | Raw data without deduplication</div>
         <div class="header-buttons">
             <button class="header-btn" id="collapse-all">Collapse All</button>
             <button class="header-btn" id="clear-all">Clear</button>
@@ -300,8 +299,8 @@
                 {label: 'To', value: to, colClass: 'col-to other-col'},
                 {label: 'Channel', value: channel_name, colClass: 'col-channel other-col'},
                 {label: 'Port', value: portnum, colClass: 'col-port other-col'},
-                {label: 'MQTT Uplink', value: uplink, colClass: 'col-uplink other-col'},
                 {label: 'Relay (Received Via)', value: relay_node, colClass: 'col-relay other-col'},
+                {label: 'MQTT Uplink', value: uplink, colClass: 'col-uplink other-col'},
                 {label: 'Next Hop', value: next_hop, colClass: 'col-next other-col'}
             ];
 
@@ -329,7 +328,6 @@
             return logLine;
         }
 
-        // Rest of functions unchanged (toggleExpand, collapseAll, etc.)
         function toggleExpand(logLine) {
             const isExpanded = logLine.dataset.isExpanded === 'true';
             if (isExpanded) {
