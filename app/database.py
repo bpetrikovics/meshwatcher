@@ -1,3 +1,4 @@
+import threading
 import logging
 
 from datetime import datetime, timedelta, timezone
@@ -145,10 +146,11 @@ class DbCleanupManager:
 
 # Singleton instance
 cleanup_manager: Optional[DbCleanupManager] = None
-
+_cleanup_lock = threading.Lock()
 
 def get_cleanup_manager() -> DbCleanupManager:
     global cleanup_manager
-    if cleanup_manager is None:
-        cleanup_manager = DbCleanupManager()
-    return cleanup_manager
+    with _cleanup_lock:
+        if cleanup_manager is None:
+            cleanup_manager = DbCleanupManager()
+        return cleanup_manager
