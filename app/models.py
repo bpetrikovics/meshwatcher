@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from typing import Optional, Dict, Any
 from pydantic.config import ConfigDict
@@ -111,7 +112,7 @@ class MeshtasticPacket(SQLModel, table=True):
         alias="nextHop",
         sa_column=Column("nextHop", Integer, nullable=True),
     )
-    rx_snr: Optional[float] = Field(
+    rx_snr: Optional[Decimal] = Field(
         default=None,
         alias="rxSnr",
         sa_column=Column("rxSnr", Numeric(precision=4, scale=2), nullable=True),
@@ -227,6 +228,7 @@ class NodeInfo(SQLModel, table=True):
 
     # Except ID, all other fields are optional so we can create placeholder node entries when
     # we receive position or telemetry for a node that has not sent a nodeinfo yet.
+    # TODO: Do we want to store which channel the given nodeinfo was received on?
     id_: str = Field(alias="id", sa_column=Column("id", String(9), primary_key=True))
     short_name: str = Field(
         alias="shortName",
