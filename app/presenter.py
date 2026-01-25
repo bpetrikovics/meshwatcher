@@ -14,4 +14,6 @@ class Presenter:
 
     def raw_packet_callback(self, packet: MeshtasticPacket):
         self.logger.info("Raw packet callback: %s", packet)
-        self.socketio.emit('rawlog', packet.model_dump_json(), namespace=settings.namespace_rawdata)
+        self.socketio.emit(
+            "rawlog", packet.model_dump_json(), namespace=settings.namespace_rawdata
+        )
