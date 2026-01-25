@@ -136,9 +136,10 @@ class DbCleanupManager:
         self._thread.start()
     
     def stop(self):
+        self.logger.info("Stopping DB retention thread")
         self._running = False
         if self._thread is not None and self._thread.is_alive():
-            self._thread.join(timeout=10)
+            self._thread.join(timeout=0)
     
     def status(self) -> Dict[str, Any]:
         return {
