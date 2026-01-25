@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from contextlib import contextmanager
 from typing import Optional, Dict, Any
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel, create_engine, Session
 
@@ -43,6 +43,13 @@ def db_session():
 
 
 class DbCleanupManager:
+    """
+    Cleanup manager for database tables.
+    Starts and peridically executes a background thread to clean up old records. No explicit
+    start is expected or necessary. Stop function is implemented but not used yet.
+    Expected to be initialized from main program at startup time, once. No multiple
+    instances should exists.
+    """
     def __init__(
         self,
         packet_retention_days: int = settings.packet_retention_days,
@@ -76,9 +83,9 @@ class DbCleanupManager:
             
             if count_before == 0:
                 return {'table': table, 'count_before': 0, 'deleted': 0}
-            
-            self.logger.info(f"{table}: {count_before:,} records > {days}d")
-            
+
+            # Section only executed if there are records to delete
+
             if self.dry_run:
                 self.logger.info("dry_run is true, returning")
                 return {'table': table, 'count_before': count_before, 'deleted': 0}
@@ -88,7 +95,7 @@ class DbCleanupManager:
             delete_result = session.execute(delete_query, {'cutoff': cutoff, 'batch_size': self.batch_size})
             deleted = delete_result.rowcount or 0
             
-            session.commit()
+            # No explicit commit, will be handled by context manager in _cleanup_cycle()
             return {'table': table, 'count_before': count_before, 'deleted': deleted}
             
         except Exception as e:
@@ -102,9 +109,8 @@ class DbCleanupManager:
             packet_stats = self._cleanup_table(session, 'packets', self.packet_retention_days, self.packet_timestamp_col)
             node_stats = self._cleanup_table(session, 'nodes', self.node_retention_days, self.node_timestamp_col)
             
-            total = packet_stats.get('deleted', 0) + node_stats.get('deleted', 0)
             mode = "DRY-RUN" if self.dry_run else "LIVE"
-            self.logger.info(f"Cleanup cycle: {total:,} deleted in {mode} mode, {self.cleanup_interval_minutes=}min")
+            self.logger.info(f"Cleanup cycle: {packet_stats.get('deleted', 0)} packets, {node_stats.get('deleted', 0)} nodes deleted in {mode} mode, {self.cleanup_interval_minutes=}min")
     
     def start(self):
         if self._running:
