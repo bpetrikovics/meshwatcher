@@ -46,7 +46,9 @@ class DbCleanupManager:
     """
     Cleanup manager for database tables.
     Starts and peridically executes a background thread to clean up old records. No explicit
-    start is expected or necessary. Stop function is implemented but not used yet.
+    start is expected or necessary. Stop function is invoked via atexit, which is not optimal
+    and should be improved (using gunicorn worker hook, worker_exit/worker_int in
+    gunicorn_config.py)
     Expected to be initialized from main program at startup time, once. No multiple
     instances should exists.
     """
