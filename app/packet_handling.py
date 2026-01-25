@@ -1,7 +1,7 @@
 import logging
 import json
 
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from pydantic import ValidationError
 
@@ -25,7 +25,7 @@ class RawPacketHandler:
 
         self.callbacks[cb_type].append(callback)
 
-    def validate_packet(self, method):
+    def validate_packet(self, method: Optional[Callable] = None, *, dedup: bool = True):
         """
         Multipurpose handler decorator for mqtt callback functions.
 
@@ -37,42 +37,46 @@ class RawPacketHandler:
 
             At the end, MQTT callback functions should receive deduplicated packets only.
         """
-        def wrapper(target_self, json_data: Any) -> MeshtasticPacket:
-            if settings.packet_json_log:
-                logger.info("Raw packet: %s", json_data)
+        def decorator(method: Callable):
+            def wrapper(target_self, json_data: Any) -> MeshtasticPacket:
+                if settings.packet_json_log:
+                    logger.info("Raw packet: %s", json_data)
 
-            packet = None
-            try:
-                packet = MeshtasticPacket.model_validate_json(json.dumps(json_data))
-            except ValidationError as exc:
-                logger.exception(exc)
-                logger.error("Validation failed for packet, skipping: %s", json_data)
-                return
+                packet = None
+                try:
+                    packet = MeshtasticPacket.model_validate_json(json.dumps(json_data))
+                except ValidationError as exc:
+                    logger.exception(exc)
+                    logger.error("Validation failed for packet, skipping: %s", json_data)
+                    return
 
-            if settings.packet_sql_log:
-                logger.info("Saving packet to database: %s", packet)
-                with db_session() as db:
-                    db.add(packet)
-                    # create a detached copy of the packet that can be passed on to callbacks
-                    db.flush()
-                    db.refresh(packet)
-                    db.expunge(packet)
+                if settings.packet_sql_log:
+                    logger.info("Saving packet to database: %s", packet)
+                    with db_session() as db:
+                        db.add(packet)
+                        # create a detached copy of the packet that can be passed on to callbacks
+                        db.flush()
+                        db.refresh(packet)
+                        db.expunge(packet)
 
-            # Invoke any callbacks that require raw data
-            for callback in self.callbacks.get('raw', []):
-                callback(packet)
+                # Invoke any callbacks that require raw data
+                for callback in self.callbacks.get('raw', []):
+                    callback(packet)
 
-            if self.stats.analyze(packet):
+                # If dedup was requested, check if the packet is a duplicate
+                if dedup and not self.stats.analyze(packet):
+                    logger.debug("Packet %s is a duplicate, skipping", packet.id_)
+                    return
+
                 logger.info(packet)
-            else:
-                # For duplicates or errors, stop processing here and return
-                return
 
-            # Only unique and valid packets remaining here
+                # Proceed and pass on packet to event manager callback
+                return method(target_self, packet)
+            return wrapper
 
-            # Proceed and pass on packet to event manager callback
-            return method(target_self, packet)
-        return wrapper
+        if method is not None:
+            return decorator(method)
+        return decorator
 
 
 raw_handler = RawPacketHandler()

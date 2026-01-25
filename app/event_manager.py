@@ -72,9 +72,8 @@ class EventManager:
 
         self.logger.debug("Node %s was upserted", nodeinfo.id_)
 
-    # FIXME: If TR handler gets deduplicated packets, it will not receive all responses only the first,
-    # which is 99% incomplete!!!!
-    @raw_handler.validate_packet
+    # If TR handler gets deduplicated packets, it will not receive all responses only the first
+    @raw_handler.validate_packet(dedup=False)
     def on_traceroute(self, packet: MeshtasticPacket):
         """
         {'from': 2956776068, 'to': 2552625594, 'channel': 8,
