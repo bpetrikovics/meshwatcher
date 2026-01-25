@@ -1,8 +1,8 @@
 import json
 import logging
 
+from typing import Callable
 from pydantic import ValidationError
-from sqlmodel import Session
 
 from meshtastic_mqtt_json import MeshtasticMQTT
 
@@ -12,10 +12,10 @@ from .presenter import Presenter
 
 
 class EventManager:
-    def __init__(self, mqtt_client: MeshtasticMQTT, db_session: Session, presenter: Presenter):
+    def __init__(self, mqtt_client: MeshtasticMQTT, db_factory: Callable, presenter: Presenter):
         self.logger = logging.getLogger(__name__)
         self.mqtt = mqtt_client
-        self.db = db_session
+        self.db_factory = db_factory
         self.presenter = presenter
 
         self.mqtt.register_callback('TEXT_MESSAGE_APP', self.on_text_message)
@@ -36,9 +36,12 @@ class EventManager:
     def extract_payload(packet: MeshtasticPacket, class_to_extract):
         return class_to_extract.model_validate_json(json.dumps(packet.decoded["payload"]))
 
+    @raw_handler.validate_packet
     def on_text_message(self, packet: MeshtasticPacket):
         """
-        { portnum': 'TEXT_MESSAGE_APP', 'payload': '🙋', 'replyId': 295099086, 'emoji': 1, 'bitfield': 1 }
+        { portnum': 'TEXT_MESSAGE_APP', 'payload': '🙋', 'replyId': 295099086, 'emoji': 1,
+         'bitfield': 1
+        }
         """
         self.logger.info(packet)
 
@@ -49,9 +52,10 @@ class EventManager:
     def on_nodeinfo(self, packet: MeshtasticPacket):
         """
         { 'portnum': 'NODEINFO_APP', 'payload': {
-            'id': '!d45a9a80', 'longName': '🇭🇺 CzD B2', 'shortName': 'czd4', 'macaddr': 'HNvUWpqA','hwModel': 'SEEED_XIAO_S3',
-            'role': 'CLIENT_BASE', 'publicKey': 'sXwaWsSIxXwHHNtaAumip6sBeajxwGbS5gFrLX5r83U=', 'isUnmessagable': True},
-            'requestId': 5571986, 'bitfield': 1 }
+          'id': '!d45a9a80', 'longName': '🇭🇺 CzD B2', 'shortName': 'czd4', 'macaddr': 'HNvUWpqA','hwModel': 'SEEED_XIAO_S3',
+          'role': 'CLIENT_BASE', 'publicKey': 'sXwaWsSIxXwHHNtaAumip6sBeajxwGbS5gFrLX5r83U=', 'isUnmessagable': True},
+          'requestId': 5571986, 'bitfield': 1
+        }
         """
         try:
             nodeinfo = self.extract_payload(packet, NodeInfo)
@@ -61,9 +65,15 @@ class EventManager:
 
         self.logger.info(nodeinfo)
 
-        self.db.merge(nodeinfo)
-        self.db.commit()
+        # TODO: recognize nodeinfo request/exchanges, directed vs broadcast
 
+        with self.db_factory() as db:
+            db.merge(nodeinfo)
+
+        self.logger.debug("Node %s was upserted", nodeinfo.id_)
+
+    # FIXME: If TR handler gets deduplicated packets, it will not receive all responses only the first,
+    # which is 99% incomplete!!!!
     @raw_handler.validate_packet
     def on_traceroute(self, packet: MeshtasticPacket):
         """
@@ -91,7 +101,10 @@ class EventManager:
         dB = mqtt dB / 4
         """
 
-        pass
+        if packet.decoded_requestid:
+            self.logger.info("Packet %s traceroute is response to previous request %s", hex(packet.id_), hex(packet.decoded_requestid))
+        else:
+            self.logger.info("Not a TR response")
 
     def on_telemetry(self, json_data):
         """

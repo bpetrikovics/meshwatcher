@@ -8,14 +8,13 @@ from pydantic import ValidationError
 from .config import settings
 from .models import MeshtasticPacket
 from .statistics import PacketStat
-from .database import get_db
+from .database import db_session
 
 logger = logging.getLogger(__name__)
 
 
 class RawPacketHandler:
     def __init__(self):
-        self.db = get_db()
         self.stats = PacketStat()
         self.callbacks = {}
 
@@ -51,12 +50,13 @@ class RawPacketHandler:
                 return
 
             if settings.packet_sql_log:
-                try:
-                    self.db.add(packet)
-                    self.db.commit()
-                except Exception as exc:
-                    logger.exception("Packet save transaction failed and was rolled back: %s", exc)
-                    self.db.rollback()
+                logger.info("Saving packet to database: %s", packet)
+                with db_session() as db:
+                    db.add(packet)
+                    # create a detached copy of the packet that can be passed on to callbacks
+                    db.flush()
+                    db.refresh(packet)
+                    db.expunge(packet)
 
             # Invoke any callbacks that require raw data
             for callback in self.callbacks.get('raw', []):
@@ -67,6 +67,8 @@ class RawPacketHandler:
             else:
                 # For duplicates or errors, stop processing here and return
                 return
+
+            # Only unique and valid packets remaining here
 
             # Proceed and pass on packet to event manager callback
             return method(target_self, packet)

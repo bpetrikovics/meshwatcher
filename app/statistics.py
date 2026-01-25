@@ -27,15 +27,16 @@ class PacketStat:
 
         # check if self report; from == uplink and relay host == last 2 bytes of uplink/host
         # ignore metrics in this case
+        # TODO: check if next_hop is set as it gives another neighbor connection
         if packet.uplink.lstrip('!') == f"{packet.from_:08x}":
-            self.logger.info("Packet %s is self-reported/outgoing, skipping", packet.id_)
+            self.logger.info("Packet %s is self-reported/outgoing, skipping hop/path analysis", packet.id_)
         else:
             hops_taken = None
             if packet.hop_start and packet.hop_limit:
                 hops_taken = packet.hop_start - packet.hop_limit
 
             if packet.uplink.lstrip('!') == f"{packet.to:08x}":
-                self.logger.info("Packet %s arrived to final recipient, this is the last hop", packet.id_)
+                self.logger.info("Packet %s arrived to final recipient, this is the last hop", hex(packet.id_))
 
             self.logger.info(
                 "Packet %s received via %s -> %s, %s/%s hops (%s taken), SNR=%s dB, RSSI=%s dBm",
@@ -63,7 +64,7 @@ class PacketStat:
                     # TODO: DOUBLE CHECK THIS!
                     self.logger.info("Packet %s !%08x and %s are directly connected", hex(packet.id_), packet.from_, packet.uplink)
                     if f"{packet.relay_node:02x}" == f"{packet.from_:08x}"[-2:]:
-                        self.logger.info("Packet %s relay_node %s->0x%02x is !%08x", hex(packet.id_), packet.uplink, packet.relay_node, packet.from_)
+                        self.logger.info("Packet %s relay_node %02x for %s is !%08x", hex(packet.id_), packet.relay_node, packet.uplink, packet.from_)
 
         self.total_packets += 1
         # --- Any further raw packet handling, reporting needs to happen here --- #

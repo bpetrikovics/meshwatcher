@@ -27,7 +27,7 @@ def get_db() -> Session:
     """
     FastAPI auto-converts to generator when used with Depends()
     """
-    return SessionLocal()
+    return SessionLocal() # expire_on_commit=False ?
 
 @contextmanager
 def db_session():

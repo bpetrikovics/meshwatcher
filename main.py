@@ -1,3 +1,4 @@
+import atexit
 import logging
 
 from flask import render_template, request
@@ -7,7 +8,7 @@ from meshtastic_mqtt_json import MeshtasticMQTT
 
 from app import create_app
 from app.config import settings
-from app.database import get_db, get_cleanup_manager
+from app.database import db_session, get_cleanup_manager
 from app.event_manager import EventManager
 from app.presenter import Presenter
 
@@ -17,8 +18,8 @@ logger = logging.getLogger("main")
 
 app = create_app()
 
-db_session = get_db()
 cleanup_manager = get_cleanup_manager()  # Starts background thread automatically
+atexit.register(cleanup_manager.stop) # Stop background thread on exit
 
 meshtastic_mqtt = MeshtasticMQTT()
 meshtastic_mqtt.connect(
@@ -35,7 +36,7 @@ presenter = Presenter(socketio)
 
 # Main app and all MQTT callbacks will share their separate DB session
 app.manager = EventManager(
-    mqtt_client=meshtastic_mqtt, db_session=db_session, presenter=presenter
+    mqtt_client=meshtastic_mqtt, db_factory=db_session, presenter=presenter
 )
 
 # SHould this move into Presenter e.g. socketio.on_event('connect, my_function, namespace=...)
