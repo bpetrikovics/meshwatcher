@@ -92,7 +92,6 @@ class DbCleanupManager:
                 self.logger.info("dry_run is true, returning")
                 return {'table': table, 'count_before': count_before, 'deleted': 0}
             
-            self.logger.info(f"{table}: cleanup commencing, there are records to delete")
             delete_query = text(f"DELETE FROM `{table}` WHERE `{timestamp_col}` < :cutoff LIMIT :batch_size")
             delete_result = session.execute(delete_query, {'cutoff': cutoff, 'batch_size': self.batch_size})
             deleted = delete_result.rowcount or 0
