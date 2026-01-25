@@ -70,6 +70,8 @@ class EventManager:
         with self.db_factory() as db:
             db.merge(nodeinfo)
 
+        self.presenter.upsert_node_cache(nodeinfo)
+
         self.logger.debug("Node %s was upserted", nodeinfo.id_)
 
     # If TR handler gets deduplicated packets, it will not receive all responses only the first

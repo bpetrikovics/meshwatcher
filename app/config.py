@@ -34,6 +34,8 @@ class Settings(BaseSettings):
 
     namespace_rawdata: str = "/rawlog"
 
+    node_cache_ttl_seconds: int = 1800
+
     class Config:
         env_file = ".env"  # Optional: loads environment variables from a .env file
         extra = "ignore"   # Ignore env variables we're unaware of

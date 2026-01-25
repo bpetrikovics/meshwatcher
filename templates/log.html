@@ -265,9 +265,19 @@
             const id_ = lineData.id_ !== undefined ? String(lineData.id_) : 'N/A';
             const from_ = lineData.from_ !== undefined ? '!'+toHex(lineData.from_) : 'N/A';
             const to = lineData.to !== undefined ? (lineData.to === 4294967295 ? 'BROADCAST' : '!'+toHex(lineData.to)) : 'N/A';
+            const uplink = lineData.uplink || 'N/A';
+
+            const fromName = lineData.from_node?.short_name || lineData.from_node?.long_name;
+            const toName = lineData.to_node?.name || lineData.to_node?.short_name || lineData.to_node?.long_name;
+            const fromDisplay = fromName ? `${from_} (${fromName})` : from_;
+            const toDisplay = (to === 'BROADCAST')
+            ? 'BROADCAST'
+            : (toName ? `${to} (${toName})` : to);
+            const uplinkName = lineData.uplink_node?.short_name || lineData.uplink_node?.long_name;
+            const uplinkDisplay = uplinkName ? `${uplink} (${uplinkName})` : uplink;
+
             const channel_name = lineData.channel_name || 'N/A';
             const portnum = lineData.decoded?.portnum || 'N/A';
-            const uplink = lineData.uplink || 'N/A';
             const relay_node = lineData.relay_node !== null ? toHex(lineData.relay_node, 2) : 'N/A';
             const next_hop = lineData.next_hop !== null ? toHex(lineData.next_hop, 2) : 'N/A';
             const received = formatTimestamp(lineData.rx_time);
@@ -281,7 +291,7 @@
             compactRow.className = 'compact-row';
 
             // MOBILE SUMMARY (shows port + from/to)
-            const mobileSummary = `Port: ${portnum} | ${from_} → ${to}`;
+            const mobileSummary = `Port: ${portnum} | ${fromDisplay} → ${toDisplay}`;
             compactRow.dataset.summary = mobileSummary;
 
             const table = document.createElement('table');
@@ -295,12 +305,12 @@
             const fields = [
                 {label: 'Received', value: received, colClass: 'col-received received-col'},
                 {label: 'Message ID', value: id_, colClass: 'col-id other-col'},
-                {label: 'From', value: from_, colClass: 'col-from other-col'},
-                {label: 'To', value: to, colClass: 'col-to other-col'},
+                {label: 'From', value: fromDisplay, colClass: 'col-from other-col'},
+                {label: 'To', value: toDisplay, colClass: 'col-to other-col'},
                 {label: 'Channel', value: channel_name, colClass: 'col-channel other-col'},
                 {label: 'Port', value: portnum, colClass: 'col-port other-col'},
                 {label: 'Relay (Received Via)', value: relay_node, colClass: 'col-relay other-col'},
-                {label: 'MQTT Uplink', value: uplink, colClass: 'col-uplink other-col'},
+                {label: 'MQTT Uplink', value: uplinkDisplay, colClass: 'col-uplink other-col'},
                 {label: 'Next Hop', value: next_hop, colClass: 'col-next other-col'}
             ];
 

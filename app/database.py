@@ -140,6 +140,8 @@ class DbCleanupManager:
     def stop(self):
         self.logger.info("Stopping DB retention thread")
         self._running = False
+        # FIXME: This is not optimal, should be handled by gunicorn worker hook
+        # In its current form it may result in errors at shutdown time
         if self._thread is not None and self._thread.is_alive():
             self._thread.join(timeout=0)
     

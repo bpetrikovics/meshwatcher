@@ -32,14 +32,14 @@ meshtastic_mqtt.connect(
 )
 
 socketio = SocketIO(app, cors_allowed_origins="*")
-presenter = Presenter(socketio)
+presenter = Presenter(socketio=socketio, db_factory=db_session)
 
 # Main app and all MQTT callbacks will share their separate DB session
 app.manager = EventManager(
     mqtt_client=meshtastic_mqtt, db_factory=db_session, presenter=presenter
 )
 
-# SHould this move into Presenter e.g. socketio.on_event('connect, my_function, namespace=...)
+# Should this move into Presenter e.g. socketio.on_event('connect, my_function, namespace=...)
 
 @socketio.on('connect')
 def handle_connect_default():
