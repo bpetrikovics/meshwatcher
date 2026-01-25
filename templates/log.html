@@ -261,20 +261,32 @@
             return (BigInt(num)).toString(16).padStart(digits, '0');
         };
 
+        function getNodeDisplayName(nodeObj) {
+            return nodeObj?.name || nodeObj?.short_name || nodeObj?.long_name;
+        }
+
+        function formatHexNodeId(nodeNum) {
+            return nodeNum !== undefined ? '!' + toHex(nodeNum) : 'N/A';
+        }
+
+        function formatToNodeId(nodeNum) {
+            if (nodeNum === undefined) return 'N/A';
+            return nodeNum === 4294967295 ? 'BROADCAST' : '!' + toHex(nodeNum);
+        }
+
+        function formatNodeWithName(idText, nameText) {
+            return nameText ? `${idText} (${nameText})` : idText;
+        }
+
         function renderCompact(lineData) {
             const id_ = lineData.id_ !== undefined ? String(lineData.id_) : 'N/A';
-            const from_ = lineData.from_ !== undefined ? '!'+toHex(lineData.from_) : 'N/A';
-            const to = lineData.to !== undefined ? (lineData.to === 4294967295 ? 'BROADCAST' : '!'+toHex(lineData.to)) : 'N/A';
-            const uplink = lineData.uplink || 'N/A';
+            const fromId = formatHexNodeId(lineData.from_);
+            const toId = formatToNodeId(lineData.to);
+            const uplinkId = lineData.uplink || 'N/A';
 
-            const fromName = lineData.from_node?.short_name || lineData.from_node?.long_name;
-            const toName = lineData.to_node?.name || lineData.to_node?.short_name || lineData.to_node?.long_name;
-            const fromDisplay = fromName ? `${from_} (${fromName})` : from_;
-            const toDisplay = (to === 'BROADCAST')
-            ? 'BROADCAST'
-            : (toName ? `${to} (${toName})` : to);
-            const uplinkName = lineData.uplink_node?.short_name || lineData.uplink_node?.long_name;
-            const uplinkDisplay = uplinkName ? `${uplink} (${uplinkName})` : uplink;
+            const fromDisplay = formatNodeWithName(fromId, getNodeDisplayName(lineData.from_node));
+            const toDisplay = toId === 'BROADCAST' ? 'BROADCAST' : formatNodeWithName(toId, getNodeDisplayName(lineData.to_node));
+            const uplinkDisplay = formatNodeWithName(uplinkId, getNodeDisplayName(lineData.uplink_node));
 
             const channel_name = lineData.channel_name || 'N/A';
             const portnum = lineData.decoded?.portnum || 'N/A';

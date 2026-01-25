@@ -21,7 +21,7 @@ class Presenter:
         self._node_cache_ttl_seconds = settings.node_cache_ttl_seconds
 
     @staticmethod
-    def _node_payload(node_map: dict, node_id: str):
+    def _node_payload(node_map: Dict[str, NodeInfo], node_id: str) -> Dict[str, Any]:
         n = node_map.get(node_id)
         if not n:
             return {"id": node_id}
@@ -59,12 +59,10 @@ class Presenter:
 
         from_id = f"!{packet.from_:08x}"
         uplink_id = packet.uplink  # already has leading '!'
-        node_ids = {from_id, uplink_id}
         is_broadcast = (packet.to == 0xffffffff)
 
         if not is_broadcast:
             to_id = f"!{packet.to:08x}"
-            node_ids.add(to_id)
 
         from_node_payload = self._get_cached_node_payload(from_id)
         uplink_node_payload = self._get_cached_node_payload(uplink_id)
@@ -89,12 +87,12 @@ class Presenter:
                     resolved = self._node_payload(node_map, node_id)
                     self._set_cached_node_payload(node_id, resolved)
 
-            if from_node_payload is None:
-                from_node_payload = self._get_cached_node_payload(from_id)
-            if uplink_node_payload is None:
-                uplink_node_payload = self._get_cached_node_payload(uplink_id)
-            if not is_broadcast and to_node_payload is None:
-                to_node_payload = self._get_cached_node_payload(to_id)
+                    if node_id == from_id:
+                        from_node_payload = resolved
+                    elif node_id == uplink_id:
+                        uplink_node_payload = resolved
+                    elif not is_broadcast and node_id == to_id:
+                        to_node_payload = resolved
 
         payload["from_node"] = from_node_payload or {"id": from_id}
         payload["uplink_node"] = uplink_node_payload or {"id": uplink_id}
