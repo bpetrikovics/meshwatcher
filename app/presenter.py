@@ -1,6 +1,7 @@
 import logging
 import threading
 import time
+from decimal import Decimal
 from flask_socketio import SocketIO
 from sqlmodel import select
 from typing import Callable, Dict, Any, Optional, Tuple
@@ -44,7 +45,6 @@ class Presenter:
             self._node_cache[node_id] = (payload, time.time())
 
     def upsert_node_cache(self, nodeinfo: NodeInfo) -> None:
-        self.logger.info("Updating cache for node %s", nodeinfo.id_)
         payload: Dict[str, Any] = {
             "id": nodeinfo.id_,
             "short_name": nodeinfo.short_name,
@@ -55,7 +55,9 @@ class Presenter:
     def raw_packet_callback(self, packet: MeshtasticPacket):
 
         self.logger.info("Raw packet callback: %s", packet)
-        payload = packet.model_dump(by_alias=True)
+        if packet.rx_snr is not None and not isinstance(packet.rx_snr, Decimal):
+            packet.rx_snr = Decimal(str(packet.rx_snr))
+        payload = packet.model_dump(mode="json")
 
         from_id = f"!{packet.from_:08x}"
         uplink_id = packet.uplink  # already has leading '!'
@@ -77,7 +79,6 @@ class Presenter:
             missing_ids.add(to_id)
 
         if missing_ids:
-            self.logger.info("Missing node info, loading from DB: %s", missing_ids)
             with self.db_factory() as db:
                 result = db.execute(select(NodeInfo).where(NodeInfo.id_.in_(list(missing_ids))))
                 nodes = result.scalars().all()

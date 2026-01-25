@@ -8,7 +8,7 @@ from sqlmodel import SQLModel, Field
 from sqlalchemy import Column, Integer, BigInteger, String, DateTime, Boolean, Numeric
 from sqlalchemy.types import JSON 
 
-from pydantic import ConfigDict, computed_field
+from pydantic import ConfigDict, computed_field, field_validator
 
 """
 {'from': 2224738468, 'to': 321385616, 'channel': 31,
@@ -145,6 +145,15 @@ class MeshtasticPacket(SQLModel, table=True):
     @property
     def decoded_portnum(self) -> Optional[str]:
         return self.decoded.get("portnum")
+
+    @field_validator("rx_snr", mode="before")
+    @classmethod
+    def _coerce_rx_snr_decimal(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, Decimal):
+            return v
+        return Decimal(str(v))
 
     @computed_field
     @property

@@ -1,5 +1,6 @@
 import logging
 import json
+from decimal import Decimal
 
 from typing import Any, Callable, Optional
 
@@ -57,6 +58,8 @@ class RawPacketHandler:
                         # create a detached copy of the packet that can be passed on to callbacks
                         db.flush()
                         db.refresh(packet)
+                        if packet.rx_snr is not None and not isinstance(packet.rx_snr, Decimal):
+                            packet.rx_snr = Decimal(str(packet.rx_snr))
                         db.expunge(packet)
 
                 # Invoke any callbacks that require raw data
