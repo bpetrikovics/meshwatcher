@@ -22,6 +22,7 @@ class Settings(BaseSettings):
 
     node_retention_days: int = 1
     packet_retention_days: int = 1
+    metrics_retention_days: int = 5
     db_cleanup_period_minutes: int = 30
 
     dup_cleanup_period: int = 60

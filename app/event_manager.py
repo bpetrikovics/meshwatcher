@@ -139,7 +139,6 @@ class EventManager:
         self.logger.info(f"Telemetry payload: {packet.decoded}")
         node_id = f"!{packet.from_:08x}"
 
-        # Keep the extract_payload() workflow working for Telemetry as requested.
         try:
             metric = self.extract_payload(packet, Telemetry)
         except ValidationError as exc:
@@ -150,7 +149,7 @@ class EventManager:
         self.logger.info(metric)
 
         with self.db_factory() as db:
-            # Allow telemetry to arrive before NODEINFO: create a placeholder node row.
+            # Allow handling of telemetry before nodeinfo received for the corresponding node
             db.merge(NodeInfo(id_=node_id))
             db.add(metric)
 

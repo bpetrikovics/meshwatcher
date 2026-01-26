@@ -56,6 +56,7 @@ class DbCleanupManager:
         self,
         packet_retention_days: int = settings.packet_retention_days,
         node_retention_days: int = settings.node_retention_days,
+        metrics_retention_days: int = settings.metrics_retention_days,
         cleanup_interval_minutes: int = settings.db_cleanup_period_minutes,
         batch_size: int = 5000,
         dry_run: bool = False,
@@ -63,6 +64,7 @@ class DbCleanupManager:
         self.logger = logging.getLogger(__name__)
         self.packet_retention_days =  packet_retention_days
         self.node_retention_days = node_retention_days
+        self.metrics_retention_days = metrics_retention_days
         self.cleanup_interval_minutes = cleanup_interval_minutes
         self.batch_size = batch_size
         self.dry_run = dry_run
@@ -71,6 +73,7 @@ class DbCleanupManager:
         
         self.packet_timestamp_col = 'createdAt'
         self.node_timestamp_col = 'updated'
+        self.metrics_timestamp_col = 'createdAt'
         
         self.start()
     
@@ -109,9 +112,10 @@ class DbCleanupManager:
         with db_session() as session:
             packet_stats = self._cleanup_table(session, 'packets', self.packet_retention_days, self.packet_timestamp_col)
             node_stats = self._cleanup_table(session, 'nodes', self.node_retention_days, self.node_timestamp_col)
+            metrics_stats = self._cleanup_table(session, 'metrics', self.metrics_retention_days, self.metrics_timestamp_col)
             
             mode = "DRY-RUN" if self.dry_run else "LIVE"
-            self.logger.info(f"Cleanup cycle: {packet_stats.get('deleted', 0)} packets, {node_stats.get('deleted', 0)} nodes deleted in {mode} mode, {self.cleanup_interval_minutes=}min")
+            self.logger.info(f"Cleanup cycle: {packet_stats.get('deleted', 0)} packets, {node_stats.get('deleted', 0)} nodes, {metrics_stats.get('deleted', 0)} metrics deleted in {mode} mode, {self.cleanup_interval_minutes=}min")
     
     def start(self):
         if self._running:
@@ -121,7 +125,7 @@ class DbCleanupManager:
         
         def loop():
             self._running = True
-            self.logger.info(f"DB retention thread started. Retention: packets={self.packet_retention_days}d, nodes={self.node_retention_days}d")
+            self.logger.info(f"DB retention thread started. Retention: packets={self.packet_retention_days}d, nodes={self.node_retention_days}d, metrics={self.metrics_retention_days}d")
             
             while self._running:
                 try:
@@ -149,8 +153,9 @@ class DbCleanupManager:
             'running': self._running,
             'packet_col': self.packet_timestamp_col,
             'node_col': self.node_timestamp_col,
+            'metrics_col': self.metrics_timestamp_col,
             'dry_run': self.dry_run,
-            'retention': (self.packet_retention_days, self.node_retention_days)
+            'retention': (self.packet_retention_days, self.node_retention_days, self.metrics_retention_days)
         }
 
 
