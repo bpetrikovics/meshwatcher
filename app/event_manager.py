@@ -38,9 +38,11 @@ class EventManager:
         if payload is None:
             return class_to_extract.model_validate({})
 
-        if isinstance(payload, (str, bytes, bytearray)):
-            payload_json = payload.decode() if isinstance(payload, (bytes, bytearray)) else payload
-            return class_to_extract.model_validate_json(payload_json)
+        if isinstance(payload, (bytes, bytearray)):
+            payload = payload.decode()
+
+        if isinstance(payload, str):
+            return class_to_extract.model_validate_json(payload)
 
         try:
             return class_to_extract.model_validate(payload)
