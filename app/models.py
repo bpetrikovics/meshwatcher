@@ -1,61 +1,16 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from pydantic.config import ConfigDict
 
 from sqlmodel import SQLModel, Field
-from sqlalchemy import Column, Integer, BigInteger, String, DateTime, Boolean, Numeric
+from sqlmodel import select
+from sqlalchemy import Column, Integer, BigInteger, String, DateTime, Boolean, Numeric, ForeignKey, Index, func
 from sqlalchemy.types import JSON 
 
-from pydantic import ConfigDict, computed_field, field_validator
+from pydantic import ConfigDict, computed_field, field_validator, model_validator
 
-"""
-{'from': 2224738468, 'to': 321385616, 'channel': 31,
-'decoded': {
-    'portnum': 'NODEINFO_APP',
-    'payload': {
-        'id': '!849ad0a4', 'longName': '🇭🇺 HA1ADM HT Mobil', 'shortName': 'ADM4',
-        'macaddr': 'sIGEmtCk', 'hwModel': 'HELTEC_V3', 'role': 'CLIENT_MUTE',
-        'publicKey': '04icuoGGUEY+IsF3BT89Ya2SIKSd8EUMirA/Nc9vHBM='
-        },
-    'wantResponse': True, 'bitfield': 3
-    },
-'id': 1330856275, 'rxTime': 1766442612, 'rxSnr': -3.25, 'hopLimit': 4,
-'rxRssi': -105, 'hopStart': 7, 'nextHop': 112, 'relayNode': 252,
-'uplink': '!a2e19ff0', 'channelName': 'MediumFast'}
-
-{'from': 2956776068, 'to': 382706456, 'channel': 31,
-'decoded': {
-    'portnum': 'NODEINFO_APP',
-    'payload': {
-        'id': '!b03cd284', 'longName': '🇭🇺 Kaszásdűlő 🏢 868', 'shortName': 'KA8B',
-        'hwModel': 'HELTEC_V3', 'role': 'CLIENT_BASE',
-        'publicKey': 'lbIajoQsPuG05U3oAAsmuUO1VEansCoTeNPK0lzMV2g='
-        },
-    'wantResponse': True, 'dest': 382706456, 'requestId': 2384491189, 'bitfield': 3
-    },
-'id': 2468926477, 'rxTime': 1766442726, 'hopLimit': 3, 'wantAck': True,
-'priority': 'RESPONSE', 'hopStart': 3, 'relayNode': 132, 'uplink': '!b03cd284',
-'channelName': 'MediumFast'
-}
-
-{'from': 2956776068, 'to': 3935232448, 'channel': 31,
-'decoded': {
-    'portnum': 'NODEINFO_APP',
-    'payload': {
-        'id': '!b03cd284', 'longName': '🇭🇺 Kaszásdűlő 🏢 868', 'shortName': 'KA8B',
-        'macaddr': 'NM2wPNKE', 'hwModel': 'HELTEC_V3', 'role': 'CLIENT_BASE',
-        'publicKey': 'lbIajoQsPuG05U3oAAsmuUO1VEansCoTeNPK0lzMV2g=',
-        'isUnmessagable': False
-        },
-    'wantResponse': True, 'bitfield': 3
-    },
-'id': 3477936900, 'rxTime': 1766442925, 'hopLimit': 7, 'priority': 'RELIABLE',
-'hopStart': 7, 'relayNode': 132, 'uplink': '!b03cd284', 'channelName': 'MediumFast'
-}
-
-"""
 
 class MeshtasticPacket(SQLModel, table=True):
     __tablename__ = "packets"
@@ -226,6 +181,54 @@ class MeshtasticPacket(SQLModel, table=True):
                     f"{has_relay}{has_nexthop}{is_response}{want_ack}{want_response}{has_uplink} on {self.channel_name}/{self.channel}")
 
 
+"""
+{'from': 2224738468, 'to': 321385616, 'channel': 31,
+'decoded': {
+    'portnum': 'NODEINFO_APP',
+    'payload': {
+        'id': '!849ad0a4', 'longName': '🇭🇺 HA1ADM HT Mobil', 'shortName': 'ADM4',
+        'macaddr': 'sIGEmtCk', 'hwModel': 'HELTEC_V3', 'role': 'CLIENT_MUTE',
+        'publicKey': '04icuoGGUEY+IsF3BT89Ya2SIKSd8EUMirA/Nc9vHBM='
+        },
+    'wantResponse': True, 'bitfield': 3
+    },
+'id': 1330856275, 'rxTime': 1766442612, 'rxSnr': -3.25, 'hopLimit': 4,
+'rxRssi': -105, 'hopStart': 7, 'nextHop': 112, 'relayNode': 252,
+'uplink': '!a2e19ff0', 'channelName': 'MediumFast'}
+
+{'from': 2956776068, 'to': 382706456, 'channel': 31,
+'decoded': {
+    'portnum': 'NODEINFO_APP',
+    'payload': {
+        'id': '!b03cd284', 'longName': '🇭🇺 Kaszásdűlő 🏢 868', 'shortName': 'KA8B',
+        'hwModel': 'HELTEC_V3', 'role': 'CLIENT_BASE',
+        'publicKey': 'lbIajoQsPuG05U3oAAsmuUO1VEansCoTeNPK0lzMV2g='
+        },
+    'wantResponse': True, 'dest': 382706456, 'requestId': 2384491189, 'bitfield': 3
+    },
+'id': 2468926477, 'rxTime': 1766442726, 'hopLimit': 3, 'wantAck': True,
+'priority': 'RESPONSE', 'hopStart': 3, 'relayNode': 132, 'uplink': '!b03cd284',
+'channelName': 'MediumFast'
+}
+
+{'from': 2956776068, 'to': 3935232448, 'channel': 31,
+'decoded': {
+    'portnum': 'NODEINFO_APP',
+    'payload': {
+        'id': '!b03cd284', 'longName': '🇭🇺 Kaszásdűlő 🏢 868', 'shortName': 'KA8B',
+        'macaddr': 'NM2wPNKE', 'hwModel': 'HELTEC_V3', 'role': 'CLIENT_BASE',
+        'publicKey': 'lbIajoQsPuG05U3oAAsmuUO1VEansCoTeNPK0lzMV2g=',
+        'isUnmessagable': False
+        },
+    'wantResponse': True, 'bitfield': 3
+    },
+'id': 3477936900, 'rxTime': 1766442925, 'hopLimit': 7, 'priority': 'RELIABLE',
+'hopStart': 7, 'relayNode': 132, 'uplink': '!b03cd284', 'channelName': 'MediumFast'
+}
+
+"""
+
+
 class NodeInfo(SQLModel, table=True):
     __tablename__ = "nodes"
 
@@ -286,3 +289,135 @@ class NodeInfo(SQLModel, table=True):
         role = f", {self.role}" if self.role else ""
 
         return f"NodeInfo {self.id_}{short_name}{long_name}{model}{role}"
+
+
+class Telemetry(SQLModel, table=True):
+    __tablename__ = "metrics"
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="forbid",
+        from_attributes=True,
+    )
+
+    db_id: Optional[int] = Field(
+        default=None,
+        exclude=True,
+        sa_column=Column(Integer, primary_key=True, autoincrement=True),
+    )
+
+    #node_id: Optional[str] = Field(default=None, sa_column=Column("nodeId", String(9), ForeignKey("nodes.id"), nullable=True))
+    node_id: Optional[str] = Field(default=None, sa_column=Column("nodeId", String(9), nullable=False))
+    metric_type: str = Field(sa_column=Column("metricType", String(32), nullable=False))
+    ts: int = Field(alias="time", sa_column=Column("ts", Integer, nullable=False))
+    payload: Dict[str, Any] = Field(default_factory=dict, sa_column=Column("payload", JSON, nullable=False))
+
+    created_at: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column("createdAt", DateTime, nullable=True),
+        exclude=True,
+    )
+
+    __table_args__ = (
+        Index("ix_metrics_node_type_ts", "nodeId", "metricType", "ts"),
+        Index("ix_metrics_node_ts", "nodeId", "ts"),
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_decoded_payload(cls, v):
+        """Allow validation from TELEMETRY_APP decoded payloads.
+
+        Supports input like:
+        {"time": 105, "powerMetrics": {"ch3Voltage": 2.92, "ch3Current": 10.8}}
+
+        and converts it into the db-ready shape:
+        {"ts": 105, "metric_type": "powerMetrics", "payload": {...}}
+
+        Note: `node_id` is not present in the decoded payload; it should be set by the
+        caller (e.g. from `packet.from_`) before persisting.
+        """
+        if not isinstance(v, dict):
+            return v
+
+        # If already normalized, do nothing
+        if "metric_type" in v and "payload" in v and ("ts" in v or "time" in v):
+            return v
+
+        ts = v.get("time")
+        if ts is None:
+            return v
+
+        metric_key = None
+        metric_payload = None
+        for k, val in v.items():
+            if k == "time":
+                continue
+            if isinstance(val, dict):
+                metric_key = k
+                metric_payload = val
+                break
+
+        if metric_key is None:
+            return v
+
+        return {
+            "ts": int(ts),
+            "metric_type": metric_key,
+            "payload": metric_payload,
+        }
+
+    @classmethod
+    def from_telemetry_payload(cls, *, node_id: str, decoded_payload: Dict[str, Any]) -> List["Telemetry"]:
+        """Create one Telemetry row per metric group in a TELEMETRY_APP decoded payload."""
+        ts = decoded_payload.get("time")
+        if ts is None:
+            raise ValueError("Telemetry decoded payload missing required 'time' field")
+
+        rows: List[Telemetry] = []
+        for key, value in decoded_payload.items():
+            if key == "time":
+                continue
+            if value is None:
+                continue
+            if not isinstance(value, dict):
+                continue
+
+            rows.append(
+                cls(
+                    node_id=node_id,
+                    metric_type=key,
+                    ts=int(ts),
+                    payload=value,
+                )
+            )
+
+        return rows
+
+    @classmethod
+    def stmt_latest_per_type(cls, *, node_id: str):
+        """Build a statement returning the most recent row per metric_type for a node."""
+        ranked = (
+            select(
+                cls.db_id.label("db_id"),
+                func.row_number()
+                .over(partition_by=cls.metric_type, order_by=cls.ts.desc())
+                .label("rn"),
+            )
+            .where(cls.node_id == node_id)
+            .subquery()
+        )
+
+        return select(cls).join(ranked, ranked.c.db_id == cls.db_id).where(ranked.c.rn == 1)
+
+    @classmethod
+    def stmt_records_for_type(cls, *, node_id: str, metric_type: str, since_ts: Optional[int] = None):
+        """Build a statement returning rows for a node/type, optionally filtered by ts >= since_ts."""
+        stmt = select(cls).where(cls.node_id == node_id, cls.metric_type == metric_type)
+        if since_ts is not None:
+            stmt = stmt.where(cls.ts >= since_ts)
+        return stmt.order_by(cls.ts.asc())
+
+    def __str__(self) -> str:
+        node = self.node_id if self.node_id is not None else "<unset>"
+        return f"Telemetry {node} {self.metric_type} @ {self.ts}: {self.payload}"

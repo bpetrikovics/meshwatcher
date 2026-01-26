@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from meshtastic_mqtt_json import MeshtasticMQTT
 
 from .packet_handling import raw_handler
-from .models import MeshtasticPacket, NodeInfo
+from .models import MeshtasticPacket, NodeInfo, Telemetry
 from .presenter import Presenter
 
 
@@ -34,7 +34,18 @@ class EventManager:
 
     @staticmethod
     def extract_payload(packet: MeshtasticPacket, class_to_extract):
-        return class_to_extract.model_validate_json(json.dumps(packet.decoded["payload"]))
+        payload = packet.decoded.get("payload")
+        if payload is None:
+            return class_to_extract.model_validate({})
+
+        if isinstance(payload, (str, bytes, bytearray)):
+            payload_json = payload.decode() if isinstance(payload, (bytes, bytearray)) else payload
+            return class_to_extract.model_validate_json(payload_json)
+
+        try:
+            return class_to_extract.model_validate(payload)
+        except ValidationError:
+            return class_to_extract.model_validate_json(json.dumps(payload))
 
     @raw_handler.validate_packet
     def on_text_message(self, packet: MeshtasticPacket):
@@ -107,7 +118,8 @@ class EventManager:
         else:
             self.logger.info("Not a TR response")
 
-    def on_telemetry(self, json_data):
+    @raw_handler.validate_packet
+    def on_telemetry(self, packet: MeshtasticPacket):
         """
         {'from': 2922542922, 'to': 4294967295,
         'channel': 8,
@@ -122,7 +134,34 @@ class EventManager:
           'bitfield': 1},
         'id': 923524629, 'rxTime': 1747876154, 'priority': 'BACKGROUND', 'hopStart': 3, 'relayNode': 74}
         """
-        pass
+        self.logger.info(f"Telemetry payload: {packet.decoded}")
+        node_id = f"!{packet.from_:08x}"
+
+        # Keep the extract_payload() workflow working for Telemetry as requested.
+        try:
+            metric = self.extract_payload(packet, Telemetry)
+        except ValidationError as exc:
+            self.logger.exception(exc)
+            return
+
+        metric.node_id = node_id
+        self.logger.info(metric)
+
+        # Persist all metric groups contained in this telemetry payload.
+        decoded_payload = packet.decoded.get("payload") or {}
+        try:
+            metrics = Telemetry.from_telemetry_payload(node_id=node_id, decoded_payload=decoded_payload)
+        except ValueError as exc:
+            self.logger.exception(exc)
+            return
+
+        if not metrics:
+            self.logger.info("No telemetry metrics found in payload")
+            return
+
+        with self.db_factory() as db:
+            for m in metrics:
+                db.add(m)
 
     def on_neighborinfo(self, json_data):
         """
