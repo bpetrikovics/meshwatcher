@@ -149,21 +149,10 @@ class EventManager:
         metric.node_id = node_id
         self.logger.info(metric)
 
-        # Persist all metric groups contained in this telemetry payload.
-        decoded_payload = packet.decoded.get("payload") or {}
-        try:
-            metrics = Telemetry.from_telemetry_payload(node_id=node_id, decoded_payload=decoded_payload)
-        except ValueError as exc:
-            self.logger.exception(exc)
-            return
-
-        if not metrics:
-            self.logger.info("No telemetry metrics found in payload")
-            return
-
         with self.db_factory() as db:
-            for m in metrics:
-                db.add(m)
+            # Allow telemetry to arrive before NODEINFO: create a placeholder node row.
+            db.merge(NodeInfo(id_=node_id))
+            db.add(metric)
 
     def on_neighborinfo(self, json_data):
         """

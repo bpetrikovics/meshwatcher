@@ -306,8 +306,10 @@ class Telemetry(SQLModel, table=True):
         sa_column=Column(Integer, primary_key=True, autoincrement=True),
     )
 
-    #node_id: Optional[str] = Field(default=None, sa_column=Column("nodeId", String(9), ForeignKey("nodes.id"), nullable=True))
-    node_id: Optional[str] = Field(default=None, sa_column=Column("nodeId", String(9), nullable=False))
+    node_id: Optional[str] = Field(
+        default=None,
+        sa_column=Column("nodeId", String(9), ForeignKey("nodes.id"), nullable=False),
+    )
     metric_type: str = Field(sa_column=Column("metricType", String(32), nullable=False))
     ts: int = Field(alias="time", sa_column=Column("ts", Integer, nullable=False))
     payload: Dict[str, Any] = Field(default_factory=dict, sa_column=Column("payload", JSON, nullable=False))
