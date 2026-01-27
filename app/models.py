@@ -13,6 +13,10 @@ from pydantic import ConfigDict, computed_field, field_validator, model_validato
 
 
 class MeshtasticPacket(SQLModel, table=True):
+    """
+    Represents a Meshtastic packet received via MQTT.
+    """
+
     __tablename__ = "packets"
 
     model_config = ConfigDict(
@@ -290,8 +294,26 @@ class NodeInfo(SQLModel, table=True):
 
         return f"NodeInfo {self.id_}{short_name}{long_name}{model}{role}"
 
+"""
+{'from': 2922542922, 'to': 4294967295,
+'channel': 8,
+'decoded': {
+    'portnum': 'TELEMETRY_APP',
+    'payload': {
+        'time': 1747876154,
+        'deviceMetrics': {
+            'batteryLevel': 91, 'voltage': 4.07, 'channelUtilization': 12.825001, 'airUtilTx': 6.1378055, 'uptimeSeconds': 1063460
+            }
+        },
+    'bitfield': 1},
+'id': 923524629, 'rxTime': 1747876154, 'priority': 'BACKGROUND', 'hopStart': 3, 'relayNode': 74}
+"""
 
 class Telemetry(SQLModel, table=True):
+    """
+    Represents telemetry data received from a Meshtastic node.
+    """
+
     __tablename__ = "metrics"
 
     model_config = ConfigDict(
@@ -368,33 +390,6 @@ class Telemetry(SQLModel, table=True):
             "metric_type": metric_key,
             "payload": metric_payload,
         }
-
-    @classmethod
-    def from_telemetry_payload(cls, *, node_id: str, decoded_payload: Dict[str, Any]) -> List["Telemetry"]:
-        """Create one Telemetry row per metric group in a TELEMETRY_APP decoded payload."""
-        ts = decoded_payload.get("time")
-        if ts is None:
-            raise ValueError("Telemetry decoded payload missing required 'time' field")
-
-        rows: List[Telemetry] = []
-        for key, value in decoded_payload.items():
-            if key == "time":
-                continue
-            if value is None:
-                continue
-            if not isinstance(value, dict):
-                continue
-
-            rows.append(
-                cls(
-                    node_id=node_id,
-                    metric_type=key,
-                    ts=int(ts),
-                    payload=value,
-                )
-            )
-
-        return rows
 
     @classmethod
     def stmt_latest_per_type(cls, *, node_id: str):

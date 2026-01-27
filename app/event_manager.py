@@ -122,21 +122,6 @@ class EventManager:
 
     @raw_handler.validate_packet
     def on_telemetry(self, packet: MeshtasticPacket):
-        """
-        {'from': 2922542922, 'to': 4294967295,
-        'channel': 8,
-        'decoded': {
-          'portnum': 'TELEMETRY_APP',
-          'payload': {
-              'time': 1747876154,
-              'deviceMetrics': {
-                  'batteryLevel': 91, 'voltage': 4.07, 'channelUtilization': 12.825001, 'airUtilTx': 6.1378055, 'uptimeSeconds': 1063460
-                  }
-              },
-          'bitfield': 1},
-        'id': 923524629, 'rxTime': 1747876154, 'priority': 'BACKGROUND', 'hopStart': 3, 'relayNode': 74}
-        """
-        # self.logger.info(f"Telemetry data: {packet.decoded}")
         node_id = f"!{packet.from_:08x}"
 
         try:
