@@ -6,7 +6,7 @@ from pydantic.config import ConfigDict
 
 from sqlmodel import SQLModel, Field
 from sqlmodel import select
-from sqlalchemy import Column, Integer, BigInteger, String, DateTime, Boolean, Numeric, ForeignKey, Index, func
+from sqlalchemy import Column, Integer, BigInteger, String, DateTime, Boolean, Numeric, ForeignKey, Index, func, UniqueConstraint, desc
 from sqlalchemy.types import JSON 
 
 from pydantic import ConfigDict, computed_field, field_validator, model_validator
@@ -314,7 +314,7 @@ class Telemetry(SQLModel, table=True):
     Represents telemetry data received from a Meshtastic node.
     """
 
-    __tablename__ = "metrics"
+    __tablename__ = "telemetry"
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -343,8 +343,9 @@ class Telemetry(SQLModel, table=True):
     )
 
     __table_args__ = (
-        Index("ix_metrics_node_type_ts", "nodeId", "metricType", "ts"),
-        Index("ix_metrics_node_ts", "nodeId", "ts"),
+        Index("ix_telemetry_node_type_ts", "nodeId", "metricType", "ts"),
+        Index("ix_telemetry_node_ts", "nodeId", "ts"),
+        UniqueConstraint("nodeId", "metricType", "ts", name="uq_telemetry_node_type_ts"),
     )
 
     @model_validator(mode="before")
@@ -418,3 +419,47 @@ class Telemetry(SQLModel, table=True):
     def __str__(self) -> str:
         node = self.node_id if self.node_id is not None else "<unset>"
         return f"Telemetry {node} {self.metric_type} @ {self.ts}: {self.payload}"
+
+
+class Metric(SQLModel, table=True):
+    __tablename__ = "metrics"
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="forbid",
+        from_attributes=True,
+    )
+
+    db_id: Optional[int] = Field(
+        default=None,
+        exclude=True,
+        sa_column=Column(Integer, primary_key=True, autoincrement=True),
+    )
+
+    telemetry_id: int = Field(
+        sa_column=Column(
+            "telemetryId",
+            Integer,
+            ForeignKey("telemetry.db_id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
+
+    node_id: str = Field(sa_column=Column("nodeId", String(9), nullable=False))
+    metric_type: str = Field(sa_column=Column("metricType", String(32), nullable=False))
+    metric: str = Field(sa_column=Column("metric", String(64), nullable=False))
+    ts: int = Field(sa_column=Column("ts", Integer, nullable=False))
+
+    value: float = Field(sa_column=Column("value", Numeric(precision=18, scale=6), nullable=False))
+
+    created_at: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column("createdAt", DateTime, nullable=True),
+        exclude=True,
+    )
+
+    __table_args__ = (
+        Index("ix_metrics_chart", "nodeId", "metricType", "metric", "ts"),
+        Index("ix_metrics_latest", "nodeId", "metricType", "metric", desc("ts")),
+        Index("ix_metrics_telemetry_id", "telemetryId"),
+    )

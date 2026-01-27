@@ -3,11 +3,13 @@ import logging
 
 from typing import Callable
 from pydantic import ValidationError
+from sqlalchemy.exc import IntegrityError
+from sqlmodel import select
 
 from meshtastic_mqtt_json import MeshtasticMQTT
 
 from .packet_handling import raw_handler
-from .models import MeshtasticPacket, NodeInfo, Telemetry
+from .models import MeshtasticPacket, NodeInfo, Telemetry, Metric
 from .presenter import Presenter
 
 
@@ -136,7 +138,34 @@ class EventManager:
         with self.db_factory() as db:
             # Allow handling of telemetry before nodeinfo received for the corresponding node
             db.merge(NodeInfo(id_=node_id))
-            db.add(metric)
+
+            try:
+                db.add(metric)
+                db.flush()
+                telemetry_row = metric
+            except IntegrityError:
+                db.rollback()
+                return
+
+            if not isinstance(telemetry_row.payload, dict):
+                return
+
+            metric_rows = []
+            for k, v in telemetry_row.payload.items():
+                if isinstance(v, (int, float)):
+                    metric_rows.append(
+                        Metric(
+                            telemetry_id=telemetry_row.db_id,
+                            node_id=telemetry_row.node_id,
+                            metric_type=telemetry_row.metric_type,
+                            metric=str(k),
+                            ts=telemetry_row.ts,
+                            value=float(v),
+                        )
+                    )
+
+            if metric_rows:
+                db.add_all(metric_rows)
 
     def on_neighborinfo(self, json_data):
         """
