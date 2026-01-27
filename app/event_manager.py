@@ -136,7 +136,7 @@ class EventManager:
           'bitfield': 1},
         'id': 923524629, 'rxTime': 1747876154, 'priority': 'BACKGROUND', 'hopStart': 3, 'relayNode': 74}
         """
-        self.logger.info(f"Telemetry payload: {packet.decoded}")
+        # self.logger.info(f"Telemetry data: {packet.decoded}")
         node_id = f"!{packet.from_:08x}"
 
         try:
