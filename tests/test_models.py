@@ -1,0 +1,430 @@
+import unittest
+import importlib.util
+from pathlib import Path
+
+from sqlalchemy import create_engine, event
+from sqlalchemy.exc import IntegrityError
+from sqlmodel import Session, SQLModel, select
+
+_models_path = Path(__file__).resolve().parents[1] / "app" / "models.py"
+_spec = importlib.util.spec_from_file_location("meshwatcher_models", _models_path)
+_models = importlib.util.module_from_spec(_spec)
+assert _spec is not None and _spec.loader is not None
+_spec.loader.exec_module(_models)
+
+Telemetry = _models.Telemetry
+Metric = _models.Metric
+NodeInfo = _models.NodeInfo
+MeshtasticPacket = _models.MeshtasticPacket
+
+
+def _normalize_keys(d: dict, key_map: dict) -> dict:
+    if not isinstance(d, dict):
+        return d
+    out = dict(d)
+    for src, dst in key_map.items():
+        if src in out and dst not in out:
+            out[dst] = out[src]
+        out.pop(src, None)
+    return out
+
+
+_MESHTASTIC_PACKET_KEY_MAP = {
+    "id": "id_",
+    "from": "from_",
+    "channelName": "channel_name",
+    "rxTime": "rx_time",
+    "hopLimit": "hop_limit",
+    "hopStart": "hop_start",
+    "relayNode": "relay_node",
+    "nextHop": "next_hop",
+    "rxSnr": "rx_snr",
+    "rxRssi": "rx_rssi",
+    "transportMechanism": "transport_mechanism",
+    "wantAck": "want_ack",
+}
+
+
+_NODEINFO_KEY_MAP = {
+    "id": "id_",
+    "shortName": "short_name",
+    "longName": "long_name",
+    "hwModel": "hw_model",
+    "publicKey": "public_key",
+    "isUnmessagable": "is_unmessagable",
+}
+
+
+def _normalize_meshtastic_packet_dict(d: dict) -> dict:
+    return _normalize_keys(d, _MESHTASTIC_PACKET_KEY_MAP)
+
+
+def _normalize_nodeinfo_dict(d: dict) -> dict:
+    return _normalize_keys(d, _NODEINFO_KEY_MAP)
+
+
+def _sqlite_engine():
+    engine = create_engine("sqlite://", echo=False)
+
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+    SQLModel.metadata.create_all(engine)
+    return engine
+
+
+class TestTelemetryModel(unittest.TestCase):
+    def test_normalize_decoded_payload_power_metrics(self):
+        decoded = {
+            "time": 105,
+            "powerMetrics": {"ch3Voltage": 2.92, "ch3Current": 10.8},
+        }
+
+        t = Telemetry.model_validate(decoded)
+        self.assertEqual(t.ts, 105)
+        self.assertEqual(t.metric_type, "powerMetrics")
+        self.assertEqual(t.payload, {"ch3Voltage": 2.92, "ch3Current": 10.8})
+
+    def test_normalize_decoded_payload_already_normalized(self):
+        normalized = {
+            "ts": 105,
+            "metric_type": "powerMetrics",
+            "payload": {"ch3Voltage": 2.92},
+        }
+
+        t = Telemetry.model_validate(normalized)
+        self.assertEqual(t.ts, 105)
+        self.assertEqual(t.metric_type, "powerMetrics")
+        self.assertEqual(t.payload, {"ch3Voltage": 2.92})
+
+
+class TestNodeInfoModel(unittest.TestCase):
+    def test_nodeinfo_field_names_are_accepted(self):
+        raw = {
+            "id_": "!d45a9a80",
+            "long_name": "Hungary Node",
+            "short_name": "HN",
+            "hw_model": "HELTEC_V3",
+            "role": "CLIENT",
+        }
+
+        node = NodeInfo.model_validate(raw)
+        self.assertEqual(node.id_, "!d45a9a80")
+        self.assertEqual(node.long_name, "Hungary Node")
+        self.assertEqual(node.short_name, "HN")
+        self.assertEqual(node.hw_model, "HELTEC_V3")
+        self.assertEqual(node.role, "CLIENT")
+
+    def test_nodeinfo_alias_payload_can_be_normalized(self):
+        raw = {
+            "id": "!d45a9a80",
+            "longName": "Hungary Node",
+            "shortName": "HN",
+            "hwModel": "HELTEC_V3",
+            "role": "CLIENT",
+        }
+
+        node = NodeInfo.model_validate(_normalize_nodeinfo_dict(raw))
+        self.assertEqual(node.id_, "!d45a9a80")
+        self.assertEqual(node.long_name, "Hungary Node")
+        self.assertEqual(node.short_name, "HN")
+        self.assertEqual(node.hw_model, "HELTEC_V3")
+        self.assertEqual(node.role, "CLIENT")
+
+    def test_nodeinfo_str_contains_id_and_names(self):
+        node = NodeInfo(
+            id_="!d45a9a80",
+            short_name="HN",
+            long_name="Hungary Node",
+            hw_model="HELTEC_V3",
+            role="CLIENT",
+        )
+        s = str(node)
+        self.assertIn("NodeInfo", s)
+        self.assertIn("!d45a9a80", s)
+        self.assertIn("[HN]", s)
+        self.assertIn("'Hungary Node'", s)
+        self.assertIn("HELTEC_V3", s)
+        self.assertIn("CLIENT", s)
+
+
+class TestMeshtasticPacketModel(unittest.TestCase):
+    def test_packet_field_names_are_accepted(self):
+        raw = {
+            "id_": 123,
+            "from_": 0x01020304,
+            "to": 0x05060708,
+            "channel": 1,
+            "channel_name": "MediumFast",
+            "decoded": {"portnum": "TEXT_MESSAGE_APP"},
+            "uplink": "!aabbccdd",
+            "rx_time": 1700000000,
+        }
+
+        p = MeshtasticPacket.model_validate(raw)
+        self.assertEqual(p.id_, 123)
+        self.assertEqual(p.from_, 0x01020304)
+        self.assertEqual(p.to, 0x05060708)
+        self.assertEqual(p.channel, 1)
+        self.assertEqual(p.channel_name, "MediumFast")
+        self.assertEqual(p.decoded_portnum, "TEXT_MESSAGE_APP")
+
+    def test_packet_alias_payload_can_be_normalized(self):
+        raw = {
+            "id": 123,
+            "from": 0x01020304,
+            "to": 0x05060708,
+            "channel": 1,
+            "channelName": "MediumFast",
+            "decoded": {"portnum": "TEXT_MESSAGE_APP"},
+            "uplink": "!aabbccdd",
+            "rxTime": 1700000000,
+        }
+
+        p = MeshtasticPacket.model_validate(_normalize_meshtastic_packet_dict(raw))
+        self.assertEqual(p.id_, 123)
+        self.assertEqual(p.from_, 0x01020304)
+        self.assertEqual(p.channel_name, "MediumFast")
+
+    def test_rx_snr_is_coerced_to_decimal(self):
+        raw = {
+            "id_": 1,
+            "from_": 1,
+            "to": 2,
+            "channel": 1,
+            "channel_name": "X",
+            "decoded": {"portnum": "TEXT_MESSAGE_APP"},
+            "uplink": "!a",
+            "rx_time": 1700000000,
+            "rx_snr": "-3.25",
+        }
+
+        p = MeshtasticPacket.model_validate(raw)
+        self.assertIsNotNone(p.rx_snr)
+        self.assertEqual(str(p.rx_snr), "-3.25")
+
+    def test_is_broadcast(self):
+        raw = {
+            "id_": 1,
+            "from_": 1,
+            "to": 0xFFFFFFFF,
+            "channel": 1,
+            "channel_name": "X",
+            "decoded": {"portnum": "TEXT_MESSAGE_APP"},
+            "uplink": "!a",
+            "rx_time": 1700000000,
+        }
+
+        p = MeshtasticPacket.model_validate(raw)
+        self.assertTrue(p.is_broadcast)
+
+    def test_str_contains_port_and_addresses(self):
+        raw = {
+            "id_": 0x1,
+            "from_": 0x01020304,
+            "to": 0xFFFFFFFF,
+            "channel": 31,
+            "channel_name": "MediumFast",
+            "decoded": {"portnum": "TEXT_MESSAGE_APP"},
+            "uplink": "!a2e19ff0",
+            "rx_time": 1700000000,
+        }
+
+        p = MeshtasticPacket.model_validate(raw)
+        s = str(p)
+        self.assertIn("TEXT_MESSAGE_APP", s)
+        self.assertIn("broadcast", s)
+        self.assertIn("MediumFast", s)
+
+
+class TestTelemetryDatabaseConstraints(unittest.TestCase):
+    def setUp(self):
+        self.engine = _sqlite_engine()
+
+    def test_telemetry_dedup_unique_constraint(self):
+        with Session(self.engine) as s:
+            s.add(NodeInfo(id_="!00000001"))
+            t1 = Telemetry(node_id="!00000001", metric_type="powerMetrics", ts=105, payload={"ch3Voltage": 2.92})
+            s.add(t1)
+            s.commit()
+
+        with self.assertRaises(IntegrityError):
+            with Session(self.engine) as s:
+                t2 = Telemetry(node_id="!00000001", metric_type="powerMetrics", ts=105, payload={"ch3Voltage": 2.92})
+                s.add(t2)
+                s.commit()
+
+
+class TestMetricCascadeDelete(unittest.TestCase):
+    def setUp(self):
+        self.engine = _sqlite_engine()
+
+    def test_metrics_deleted_when_telemetry_deleted(self):
+        telemetry_id = None
+        with Session(self.engine) as s:
+            s.add(NodeInfo(id_="!00000001"))
+            t = Telemetry(node_id="!00000001", metric_type="powerMetrics", ts=105, payload={"ch3Voltage": 2.92})
+            s.add(t)
+            s.flush()
+            telemetry_id = t.db_id
+
+            m = Metric(
+                telemetry_id=t.db_id,
+                node_id=t.node_id,
+                metric_type=t.metric_type,
+                metric="ch3Voltage",
+                ts=t.ts,
+                value=2.92,
+            )
+            s.add(m)
+            s.commit()
+
+        with Session(self.engine) as s:
+            telemetry = s.get(Telemetry, telemetry_id)
+            self.assertIsNotNone(telemetry)
+            metrics = s.exec(select(Metric)).all()
+            self.assertEqual(len(metrics), 1)
+
+        with Session(self.engine) as s:
+            telemetry = s.get(Telemetry, telemetry_id)
+            s.delete(telemetry)
+            s.commit()
+
+        with Session(self.engine) as s:
+            metrics = s.exec(select(Metric)).all()
+            self.assertEqual(len(metrics), 0)
+
+
+class TestRealTrafficExamples(unittest.TestCase):
+    def test_models_py_nodeinfo_packet_example_validates(self):
+        pkt = {
+            "from": 2224738468,
+            "to": 321385616,
+            "channel": 31,
+            "decoded": {
+                "portnum": "NODEINFO_APP",
+                "payload": {
+                    "id": "!849ad0a4",
+                    "longName": "🇭🇺 HA1ADM HT Mobil",
+                    "shortName": "ADM4",
+                    "macaddr": "sIGEmtCk",
+                    "hwModel": "HELTEC_V3",
+                    "role": "CLIENT_MUTE",
+                    "publicKey": "04icuoGGUEY+IsF3BT89Ya2SIKSd8EUMirA/Nc9vHBM=",
+                },
+                "wantResponse": True,
+                "bitfield": 3,
+            },
+            "id": 1330856275,
+            "rxTime": 1766442612,
+            "rxSnr": -3.25,
+            "hopLimit": 4,
+            "rxRssi": -105,
+            "hopStart": 7,
+            "nextHop": 112,
+            "relayNode": 252,
+            "uplink": "!a2e19ff0",
+            "channelName": "MediumFast",
+        }
+
+        packet = MeshtasticPacket.model_validate(_normalize_meshtastic_packet_dict(pkt))
+        self.assertEqual(packet.decoded_portnum, "NODEINFO_APP")
+
+        node = NodeInfo.model_validate(_normalize_nodeinfo_dict(packet.decoded.get("payload")))
+        self.assertEqual(node.id_, "!849ad0a4")
+
+    def test_models_py_telemetry_packet_example_validates(self):
+        pkt = {
+            "from": 2922542922,
+            "to": 4294967295,
+            "channel": 8,
+            "decoded": {
+                "portnum": "TELEMETRY_APP",
+                "payload": {
+                    "time": 1747876154,
+                    "deviceMetrics": {
+                        "batteryLevel": 91,
+                        "voltage": 4.07,
+                        "channelUtilization": 12.825001,
+                        "airUtilTx": 6.1378055,
+                        "uptimeSeconds": 1063460,
+                    },
+                },
+                "bitfield": 1,
+            },
+            "id": 923524629,
+            "rxTime": 1747876154,
+            "priority": "BACKGROUND",
+            "hopStart": 3,
+            "relayNode": 74,
+            "uplink": "!a2e19ff0",
+            "channelName": "MediumFast",
+        }
+
+        packet = MeshtasticPacket.model_validate(_normalize_meshtastic_packet_dict(pkt))
+        self.assertEqual(packet.decoded_portnum, "TELEMETRY_APP")
+
+        telemetry = Telemetry.model_validate(packet.decoded.get("payload"))
+        self.assertEqual(telemetry.ts, 1747876154)
+        self.assertEqual(telemetry.metric_type, "deviceMetrics")
+
+    def test_event_manager_traceroute_examples_validate(self):
+        req = {
+            "from": 2956776068,
+            "to": 2552625594,
+            "channel": 8,
+            "decoded": {
+                "portnum": "TRACEROUTE_APP",
+                "wantResponse": True,
+                "bitfield": 3,
+                "payload": {},
+            },
+            "id": 2363252984,
+            "rxTime": 1759165167,
+            "hopLimit": 7,
+            "wantAck": True,
+            "priority": "RELIABLE",
+            "hopStart": 7,
+            "nextHop": 227,
+            "relayNode": 132,
+            "uplink": "!b03cd284",
+            "channelName": "MediumFast",
+        }
+        resp = {
+            "from": 2552625594,
+            "to": 2956776068,
+            "channel": 8,
+            "decoded": {
+                "portnum": "TRACEROUTE_APP",
+                "payload": {
+                    "route": [2574456035, 146503212],
+                    "snrTowards": [11, -54, -4],
+                    "routeBack": [146509480],
+                    "snrBack": [36],
+                },
+                "requestId": 2363252984,
+                "bitfield": 1,
+            },
+            "id": 3427050615,
+            "rxTime": 1759165174,
+            "rxSnr": -13.0,
+            "hopLimit": 2,
+            "wantAck": True,
+            "rxRssi": -123,
+            "hopStart": 3,
+            "relayNode": 168,
+            "uplink": "!b03cd284",
+            "channelName": "MediumFast",
+        }
+
+        p_req = MeshtasticPacket.model_validate(_normalize_meshtastic_packet_dict(req))
+        p_resp = MeshtasticPacket.model_validate(_normalize_meshtastic_packet_dict(resp))
+        self.assertEqual(p_req.decoded_portnum, "TRACEROUTE_APP")
+        self.assertEqual(p_resp.decoded_requestid, 2363252984)
+
+
+if __name__ == "__main__":
+    unittest.main()
