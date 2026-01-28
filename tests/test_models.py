@@ -1,5 +1,6 @@
 import unittest
 import importlib.util
+import sys
 from pathlib import Path
 
 from sqlalchemy import create_engine, event
@@ -435,6 +436,89 @@ class TestRealTrafficExamples(unittest.TestCase):
         p_resp = MeshtasticPacket.model_validate(_normalize_meshtastic_packet_dict(resp))
         self.assertEqual(p_req.decoded_portnum, "TRACEROUTE_APP")
         self.assertEqual(p_resp.decoded_requestid, 2363252984)
+
+
+class TestRawPacketHandlerValidatePacket(unittest.TestCase):
+    def setUp(self):
+        # NOTE: Dynamically import packet_handling here to avoid pulling in full app dependencies
+        # and to prevent SQLAlchemy table redefinition conflicts with models already loaded.
+        # Pre-load config to satisfy relative imports.
+        app_dir = Path(__file__).resolve().parents[1] / "app"
+        config_path = app_dir / "config.py"
+        config_spec = importlib.util.spec_from_file_location("app.config", config_path)
+        config_module = importlib.util.module_from_spec(config_spec)
+        assert config_spec is not None and config_spec.loader is not None
+        config_spec.loader.exec_module(config_module)
+        sys.modules["app.config"] = config_module
+
+        # Make app.models point to our already-loaded models to avoid table redefinition
+        sys.modules["app.models"] = _models
+
+        # Now load packet_handling
+        _packet_handling_path = app_dir / "packet_handling.py"
+        _packet_spec = importlib.util.spec_from_file_location("app.packet_handling", _packet_handling_path)
+        _packet_module = importlib.util.module_from_spec(_packet_spec)
+        assert _packet_spec is not None and _packet_spec.loader is not None
+        _packet_spec.loader.exec_module(_packet_module)
+
+        self.handler = _packet_module.RawPacketHandler
+        self.packet_module = _packet_module
+
+        # Disable logging and DB writes for this test
+        self.packet_module.settings.packet_json_log = False
+        self.packet_module.settings.packet_sql_log = False
+
+    def test_real_traffic_payload_converts_to_meshtasticpacket(self):
+        # Use a real-traffic NodeInfo packet (already in this file)
+        payload = {
+            "from": 2224738468,
+            "to": 321385616,
+            "channel": 31,
+            "decoded": {
+                "portnum": "NODEINFO_APP",
+                "payload": {
+                    "id": "!849ad0a4",
+                    "longName": "🇭🇺 HA1ADM HT Mobil",
+                    "shortName": "ADM4",
+                    "macaddr": "sIGEmtCk",
+                    "hwModel": "HELTEC_V3",
+                    "role": "CLIENT_MUTE",
+                    "publicKey": "04icuoGGUEY+IsF3BT89Ya2SIKSd8EUMirA/Nc9vHBM=",
+                },
+                "wantResponse": True,
+                "bitfield": 3,
+            },
+            "id": 1330856275,
+            "rxTime": 1766442612,
+            "rxSnr": -3.25,
+            "hopLimit": 4,
+            "rxRssi": -105,
+            "hopStart": 7,
+            "nextHop": 112,
+            "relayNode": 252,
+            "uplink": "!a2e19ff0",
+            "channelName": "MediumFast",
+        }
+
+        captured_packet = None
+
+        def dummy_handler(target_self, packet: MeshtasticPacket):
+            nonlocal captured_packet
+            captured_packet = packet
+
+        # Apply the decorator with dedup disabled
+        wrapped = self.handler().validate_packet(dummy_handler, dedup=False)
+
+        # Call the wrapper with the raw payload
+        wrapped(target_self=None, json_data=payload)
+
+        # Assert conversion succeeded
+        self.assertIsNotNone(captured_packet)
+        self.assertIsInstance(captured_packet, MeshtasticPacket)
+        self.assertEqual(captured_packet.id_, 1330856275)
+        self.assertEqual(captured_packet.from_, 2224738468)
+        self.assertEqual(captured_packet.channel_name, "MediumFast")
+        self.assertEqual(captured_packet.decoded_portnum, "NODEINFO_APP")
 
 
 if __name__ == "__main__":

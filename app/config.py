@@ -1,3 +1,4 @@
+from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -37,9 +38,10 @@ class Settings(BaseSettings):
 
     node_cache_ttl_seconds: int = 1800
 
-    class Config:
-        env_file = ".env"  # Optional: loads environment variables from a .env file
-        extra = "ignore"   # Ignore env variables we're unaware of
+    model_config = ConfigDict(
+        env_file=".env",  # Optional: loads environment variables from a .env file
+        extra="ignore",   # Ignore env variables we're unaware of
+    )
 
 # Create a single instance of settings to be used application-wide
 settings = Settings()
