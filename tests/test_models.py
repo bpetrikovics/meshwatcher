@@ -6,6 +6,8 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, SQLModel, select
 
+# NOTE: We load app/models.py directly (instead of `import app.models`) so these unit tests
+# can run without importing the full Flask app package and its runtime dependencies.
 _models_path = Path(__file__).resolve().parents[1] / "app" / "models.py"
 _spec = importlib.util.spec_from_file_location("meshwatcher_models", _models_path)
 _models = importlib.util.module_from_spec(_spec)
@@ -18,6 +20,11 @@ NodeInfo = _models.NodeInfo
 MeshtasticPacket = _models.MeshtasticPacket
 
 
+# Helper used by tests to normalize real-traffic (alias-style) payload dicts into the
+# field-name format that the current models accept (e.g. `from` -> `from_`).
+#
+# This is intentionally in the tests (not in application code) so we can validate example
+# real-traffic packets without changing model validation behavior.
 def _normalize_keys(d: dict, key_map: dict) -> dict:
     if not isinstance(d, dict):
         return d
@@ -29,6 +36,7 @@ def _normalize_keys(d: dict, key_map: dict) -> dict:
     return out
 
 
+# Key mapping for alias-style Meshtastic packets captured from MQTT JSON.
 _MESHTASTIC_PACKET_KEY_MAP = {
     "id": "id_",
     "from": "from_",
@@ -45,6 +53,7 @@ _MESHTASTIC_PACKET_KEY_MAP = {
 }
 
 
+# Key mapping for alias-style NodeInfo payloads (nested inside `decoded.payload`).
 _NODEINFO_KEY_MAP = {
     "id": "id_",
     "shortName": "short_name",
@@ -55,10 +64,12 @@ _NODEINFO_KEY_MAP = {
 }
 
 
+# Convenience wrapper for packet normalization.
 def _normalize_meshtastic_packet_dict(d: dict) -> dict:
     return _normalize_keys(d, _MESHTASTIC_PACKET_KEY_MAP)
 
 
+# Convenience wrapper for NodeInfo normalization.
 def _normalize_nodeinfo_dict(d: dict) -> dict:
     return _normalize_keys(d, _NODEINFO_KEY_MAP)
 
