@@ -2,24 +2,23 @@ import unittest
 import importlib.util
 import sys
 from pathlib import Path
+from typing import Dict, Any
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, SQLModel, select
 
-# NOTE: We load app/models.py directly (instead of `import app.models`) so these unit tests
-# can run without importing the full Flask app package and its runtime dependencies.
-_models_path = Path(__file__).resolve().parents[1] / "app" / "models.py"
-_spec = importlib.util.spec_from_file_location("meshwatcher_models", _models_path)
-_models = importlib.util.module_from_spec(_spec)
-assert _spec is not None and _spec.loader is not None
-_spec.loader.exec_module(_models)
-
-Telemetry = _models.Telemetry
-Metric = _models.Metric
-NodeInfo = _models.NodeInfo
-MeshtasticPacket = _models.MeshtasticPacket
-
+# Constants for test data
+TEST_NODE_ID = "!d45a9a80"
+TEST_NODE_ID_2 = "!00000001"
+TEST_UPLINK = "!aabbccdd"
+TEST_CHANNEL_NAME = "MediumFast"
+TEST_SHORT_NAME = "HN"
+TEST_LONG_NAME = "Hungary Node"
+TEST_HW_MODEL = "HELTEC_V3"
+TEST_ROLE = "CLIENT"
+TEST_TS = 105
+TEST_RX_TIME = 1700000000
 
 # Helper used by tests to normalize real-traffic (alias-style) payload dicts into the
 # field-name format that the current models accept (e.g. `from` -> `from_`).
@@ -75,6 +74,110 @@ def _normalize_nodeinfo_dict(d: dict) -> dict:
     return _normalize_keys(d, _NODEINFO_KEY_MAP)
 
 
+def _load_models():
+    """Load models dynamically to avoid importing full Flask app."""
+    _models_path = Path(__file__).resolve().parents[1] / "app" / "models.py"
+    _spec = importlib.util.spec_from_file_location("meshwatcher_models", _models_path)
+    _models = importlib.util.module_from_spec(_spec)
+    assert _spec is not None and _spec.loader is not None
+    _spec.loader.exec_module(_models)
+    return _models
+
+
+# Load models
+_models = _load_models()
+Telemetry = _models.Telemetry
+Metric = _models.Metric
+NodeInfo = _models.NodeInfo
+MeshtasticPacket = _models.MeshtasticPacket
+
+
+class TestDataFactory:
+    """Factory for creating test data objects."""
+    
+    @staticmethod
+    def create_node_info(**overrides) -> Dict[str, Any]:
+        """Create a NodeInfo test data dictionary."""
+        defaults = {
+            "id_": TEST_NODE_ID,
+            "long_name": TEST_LONG_NAME,
+            "short_name": TEST_SHORT_NAME,
+            "hw_model": TEST_HW_MODEL,
+            "role": TEST_ROLE,
+        }
+        return {**defaults, **overrides}
+    
+    @staticmethod
+    def create_node_info_alias(**overrides) -> Dict[str, Any]:
+        """Create a NodeInfo test data dictionary with alias field names."""
+        defaults = {
+            "id": TEST_NODE_ID,
+            "longName": TEST_LONG_NAME,
+            "shortName": TEST_SHORT_NAME,
+            "hwModel": TEST_HW_MODEL,
+            "role": TEST_ROLE,
+        }
+        return {**defaults, **overrides}
+    
+    @staticmethod
+    def create_meshtastic_packet(**overrides) -> Dict[str, Any]:
+        """Create a MeshtasticPacket test data dictionary."""
+        defaults = {
+            "id_": 123,
+            "from_": 0x01020304,
+            "to": 0x05060708,
+            "channel": 1,
+            "channel_name": TEST_CHANNEL_NAME,
+            "decoded": {"portnum": "TEXT_MESSAGE_APP"},
+            "uplink": TEST_UPLINK,
+            "rx_time": TEST_RX_TIME,
+        }
+        return {**defaults, **overrides}
+    
+    @staticmethod
+    def create_meshtastic_packet_alias(**overrides) -> Dict[str, Any]:
+        """Create a MeshtasticPacket test data dictionary with alias field names."""
+        defaults = {
+            "id": 123,
+            "from": 0x01020304,
+            "to": 0x05060708,
+            "channel": 1,
+            "channelName": TEST_CHANNEL_NAME,
+            "decoded": {"portnum": "TEXT_MESSAGE_APP"},
+            "uplink": TEST_UPLINK,
+            "rxTime": TEST_RX_TIME,
+        }
+        return {**defaults, **overrides}
+    
+    @staticmethod
+    def create_telemetry(**overrides) -> Dict[str, Any]:
+        """Create a Telemetry test data dictionary."""
+        defaults = {
+            "ts": TEST_TS,
+            "metric_type": "powerMetrics",
+            "payload": {"ch3Voltage": 2.92, "ch3Current": 10.8},
+        }
+        return {**defaults, **overrides}
+    
+    @staticmethod
+    def create_telemetry_decoded(**overrides) -> Dict[str, Any]:
+        """Create a Telemetry test data dictionary in decoded format."""
+        defaults = {
+            "time": TEST_TS,
+            "powerMetrics": {"ch3Voltage": 2.92, "ch3Current": 10.8},
+        }
+        return {**defaults, **overrides}
+
+
+class DatabaseTestMixin:
+    """Mixin providing database setup for tests."""
+    
+    def setUp(self):
+        """Set up in-memory SQLite database for testing."""
+        self.engine = _sqlite_engine()
+        super().setUp() if hasattr(super(), 'setUp') else None
+
+
 def _sqlite_engine():
     engine = create_engine("sqlite://", echo=False)
 
@@ -89,196 +192,169 @@ def _sqlite_engine():
 
 
 class TestTelemetryModel(unittest.TestCase):
+    """Test cases for the Telemetry model validation and behavior."""
+    
     def test_normalize_decoded_payload_power_metrics(self):
-        decoded = {
-            "time": 105,
-            "powerMetrics": {"ch3Voltage": 2.92, "ch3Current": 10.8},
-        }
-
+        """Test that decoded payload with powerMetrics is normalized correctly."""
+        decoded = TestDataFactory.create_telemetry_decoded()
         t = Telemetry.model_validate(decoded)
-        self.assertEqual(t.ts, 105)
+        
+        self.assertEqual(t.ts, TEST_TS)
         self.assertEqual(t.metric_type, "powerMetrics")
         self.assertEqual(t.payload, {"ch3Voltage": 2.92, "ch3Current": 10.8})
 
     def test_normalize_decoded_payload_already_normalized(self):
-        normalized = {
-            "ts": 105,
-            "metric_type": "powerMetrics",
-            "payload": {"ch3Voltage": 2.92},
-        }
-
+        """Test that already normalized payload is handled correctly."""
+        normalized = TestDataFactory.create_telemetry()
         t = Telemetry.model_validate(normalized)
-        self.assertEqual(t.ts, 105)
+        
+        self.assertEqual(t.ts, TEST_TS)
         self.assertEqual(t.metric_type, "powerMetrics")
-        self.assertEqual(t.payload, {"ch3Voltage": 2.92})
+        self.assertEqual(t.payload, {"ch3Voltage": 2.92, "ch3Current": 10.8})
 
 
 class TestNodeInfoModel(unittest.TestCase):
+    """Test cases for the NodeInfo model validation and behavior."""
+    
     def test_nodeinfo_field_names_are_accepted(self):
-        raw = {
-            "id_": "!d45a9a80",
-            "long_name": "Hungary Node",
-            "short_name": "HN",
-            "hw_model": "HELTEC_V3",
-            "role": "CLIENT",
-        }
-
+        """Test that NodeInfo accepts normalized field names."""
+        raw = TestDataFactory.create_node_info()
         node = NodeInfo.model_validate(raw)
-        self.assertEqual(node.id_, "!d45a9a80")
-        self.assertEqual(node.long_name, "Hungary Node")
-        self.assertEqual(node.short_name, "HN")
-        self.assertEqual(node.hw_model, "HELTEC_V3")
-        self.assertEqual(node.role, "CLIENT")
+        
+        self.assertEqual(node.id_, TEST_NODE_ID)
+        self.assertEqual(node.long_name, TEST_LONG_NAME)
+        self.assertEqual(node.short_name, TEST_SHORT_NAME)
+        self.assertEqual(node.hw_model, TEST_HW_MODEL)
+        self.assertEqual(node.role, TEST_ROLE)
 
     def test_nodeinfo_alias_payload_can_be_normalized(self):
-        raw = {
-            "id": "!d45a9a80",
-            "longName": "Hungary Node",
-            "shortName": "HN",
-            "hwModel": "HELTEC_V3",
-            "role": "CLIENT",
-        }
-
+        """Test that NodeInfo can normalize alias field names."""
+        raw = TestDataFactory.create_node_info_alias()
         node = NodeInfo.model_validate(_normalize_nodeinfo_dict(raw))
-        self.assertEqual(node.id_, "!d45a9a80")
-        self.assertEqual(node.long_name, "Hungary Node")
-        self.assertEqual(node.short_name, "HN")
-        self.assertEqual(node.hw_model, "HELTEC_V3")
-        self.assertEqual(node.role, "CLIENT")
+        
+        self.assertEqual(node.id_, TEST_NODE_ID)
+        self.assertEqual(node.long_name, TEST_LONG_NAME)
+        self.assertEqual(node.short_name, TEST_SHORT_NAME)
+        self.assertEqual(node.hw_model, TEST_HW_MODEL)
+        self.assertEqual(node.role, TEST_ROLE)
 
     def test_nodeinfo_str_contains_id_and_names(self):
+        """Test that NodeInfo string representation contains key information."""
         node = NodeInfo(
-            id_="!d45a9a80",
-            short_name="HN",
-            long_name="Hungary Node",
-            hw_model="HELTEC_V3",
-            role="CLIENT",
+            id_=TEST_NODE_ID,
+            short_name=TEST_SHORT_NAME,
+            long_name=TEST_LONG_NAME,
+            hw_model=TEST_HW_MODEL,
+            role=TEST_ROLE,
         )
         s = str(node)
+        
         self.assertIn("NodeInfo", s)
-        self.assertIn("!d45a9a80", s)
-        self.assertIn("[HN]", s)
-        self.assertIn("'Hungary Node'", s)
-        self.assertIn("HELTEC_V3", s)
-        self.assertIn("CLIENT", s)
+        self.assertIn(TEST_NODE_ID, s)
+        self.assertIn(f"[{TEST_SHORT_NAME}]", s)
+        self.assertIn(f"'{TEST_LONG_NAME}'", s)
+        self.assertIn(TEST_HW_MODEL, s)
+        self.assertIn(TEST_ROLE, s)
 
 
 class TestMeshtasticPacketModel(unittest.TestCase):
+    """Test cases for the MeshtasticPacket model validation and behavior."""
+    
     def test_packet_field_names_are_accepted(self):
-        raw = {
-            "id_": 123,
-            "from_": 0x01020304,
-            "to": 0x05060708,
-            "channel": 1,
-            "channel_name": "MediumFast",
-            "decoded": {"portnum": "TEXT_MESSAGE_APP"},
-            "uplink": "!aabbccdd",
-            "rx_time": 1700000000,
-        }
-
+        """Test that MeshtasticPacket accepts normalized field names."""
+        raw = TestDataFactory.create_meshtastic_packet()
         p = MeshtasticPacket.model_validate(raw)
+        
         self.assertEqual(p.id_, 123)
         self.assertEqual(p.from_, 0x01020304)
         self.assertEqual(p.to, 0x05060708)
         self.assertEqual(p.channel, 1)
-        self.assertEqual(p.channel_name, "MediumFast")
+        self.assertEqual(p.channel_name, TEST_CHANNEL_NAME)
         self.assertEqual(p.decoded_portnum, "TEXT_MESSAGE_APP")
 
     def test_packet_alias_payload_can_be_normalized(self):
-        raw = {
-            "id": 123,
-            "from": 0x01020304,
-            "to": 0x05060708,
-            "channel": 1,
-            "channelName": "MediumFast",
-            "decoded": {"portnum": "TEXT_MESSAGE_APP"},
-            "uplink": "!aabbccdd",
-            "rxTime": 1700000000,
-        }
-
+        """Test that MeshtasticPacket can normalize alias field names."""
+        raw = TestDataFactory.create_meshtastic_packet_alias()
         p = MeshtasticPacket.model_validate(_normalize_meshtastic_packet_dict(raw))
+        
         self.assertEqual(p.id_, 123)
         self.assertEqual(p.from_, 0x01020304)
-        self.assertEqual(p.channel_name, "MediumFast")
+        self.assertEqual(p.channel_name, TEST_CHANNEL_NAME)
 
     def test_rx_snr_is_coerced_to_decimal(self):
-        raw = {
-            "id_": 1,
-            "from_": 1,
-            "to": 2,
-            "channel": 1,
-            "channel_name": "X",
-            "decoded": {"portnum": "TEXT_MESSAGE_APP"},
-            "uplink": "!a",
-            "rx_time": 1700000000,
-            "rx_snr": "-3.25",
-        }
-
+        """Test that rx_snr string values are coerced to decimal."""
+        raw = TestDataFactory.create_meshtastic_packet(rx_snr="-3.25")
         p = MeshtasticPacket.model_validate(raw)
+        
         self.assertIsNotNone(p.rx_snr)
         self.assertEqual(str(p.rx_snr), "-3.25")
 
     def test_is_broadcast(self):
-        raw = {
-            "id_": 1,
-            "from_": 1,
-            "to": 0xFFFFFFFF,
-            "channel": 1,
-            "channel_name": "X",
-            "decoded": {"portnum": "TEXT_MESSAGE_APP"},
-            "uplink": "!a",
-            "rx_time": 1700000000,
-        }
-
+        """Test that broadcast detection works correctly."""
+        raw = TestDataFactory.create_meshtastic_packet(to=0xFFFFFFFF)
         p = MeshtasticPacket.model_validate(raw)
+        
         self.assertTrue(p.is_broadcast)
 
     def test_str_contains_port_and_addresses(self):
-        raw = {
-            "id_": 0x1,
-            "from_": 0x01020304,
-            "to": 0xFFFFFFFF,
-            "channel": 31,
-            "channel_name": "MediumFast",
-            "decoded": {"portnum": "TEXT_MESSAGE_APP"},
-            "uplink": "!a2e19ff0",
-            "rx_time": 1700000000,
-        }
-
+        """Test that packet string representation contains key information."""
+        raw = TestDataFactory.create_meshtastic_packet(
+            id_=0x1,
+            from_=0x01020304,
+            to=0xFFFFFFFF,
+            channel=31,
+            channel_name=TEST_CHANNEL_NAME
+        )
         p = MeshtasticPacket.model_validate(raw)
         s = str(p)
+        
         self.assertIn("TEXT_MESSAGE_APP", s)
         self.assertIn("broadcast", s)
-        self.assertIn("MediumFast", s)
+        self.assertIn(TEST_CHANNEL_NAME, s)
 
 
-class TestTelemetryDatabaseConstraints(unittest.TestCase):
-    def setUp(self):
-        self.engine = _sqlite_engine()
-
+class TestTelemetryDatabaseConstraints(unittest.TestCase, DatabaseTestMixin):
+    """Test cases for Telemetry database constraints and deduplication."""
+    
     def test_telemetry_dedup_unique_constraint(self):
+        """Test that telemetry records have unique constraints enforced."""
         with Session(self.engine) as s:
-            s.add(NodeInfo(id_="!00000001"))
-            t1 = Telemetry(node_id="!00000001", metric_type="powerMetrics", ts=105, payload={"ch3Voltage": 2.92})
+            s.add(NodeInfo(id_=TEST_NODE_ID_2))
+            t1 = Telemetry(
+                node_id=TEST_NODE_ID_2, 
+                metric_type="powerMetrics", 
+                ts=TEST_TS, 
+                payload={"ch3Voltage": 2.92}
+            )
             s.add(t1)
             s.commit()
 
         with self.assertRaises(IntegrityError):
             with Session(self.engine) as s:
-                t2 = Telemetry(node_id="!00000001", metric_type="powerMetrics", ts=105, payload={"ch3Voltage": 2.92})
+                t2 = Telemetry(
+                    node_id=TEST_NODE_ID_2, 
+                    metric_type="powerMetrics", 
+                    ts=TEST_TS, 
+                    payload={"ch3Voltage": 2.92}
+                )
                 s.add(t2)
                 s.commit()
 
 
-class TestMetricCascadeDelete(unittest.TestCase):
-    def setUp(self):
-        self.engine = _sqlite_engine()
-
+class TestMetricCascadeDelete(unittest.TestCase, DatabaseTestMixin):
+    """Test cases for Metric cascade delete behavior."""
+    
     def test_metrics_deleted_when_telemetry_deleted(self):
+        """Test that metrics are cascade deleted when telemetry is deleted."""
         telemetry_id = None
         with Session(self.engine) as s:
-            s.add(NodeInfo(id_="!00000001"))
-            t = Telemetry(node_id="!00000001", metric_type="powerMetrics", ts=105, payload={"ch3Voltage": 2.92})
+            s.add(NodeInfo(id_=TEST_NODE_ID_2))
+            t = Telemetry(
+                node_id=TEST_NODE_ID_2, 
+                metric_type="powerMetrics", 
+                ts=TEST_TS, 
+                payload={"ch3Voltage": 2.92}
+            )
             s.add(t)
             s.flush()
             telemetry_id = t.db_id
@@ -311,7 +387,10 @@ class TestMetricCascadeDelete(unittest.TestCase):
 
 
 class TestRealTrafficExamples(unittest.TestCase):
+    """Test cases using real-world traffic examples to validate model behavior."""
+    
     def test_models_py_nodeinfo_packet_example_validates(self):
+        """Test that real NodeInfo packet from models.py validates correctly."""
         pkt = {
             "from": 2224738468,
             "to": 321385616,
@@ -349,6 +428,7 @@ class TestRealTrafficExamples(unittest.TestCase):
         self.assertEqual(node.id_, "!849ad0a4")
 
     def test_models_py_telemetry_packet_example_validates(self):
+        """Test that real Telemetry packet from models.py validates correctly."""
         pkt = {
             "from": 2922542922,
             "to": 4294967295,
@@ -384,6 +464,7 @@ class TestRealTrafficExamples(unittest.TestCase):
         self.assertEqual(telemetry.metric_type, "deviceMetrics")
 
     def test_event_manager_traceroute_examples_validate(self):
+        """Test that real traceroute packets validate correctly."""
         req = {
             "from": 2956776068,
             "to": 2552625594,
@@ -439,10 +520,19 @@ class TestRealTrafficExamples(unittest.TestCase):
 
 
 class TestRawPacketHandlerValidatePacket(unittest.TestCase):
+    """Test cases for RawPacketHandler validation with real traffic data."""
+    
     def setUp(self):
-        # NOTE: Dynamically import packet_handling here to avoid pulling in full app dependencies
-        # and to prevent SQLAlchemy table redefinition conflicts with models already loaded.
-        # Pre-load config to satisfy relative imports.
+        """Set up packet handler with dynamic module loading."""
+        self.handler, self.packet_module = self._load_packet_handler()
+        
+        # Disable logging and DB writes for this test
+        self.packet_module.settings.packet_json_log = False
+        self.packet_module.settings.packet_sql_log = False
+    
+    def _load_packet_handler(self):
+        """Dynamically load packet handling modules to avoid dependency conflicts."""
+        # Pre-load config to satisfy relative imports
         app_dir = Path(__file__).resolve().parents[1] / "app"
         config_path = app_dir / "config.py"
         config_spec = importlib.util.spec_from_file_location("app.config", config_path)
@@ -461,14 +551,10 @@ class TestRawPacketHandlerValidatePacket(unittest.TestCase):
         assert _packet_spec is not None and _packet_spec.loader is not None
         _packet_spec.loader.exec_module(_packet_module)
 
-        self.handler = _packet_module.RawPacketHandler
-        self.packet_module = _packet_module
-
-        # Disable logging and DB writes for this test
-        self.packet_module.settings.packet_json_log = False
-        self.packet_module.settings.packet_sql_log = False
+        return _packet_module.RawPacketHandler, _packet_module
 
     def test_real_traffic_payload_converts_to_meshtasticpacket(self):
+        """Test that real NodeInfo traffic payload converts to MeshtasticPacket correctly."""
         # Use a real-traffic NodeInfo packet (already in this file)
         payload = {
             "from": 2224738468,
