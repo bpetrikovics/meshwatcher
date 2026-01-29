@@ -7,27 +7,49 @@
     <link rel="shortcut icon" href="/static/favicon.ico">
     <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"></script>
     <style>
-        * {
-            box-sizing: border-box;
-        }
+        /* ===== CSS VARIABLES ===== */
         :root {
             --header-height: 56px;
             --spacing-xs: 2px;
             --spacing-sm: 4px;
             --spacing-md: 6px;
             --spacing-lg: 8px;
+            --bg-primary: #1b1d24;
+            --bg-secondary: rgba(255,255,255,0.08);
+            --bg-hover: rgba(255,255,255,0.12);
+            --bg-expanded: rgba(255,255,255,0.14);
+            --text-primary: #eee;
+            --text-secondary: #ccc;
+            --border-color: rgba(255,255,255,0.15);
+            --border-hover: rgba(255,255,255,0.3);
+            --header-bg: rgba(74, 114, 223, 0.75);
+            --header-text: rgb(255, 244, 229);
+            --port-nodeinfo: rgba(100, 180, 120, 0.3);
+            --port-traceroute: rgba(180, 120, 100, 0.3);
+            --port-textmsg: rgba(53, 102, 199, 0.3);
+            --port-position: rgba(180, 140, 100, 0.3);
+            --port-routing: rgba(120, 100, 160, 0.3);
+            --port-telemetry: rgba(80, 170, 200, 0.3);
         }
+
+        /* ===== BASE STYLES ===== */
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             margin: 0;
             font-family: monospace;
-            background: #1b1d24;
-            color: #eee;
+            background: var(--bg-primary);
+            color: var(--text-primary);
             height: 100vh;
             overflow: hidden;
         }
+
+        /* ===== LAYOUT COMPONENTS ===== */
         #header {
-            background: rgba(74, 114, 223, 0.75);
-            color: rgb(255, 244, 229);
+            background: var(--header-bg);
+            color: var(--header-text);
             text-align: center;
             font-size: 1.1em;
             padding: 6px;
@@ -37,15 +59,18 @@
             flex-wrap: wrap;
             gap: 6px;
         }
+
         .header-title {
             flex: 1;
             text-align: center;
             font-size: clamp(0.9em, 4vw, 1.1em);
         }
+
         .header-buttons {
             display: flex;
             gap: 4px;
         }
+
         .header-btn {
             background: rgba(255,255,255,0.2);
             border: 1px solid rgba(255,255,255,0.3);
@@ -58,43 +83,52 @@
             transition: all 0.2s;
             white-space: nowrap;
         }
+
         .header-btn:hover {
             background: rgba(255,255,255,0.3);
             border-color: rgba(255,255,255,0.5);
         }
+
         #log {
             height: calc(100vh - var(--header-height));
             padding: 8px;
             overflow-y: auto;
             overflow-x: hidden;
         }
+
+        /* ===== LOG LINE COMPONENTS ===== */
         .log-line {
-            background: rgba(255,255,255,0.08);
-            border: 1px solid rgba(255,255,255,0.15);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
             border-radius: 4px;
             margin-bottom: var(--spacing-sm);
             cursor: pointer;
+            transition: background 0.2s;
         }
+
         .log-line:hover {
-            background: rgba(255,255,255,0.12);
+            background: var(--bg-hover);
         }
+
         .log-line.expanded {
-            background: rgba(255,255,255,0.14);
-            border-color: rgba(255,255,255,0.3);
+            background: var(--bg-expanded);
+            border-color: var(--border-hover);
         }
+
         .compact-row {
             padding: var(--spacing-md) var(--spacing-lg);
             position: relative;
         }
-        /* Color classes */
-        .compact-row table.port-nodeinfo { background: rgba(100, 180, 120, 0.3); }
-        .compact-row table.port-traceroute { background: rgba(180, 120, 100, 0.3); }
-        .compact-row table.port-textmsg { background: rgba(53, 102, 199, 0.3); }
-        .compact-row table.port-position { background: rgba(180, 140, 100, 0.3); }
-        .compact-row table.port-routing { background: rgba(120, 100, 160, 0.3); }
-        .compact-row table.port-telemetry { background: rgba(80, 170, 200, 0.3); }
-        
-        /* DESKTOP: Fixed layout table */
+
+        /* ===== PORT COLOR THEMES ===== */
+        .compact-row table.port-nodeinfo { background: var(--port-nodeinfo); }
+        .compact-row table.port-traceroute { background: var(--port-traceroute); }
+        .compact-row table.port-textmsg { background: var(--port-textmsg); }
+        .compact-row table.port-position { background: var(--port-position); }
+        .compact-row table.port-routing { background: var(--port-routing); }
+        .compact-row table.port-telemetry { background: var(--port-telemetry); }
+
+        /* ===== DESKTOP LAYOUT ===== */
         @media (min-width: 768px) {
             .compact-row table {
                 table-layout: fixed;
@@ -102,6 +136,7 @@
                 border-collapse: collapse;
                 font-size: 0.95em;
             }
+
             .compact-row td {
                 padding: 1px 3px;
                 border: 1px solid rgba(255,255,255,0.1);
@@ -111,6 +146,7 @@
                 text-overflow: ellipsis;
                 white-space: nowrap;
             }
+
             .col-received { width: 16%; }
             .col-id { width: 8%; }
             .col-from { width: 9%; }
@@ -122,7 +158,7 @@
             .col-next { width: 10%; }
         }
 
-        /* MOBILE: CSS Grid layout - stacks naturally */
+        /* ===== MOBILE LAYOUT ===== */
         @media (max-width: 767px) {
             .compact-row {
                 padding: 6px;
@@ -130,6 +166,7 @@
                 gap: 4px;
                 font-size: 0.85em;
             }
+
             .compact-row::before {
                 content: attr(data-summary);
                 display: block;
@@ -140,6 +177,7 @@
                 background: rgba(0,0,0,0.4);
                 border-radius: 2px;
             }
+
             .compact-row > div {
                 display: flex;
                 flex-direction: column;
@@ -148,40 +186,46 @@
                 border: 1px solid rgba(255,255,255,0.1);
                 border-radius: 2px;
             }
+
             .compact-label {
                 font-size: 0.65em;
                 opacity: 0.9;
                 font-weight: bold;
                 text-transform: uppercase;
-                color: #ccc;
+                color: var(--text-secondary);
             }
+
             .compact-value {
                 font-family: monospace;
                 color: #fff;
                 font-size: 0.8em;
                 word-break: break-all;
             }
+
             .expand-indicator {
                 display: none;
             }
         }
 
+        /* ===== TEXT COMPONENTS ===== */
         .compact-label {
             font-size: 0.75em;
             opacity: 0.8;
             font-weight: bold;
             text-transform: uppercase;
-            color: #ccc;
+            color: var(--text-secondary);
         }
+
         .compact-value {
             font-family: monospace;
             color: #fff;
             font-size: 0.9em;
         }
+
         .full-json {
             padding: 8px;
             background: #2b2b2b;
-            border-top: 1px solid rgba(255,255,255,0.15);
+            border-top: 1px solid var(--border-color);
             margin: 0;
             font-size: 0.9em;
             white-space: pre-wrap;
@@ -191,6 +235,8 @@
             overflow-y: auto;
             border-radius: 0 0 4px 4px;
         }
+
+        /* ===== INDICATORS ===== */
         .expand-indicator {
             position: absolute;
             right: 8px;
@@ -200,10 +246,13 @@
             opacity: 0.7;
             pointer-events: none;
             font-weight: bold;
+            transition: transform 0.2s;
         }
+
         .log-line.expanded .expand-indicator {
             transform: translateY(-50%) rotate(180deg);
         }
+
         .duplicate-indicator {
             position: absolute;
             right: 28px;
@@ -232,159 +281,306 @@
     <div id="log"></div>
 
     <script type="application/javascript">
-        const socket = io('{{ settings.namespace_rawdata }}');
-        const logDiv = document.getElementById('log');
-        const collapseAllBtn = document.getElementById('collapse-all');
-        const clearAllBtn = document.getElementById('clear-all');
-        const showDuplicatesCheckbox = document.getElementById('show-duplicates');
-
-        const portColors = {
-            'NODEINFO_APP': 'port-nodeinfo',
-            'TRACEROUTE_APP': 'port-traceroute', 
-            'TEXT_MESSAGE_APP': 'port-textmsg',
-            'POSITION_APP': 'port-position',
-            'ROUTING_APP': 'port-routing',
-            'TELEMETRY_APP': 'port-telemetry'
+        // ===== CONFIGURATION & CONSTANTS =====
+        const CONFIG = {
+            SOCKET_NAMESPACE: '{{ settings.namespace_rawdata }}',
+            PORT_COLORS: {
+                'NODEINFO_APP': 'port-nodeinfo',
+                'TRACEROUTE_APP': 'port-traceroute', 
+                'TEXT_MESSAGE_APP': 'port-textmsg',
+                'POSITION_APP': 'port-position',
+                'ROUTING_APP': 'port-routing',
+                'TELEMETRY_APP': 'port-telemetry'
+            },
+            TABLE_FIELDS: [
+                {label: 'Received', value: 'received', colClass: 'col-received received-col'},
+                {label: 'Message ID', value: 'id_', colClass: 'col-id other-col'},
+                {label: 'From', value: 'fromDisplay', colClass: 'col-from other-col'},
+                {label: 'To', value: 'toDisplay', colClass: 'col-to other-col'},
+                {label: 'Channel', value: 'channel_name', colClass: 'col-channel other-col'},
+                {label: 'Port', value: 'portnum', colClass: 'col-port other-col'},
+                {label: 'Relay (Received Via)', value: 'relay_node', colClass: 'col-relay other-col'},
+                {label: 'MQTT Uplink', value: 'uplinkDisplay', colClass: 'col-uplink other-col'},
+                {label: 'Next Hop', value: 'next_hop', colClass: 'col-next other-col'}
+            ]
         };
 
-        function safeParse(rawData) {
-            if (typeof rawData !== 'string') return rawData;
-            try {
-                return JSON.parse(rawData);
-            } catch (e) {
-                console.warn('Invalid JSON received:', rawData?.substring(0, 100));
-                return null;
-            }
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        function formatTimestamp(unixTime) {
-            if (!unixTime || unixTime === null || unixTime === undefined) return 'N/A';
-            try {
-                const date = new Date(unixTime * 1000);
-                return date.toLocaleString();
-            } catch (e) {
-                return 'Invalid';
-            }
-        }
-
-        function toHex (n, digits = 8) {
-            const num = +n;
-            if (!num) return '0'.repeat(digits);
-            return (BigInt(num)).toString(16).padStart(digits, '0');
+        // ===== DOM ELEMENT REFERENCES =====
+        const DOM = {
+            logDiv: document.getElementById('log'),
+            collapseAllBtn: document.getElementById('collapse-all'),
+            clearAllBtn: document.getElementById('clear-all'),
+            showDuplicatesCheckbox: document.getElementById('show-duplicates')
         };
 
-        function getNodeDisplayName(nodeObj) {
-            return nodeObj?.name || nodeObj?.short_name || nodeObj?.long_name;
-        }
+        // ===== SOCKET.IO CLIENT =====
+        const socket = io(CONFIG.SOCKET_NAMESPACE);
 
-        function formatHexNodeId(nodeNum) {
-            return nodeNum !== undefined ? '!' + toHex(nodeNum) : 'N/A';
-        }
+        // ===== UTILITY FUNCTIONS =====
+        const Utils = {
+            /**
+             * Safely parse JSON string
+             * @param {string} rawData - JSON string to parse
+             * @returns {object|null} Parsed object or null if invalid
+             */
+            safeParse(rawData) {
+                if (typeof rawData !== 'string') return rawData;
+                try {
+                    return JSON.parse(rawData);
+                } catch (e) {
+                    console.warn('Invalid JSON received:', rawData?.substring(0, 100));
+                    return null;
+                }
+            },
 
-        function formatToNodeId(nodeNum) {
-            if (nodeNum === undefined) return 'N/A';
-            return nodeNum === 4294967295 ? 'BROADCAST' : '!' + toHex(nodeNum);
-        }
+            /**
+             * Escape HTML to prevent XSS
+             * @param {string} text - Text to escape
+             * @returns {string} Escaped HTML
+             */
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            },
 
-        function formatNodeWithName(idText, nameText) {
-            return nameText ? `${idText} (${nameText})` : idText;
-        }
+            /**
+             * Format Unix timestamp to readable string
+             * @param {number} unixTime - Unix timestamp
+             * @returns {string} Formatted date/time
+             */
+            formatTimestamp(unixTime) {
+                if (!unixTime || unixTime === null || unixTime === undefined) return 'N/A';
+                try {
+                    const date = new Date(unixTime * 1000);
+                    return date.toLocaleString();
+                } catch (e) {
+                    return 'Invalid';
+                }
+            },
 
-        function renderCompact(lineData) {
-            const id_ = lineData.id_ !== undefined ? String(lineData.id_) : 'N/A';
-            const fromId = formatHexNodeId(lineData.from_);
-            const toId = formatToNodeId(lineData.to);
-            const uplinkId = lineData.uplink || 'N/A';
+            /**
+             * Convert number to hexadecimal string
+             * @param {number} n - Number to convert
+             * @param {number} digits - Number of digits to pad
+             * @returns {string} Hexadecimal string
+             */
+            toHex(n, digits = 8) {
+                const num = +n;
+                if (!num) return '0'.repeat(digits);
+                return (BigInt(num)).toString(16).padStart(digits, '0');
+            },
 
-            const fromDisplay = formatNodeWithName(fromId, getNodeDisplayName(lineData.from_node));
-            const toDisplay = toId === 'BROADCAST' ? 'BROADCAST' : formatNodeWithName(toId, getNodeDisplayName(lineData.to_node));
-            const uplinkDisplay = formatNodeWithName(uplinkId, getNodeDisplayName(lineData.uplink_node));
+            /**
+             * Get display name from node object
+             * @param {object} nodeObj - Node object with name properties
+             * @returns {string} Display name or undefined
+             */
+            getNodeDisplayName(nodeObj) {
+                return nodeObj?.name || nodeObj?.short_name || nodeObj?.long_name;
+            },
 
-            const channel_name = lineData.channel_name || 'N/A';
-            const portnum = lineData.decoded?.portnum || 'N/A';
-            const relay_node = lineData.relay_node !== null ? toHex(lineData.relay_node, 2) : 'N/A';
-            const next_hop = lineData.next_hop !== null ? toHex(lineData.next_hop, 2) : 'N/A';
-            const received = formatTimestamp(lineData.rx_time);
+            /**
+             * Format node ID as hexadecimal
+             * @param {number} nodeNum - Node number
+             * @returns {string} Formatted node ID
+             */
+            formatHexNodeId(nodeNum) {
+                return nodeNum !== undefined ? '!' + this.toHex(nodeNum) : 'N/A';
+            },
 
-            const logLine = document.createElement('div');
-            logLine.className = 'log-line';
-            logLine.dataset.rawData = JSON.stringify(lineData);
-            logLine.dataset.isExpanded = 'false';
+            /**
+             * Format destination node ID with broadcast handling
+             * @param {number} nodeNum - Node number
+             * @returns {string} Formatted destination ID
+             */
+            formatToNodeId(nodeNum) {
+                if (nodeNum === undefined) return 'N/A';
+                return nodeNum === 4294967295 ? 'BROADCAST' : '!' + this.toHex(nodeNum);
+            },
 
-            const compactRow = document.createElement('div');
-            compactRow.className = 'compact-row';
-
-            // MOBILE SUMMARY (shows port + from/to)
-            const mobileSummary = `Port: ${portnum} | ${fromDisplay} → ${toDisplay}`;
-            compactRow.dataset.summary = mobileSummary;
-
-            const table = document.createElement('table');
-            const portColorClass = portColors[portnum] || '';
-            if (portColorClass) {
-                table.classList.add(portColorClass);
+            /**
+             * Combine node ID with display name
+             * @param {string} idText - Node ID text
+             * @param {string} nameText - Node name text
+             * @returns {string} Combined display text
+             */
+            formatNodeWithName(idText, nameText) {
+                return nameText ? `${idText} (${nameText})` : idText;
             }
+        };
 
-            const row = table.insertRow();
-            
-            const fields = [
-                {label: 'Received', value: received, colClass: 'col-received received-col'},
-                {label: 'Message ID', value: id_, colClass: 'col-id other-col'},
-                {label: 'From', value: fromDisplay, colClass: 'col-from other-col'},
-                {label: 'To', value: toDisplay, colClass: 'col-to other-col'},
-                {label: 'Channel', value: channel_name, colClass: 'col-channel other-col'},
-                {label: 'Port', value: portnum, colClass: 'col-port other-col'},
-                {label: 'Relay (Received Via)', value: relay_node, colClass: 'col-relay other-col'},
-                {label: 'MQTT Uplink', value: uplinkDisplay, colClass: 'col-uplink other-col'},
-                {label: 'Next Hop', value: next_hop, colClass: 'col-next other-col'}
-            ];
+        // ===== DATA PROCESSING =====
+        const DataProcessor = {
+            /**
+             * Process raw line data into formatted display values
+             * @param {object} lineData - Raw packet data
+             * @returns {object} Processed data with display values
+             */
+            processLineData(lineData) {
+                const id_ = lineData.id_ !== undefined ? String(lineData.id_) : 'N/A';
+                const fromId = Utils.formatHexNodeId(lineData.from_);
+                const toId = Utils.formatToNodeId(lineData.to);
+                const uplinkId = lineData.uplink || 'N/A';
 
-            fields.forEach(field => {
-                const cell = row.insertCell();
-                cell.className = field.colClass;
-                cell.innerHTML = `
-                    <div class="compact-label">${escapeHtml(field.label)}</div>
-                    <div class="compact-value">${escapeHtml(field.value)}</div>
-                `;
-            });
+                const fromDisplay = Utils.formatNodeWithName(fromId, Utils.getNodeDisplayName(lineData.from_node));
+                const toDisplay = toId === 'BROADCAST' ? 'BROADCAST' : Utils.formatNodeWithName(toId, Utils.getNodeDisplayName(lineData.to_node));
+                const uplinkDisplay = Utils.formatNodeWithName(uplinkId, Utils.getNodeDisplayName(lineData.uplink_node));
 
-            const indicator = document.createElement('div');
-            indicator.className = 'expand-indicator';
-            indicator.textContent = '▼';
-            compactRow.appendChild(indicator);
-            
-            // Add duplicate indicator if this is a duplicate packet
-            if (lineData.is_duplicate === true) {
-                const duplicateIndicator = document.createElement('div');
-                duplicateIndicator.className = 'duplicate-indicator';
-                duplicateIndicator.textContent = '🔄';
-                compactRow.appendChild(duplicateIndicator);
+                const channel_name = lineData.channel_name || 'N/A';
+                const portnum = lineData.decoded?.portnum || 'N/A';
+                const relay_node = lineData.relay_node !== null ? Utils.toHex(lineData.relay_node, 2) : 'N/A';
+                const next_hop = lineData.next_hop !== null ? Utils.toHex(lineData.next_hop, 2) : 'N/A';
+                const received = Utils.formatTimestamp(lineData.rx_time);
+
+                return {
+                    ...lineData,
+                    id_,
+                    fromDisplay,
+                    toDisplay,
+                    uplinkDisplay,
+                    channel_name,
+                    portnum,
+                    relay_node,
+                    next_hop,
+                    received
+                };
             }
-            
-            compactRow.appendChild(table);
-            logLine.appendChild(compactRow);
+        };
 
-            logLine.addEventListener('click', (e) => {
-                if (e.target.closest('.expand-indicator')) return;
-                toggleExpand(logLine);
-            });
+        // ===== DOM RENDERING =====
+        const Renderer = {
+            /**
+             * Create a compact log line element
+             * @param {object} lineData - Processed packet data
+             * @returns {HTMLElement} Log line element
+             */
+            renderCompact(lineData) {
+                const processedData = DataProcessor.processLineData(lineData);
+                
+                const logLine = this.createLogLineContainer(processedData);
+                const compactRow = this.createCompactRow(processedData);
+                
+                logLine.appendChild(compactRow);
+                this.attachEventListeners(logLine);
+                
+                return logLine;
+            },
 
-            return logLine;
-        }
-
-        function toggleExpand(logLine) {
-            const isExpanded = logLine.dataset.isExpanded === 'true';
-            if (isExpanded) {
-                const jsonBlock = logLine.querySelector('.full-json');
-                if (jsonBlock) jsonBlock.remove();
-                logLine.classList.remove('expanded');
+            /**
+             * Create the main log line container
+             * @param {object} processedData - Processed packet data
+             * @returns {HTMLElement} Log line container
+             */
+            createLogLineContainer(processedData) {
+                const logLine = document.createElement('div');
+                logLine.className = 'log-line';
+                logLine.dataset.rawData = JSON.stringify(processedData);
                 logLine.dataset.isExpanded = 'false';
-            } else {
+                return logLine;
+            },
+
+            /**
+             * Create the compact row with table
+             * @param {object} processedData - Processed packet data
+             * @returns {HTMLElement} Compact row element
+             */
+            createCompactRow(processedData) {
+                const compactRow = document.createElement('div');
+                compactRow.className = 'compact-row';
+                
+                // Mobile summary
+                const mobileSummary = `Port: ${processedData.portnum} | ${processedData.fromDisplay} → ${processedData.toDisplay}`;
+                compactRow.dataset.summary = mobileSummary;
+
+                const table = this.createTable(processedData);
+                compactRow.appendChild(table);
+                
+                this.addIndicators(compactRow, processedData);
+                
+                return compactRow;
+            },
+
+            /**
+             * Create the data table
+             * @param {object} processedData - Processed packet data
+             * @returns {HTMLElement} Table element
+             */
+            createTable(processedData) {
+                const table = document.createElement('table');
+                const portColorClass = CONFIG.PORT_COLORS[processedData.portnum];
+                if (portColorClass) {
+                    table.classList.add(portColorClass);
+                }
+
+                const row = table.insertRow();
+                
+                CONFIG.TABLE_FIELDS.forEach(field => {
+                    const cell = row.insertCell();
+                    cell.className = field.colClass;
+                    cell.innerHTML = `
+                        <div class="compact-label">${Utils.escapeHtml(field.label)}</div>
+                        <div class="compact-value">${Utils.escapeHtml(processedData[field.value] || 'N/A')}</div>
+                    `;
+                });
+
+                return table;
+            },
+
+            /**
+             * Add expand and duplicate indicators
+             * @param {HTMLElement} compactRow - Row element
+             * @param {object} processedData - Processed packet data
+             */
+            addIndicators(compactRow, processedData) {
+                // Expand indicator
+                const indicator = document.createElement('div');
+                indicator.className = 'expand-indicator';
+                indicator.textContent = '▼';
+                compactRow.appendChild(indicator);
+                
+                // Duplicate indicator
+                if (processedData.is_duplicate === true) {
+                    const duplicateIndicator = document.createElement('div');
+                    duplicateIndicator.className = 'duplicate-indicator';
+                    duplicateIndicator.textContent = '🔄';
+                    compactRow.appendChild(duplicateIndicator);
+                }
+            },
+
+            /**
+             * Attach click event listener
+             * @param {HTMLElement} logLine - Log line element
+             */
+            attachEventListeners(logLine) {
+                logLine.addEventListener('click', (e) => {
+                    if (e.target.closest('.expand-indicator')) return;
+                    UIController.toggleExpand(logLine);
+                });
+            }
+        };
+
+        // ===== UI CONTROLLER =====
+        const UIController = {
+            /**
+             * Toggle expansion of a log line
+             * @param {HTMLElement} logLine - Log line element
+             */
+            toggleExpand(logLine) {
+                const isExpanded = logLine.dataset.isExpanded === 'true';
+                
+                if (isExpanded) {
+                    this.collapseLine(logLine);
+                } else {
+                    this.expandLine(logLine);
+                }
+            },
+
+            /**
+             * Expand a log line to show JSON
+             * @param {HTMLElement} logLine - Log line element
+             */
+            expandLine(logLine) {
                 const rawData = JSON.parse(logLine.dataset.rawData);
                 const jsonDiv = document.createElement('div');
                 jsonDiv.className = 'full-json';
@@ -392,75 +588,96 @@
                 logLine.appendChild(jsonDiv);
                 logLine.classList.add('expanded');
                 logLine.dataset.isExpanded = 'true';
-            }
-        }
+            },
 
-        function collapseAll() {
-            const expandedLines = logDiv.querySelectorAll('.log-line.expanded');
-            expandedLines.forEach(logLine => {
+            /**
+             * Collapse a log line to hide JSON
+             * @param {HTMLElement} logLine - Log line element
+             */
+            collapseLine(logLine) {
                 const jsonBlock = logLine.querySelector('.full-json');
                 if (jsonBlock) jsonBlock.remove();
                 logLine.classList.remove('expanded');
                 logLine.dataset.isExpanded = 'false';
-            });
-        }
+            },
 
-        function clearAll() {
-            logDiv.innerHTML = '';
-        }
+            /**
+             * Collapse all expanded log lines
+             */
+            collapseAll() {
+                const expandedLines = DOM.logDiv.querySelectorAll('.log-line.expanded');
+                expandedLines.forEach(logLine => this.collapseLine(logLine));
+            },
 
-        collapseAllBtn.addEventListener('click', collapseAll);
-        clearAllBtn.addEventListener('click', clearAll);
-        
-        // Filter existing packets when checkbox is toggled
-        showDuplicatesCheckbox.addEventListener('change', () => {
-            filterExistingPackets();
-        });
-        
-        function filterExistingPackets() {
-            const showDuplicates = showDuplicatesCheckbox.checked;
-            const allLogLines = logDiv.querySelectorAll('.log-line');
-            
-            allLogLines.forEach((logLine) => {
-                const rawData = JSON.parse(logLine.dataset.rawData);
-                const isDuplicate = rawData.is_duplicate === true;
+            /**
+             * Clear all log lines
+             */
+            clearAll() {
+                DOM.logDiv.innerHTML = '';
+            },
+
+            /**
+             * Filter existing packets based on duplicate setting
+             */
+            filterExistingPackets() {
+                const showDuplicates = DOM.showDuplicatesCheckbox.checked;
+                const allLogLines = DOM.logDiv.querySelectorAll('.log-line');
                 
-                // Show/hide based on filter
-                if (showDuplicates) {
-                    // When showing duplicates: show everything (both unique and duplicates)
-                    logLine.style.display = 'block';
-                } else {
-                    // When not showing duplicates: only show unique packets
-                    if (isDuplicate) {
-                        logLine.style.display = 'none'; // Hide duplicates
-                    } else {
-                        logLine.style.display = 'block'; // Show unique packets
-                    }
-                }
+                allLogLines.forEach((logLine) => {
+                    const rawData = JSON.parse(logLine.dataset.rawData);
+                    const isDuplicate = rawData.is_duplicate === true;
+                    
+                    logLine.style.display = showDuplicates || !isDuplicate ? 'block' : 'none';
+                });
+            },
+
+            /**
+             * Add a new log line to the display
+             * @param {object} rawData - Raw packet data
+             */
+            addLogLine(rawData) {
+                let lineData = Utils.safeParse(rawData);
+                if (!lineData) return;
+                
+                const logLine = Renderer.renderCompact(lineData);
+                DOM.logDiv.appendChild(logLine);
+                DOM.logDiv.scrollTop = DOM.logDiv.scrollHeight;
+                
+                // Apply current filter to the new packet
+                this.filterExistingPackets();
+            }
+        };
+
+        // ===== EVENT LISTENERS =====
+        function initializeEventListeners() {
+            DOM.collapseAllBtn.addEventListener('click', UIController.collapseAll);
+            DOM.clearAllBtn.addEventListener('click', UIController.clearAll);
+            DOM.showDuplicatesCheckbox.addEventListener('change', UIController.filterExistingPackets);
+        }
+
+        // ===== SOCKET.IO EVENT HANDLERS =====
+        function initializeSocketHandlers() {
+            socket.on('connect', () => {
+                console.log('Connected to socket');
+            });
+            
+            socket.on('disconnect', () => {
+                console.log('Disconnected from socket');
+            });
+            
+            socket.on('rawlog', data => {
+                UIController.addLogLine(data);
             });
         }
 
-        function addLogLine(rawData) {
-            let lineData = safeParse(rawData);
-            if (!lineData) return;
-            
-            const logLine = renderCompact(lineData);
-            logDiv.appendChild(logLine);
-            logDiv.scrollTop = logDiv.scrollHeight;
-            
-            // Apply current filter to the new packet
-            filterExistingPackets();
+        // ===== INITIALIZATION =====
+        function initializeApp() {
+            initializeEventListeners();
+            initializeSocketHandlers();
         }
 
-        socket.on('connect', () => {
-            console.log('Connected to socket');
-        });
-        socket.on('disconnect', () => {
-            console.log('Disconnected from socket');
-        });
-        socket.on('rawlog', data => {
-            addLogLine(data);
-        });
+        // Start the application when DOM is ready
+        document.addEventListener('DOMContentLoaded', initializeApp);
     </script>
 </body>
 </html>
