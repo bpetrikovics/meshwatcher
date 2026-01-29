@@ -260,9 +260,9 @@
             transform: translateY(-50%);
             font-size: 0.9em;
             opacity: 0.8;
-            pointer-events: none;
             color: #ff6b6b;
             font-weight: bold;
+            cursor: help;
         }
     </style>
 </head>
@@ -544,6 +544,7 @@
                     const duplicateIndicator = document.createElement('div');
                     duplicateIndicator.className = 'duplicate-indicator';
                     duplicateIndicator.textContent = '🔄';
+                    duplicateIndicator.title = 'This packet is a duplicate';
                     compactRow.appendChild(duplicateIndicator);
                 }
             },
