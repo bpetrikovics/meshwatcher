@@ -131,6 +131,11 @@ class MeshtasticPacket(SQLModel, table=True):
 
     @computed_field
     @property
+    def is_duplicate(self) -> bool:
+        return getattr(self, '_is_duplicate', False)
+
+    @computed_field
+    @property
     def is_broadcast(self) -> bool:
         return (self.to == 0xffffffff)
 

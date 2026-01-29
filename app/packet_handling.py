@@ -51,6 +51,10 @@ class RawPacketHandler:
                     logger.error("Validation failed for packet, skipping: %s", json_data)
                     return
 
+                # Always check for duplicates to mark the packet, but only filter if dedup was requested
+                is_duplicate = not self.stats.analyze(packet)
+                packet._is_duplicate = is_duplicate
+
                 if settings.packet_sql_log:
                     logger.info("Saving packet to database: %s", packet)
                     with db_session() as db:
@@ -61,13 +65,14 @@ class RawPacketHandler:
                         if packet.rx_snr is not None and not isinstance(packet.rx_snr, Decimal):
                             packet.rx_snr = Decimal(str(packet.rx_snr))
                         db.expunge(packet)
+                        # Ensure _is_duplicate survives the database operations
+                        packet._is_duplicate = is_duplicate
 
                 # Invoke any callbacks that require raw data
                 for callback in self.callbacks.get('raw', []):
                     callback(packet)
-
-                # If dedup was requested, check if the packet is a duplicate
-                if dedup and not self.stats.analyze(packet):
+                
+                if dedup and is_duplicate:
                     logger.debug("Packet %s is a duplicate, skipping", packet.id_)
                     return
 

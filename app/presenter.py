@@ -58,6 +58,9 @@ class Presenter:
         if packet.rx_snr is not None and not isinstance(packet.rx_snr, Decimal):
             packet.rx_snr = Decimal(str(packet.rx_snr))
         payload = packet.model_dump(mode="json")
+        
+        # Ensure is_duplicate is included in the payload
+        payload["is_duplicate"] = packet.is_duplicate
 
         # Enrich the data sent to the frontend with resolved node names
         from_id = f"!{packet.from_:08x}"
