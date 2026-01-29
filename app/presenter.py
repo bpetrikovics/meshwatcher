@@ -59,6 +59,7 @@ class Presenter:
             packet.rx_snr = Decimal(str(packet.rx_snr))
         payload = packet.model_dump(mode="json")
 
+        # Enrich the data sent to the frontend with resolved node names
         from_id = f"!{packet.from_:08x}"
         uplink_id = packet.uplink  # already has leading '!'
         is_broadcast = (packet.to == 0xffffffff)
@@ -95,6 +96,8 @@ class Presenter:
                     elif not is_broadcast and node_id == to_id:
                         to_node_payload = resolved
 
+        # Add the resolved node names to the payload
+        # TODO: is this the best wey, or from/to/uplink nodes should be objects instead of strings?
         payload["from_node"] = from_node_payload or {"id": from_id}
         payload["uplink_node"] = uplink_node_payload or {"id": uplink_id}
         if is_broadcast:
