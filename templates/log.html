@@ -204,12 +204,27 @@
         .log-line.expanded .expand-indicator {
             transform: translateY(-50%) rotate(180deg);
         }
+        .duplicate-indicator {
+            position: absolute;
+            right: 28px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.9em;
+            opacity: 0.8;
+            pointer-events: none;
+            color: #ff6b6b;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     <div id="header">
         <div class="header-title">Real-time mesh packet log via {{ settings.mqtt_server }} | Raw data without deduplication</div>
         <div class="header-buttons">
+            <label class="header-btn" style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                <input type="checkbox" id="show-duplicates" checked>
+                <span>Show duplicates</span>
+            </label>
             <button class="header-btn" id="collapse-all">Collapse All</button>
             <button class="header-btn" id="clear-all">Clear</button>
         </div>
@@ -221,6 +236,7 @@
         const logDiv = document.getElementById('log');
         const collapseAllBtn = document.getElementById('collapse-all');
         const clearAllBtn = document.getElementById('clear-all');
+        const showDuplicatesCheckbox = document.getElementById('show-duplicates');
 
         const portColors = {
             'NODEINFO_APP': 'port-nodeinfo',
@@ -341,6 +357,15 @@
             indicator.className = 'expand-indicator';
             indicator.textContent = '▼';
             compactRow.appendChild(indicator);
+            
+            // Add duplicate indicator if this is a duplicate packet
+            if (lineData.is_duplicate === true) {
+                const duplicateIndicator = document.createElement('div');
+                duplicateIndicator.className = 'duplicate-indicator';
+                duplicateIndicator.textContent = '🔄';
+                compactRow.appendChild(duplicateIndicator);
+            }
+            
             compactRow.appendChild(table);
             logLine.appendChild(compactRow);
 
@@ -386,18 +411,56 @@
 
         collapseAllBtn.addEventListener('click', collapseAll);
         clearAllBtn.addEventListener('click', clearAll);
+        
+        // Filter existing packets when checkbox is toggled
+        showDuplicatesCheckbox.addEventListener('change', () => {
+            filterExistingPackets();
+        });
+        
+        function filterExistingPackets() {
+            const showDuplicates = showDuplicatesCheckbox.checked;
+            const allLogLines = logDiv.querySelectorAll('.log-line');
+            
+            allLogLines.forEach((logLine) => {
+                const rawData = JSON.parse(logLine.dataset.rawData);
+                const isDuplicate = rawData.is_duplicate === true;
+                
+                // Show/hide based on filter
+                if (showDuplicates) {
+                    // When showing duplicates: show everything (both unique and duplicates)
+                    logLine.style.display = 'block';
+                } else {
+                    // When not showing duplicates: only show unique packets
+                    if (isDuplicate) {
+                        logLine.style.display = 'none'; // Hide duplicates
+                    } else {
+                        logLine.style.display = 'block'; // Show unique packets
+                    }
+                }
+            });
+        }
 
         function addLogLine(rawData) {
             let lineData = safeParse(rawData);
             if (!lineData) return;
+            
             const logLine = renderCompact(lineData);
             logDiv.appendChild(logLine);
             logDiv.scrollTop = logDiv.scrollHeight;
+            
+            // Apply current filter to the new packet
+            filterExistingPackets();
         }
 
-        socket.on('connect', () => console.log('Connected'));
-        socket.on('disconnect', () => console.log('Disconnected'));
-        socket.on('rawlog', data => addLogLine(data));
+        socket.on('connect', () => {
+            console.log('Connected to socket');
+        });
+        socket.on('disconnect', () => {
+            console.log('Disconnected from socket');
+        });
+        socket.on('rawlog', data => {
+            addLogLine(data);
+        });
     </script>
 </body>
 </html>
