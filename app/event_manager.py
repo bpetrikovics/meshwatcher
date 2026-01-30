@@ -9,7 +9,7 @@ from sqlmodel import select
 from meshtastic_mqtt_json import MeshtasticMQTT
 
 from .packet_handling import raw_handler
-from .models import MeshtasticPacket, NodeInfo, Telemetry, Metric
+from .models import MeshtasticPacket, NodeInfo, Telemetry, Metric, Position
 from .presenter import Presenter
 
 
@@ -60,8 +60,17 @@ class EventManager:
         """
         self.logger.info(packet)
 
-    def on_position(self, json_data):
-        pass
+    @raw_handler.validate_packet
+    def on_position(self, packet: MeshtasticPacket):
+        try:
+            position = self.extract_payload(packet, Position)
+        except ValidationError as exc:
+            self.logger.exception(exc)
+            return
+        
+        node_id = f"!{packet.from_:08x}"
+        position.node_id = node_id
+        self.logger.info(position)
 
     @raw_handler.validate_packet
     def on_nodeinfo(self, packet: MeshtasticPacket):

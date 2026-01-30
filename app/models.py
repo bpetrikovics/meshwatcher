@@ -427,6 +427,10 @@ class Telemetry(SQLModel, table=True):
 
 
 class Metric(SQLModel, table=True):
+    """
+    Represents a metric extracted from telemetry data.
+    """
+
     __tablename__ = "metrics"
 
     model_config = ConfigDict(
@@ -468,3 +472,93 @@ class Metric(SQLModel, table=True):
         Index("ix_metrics_latest", "nodeId", "metricType", "metric", desc("ts")),
         Index("ix_metrics_telemetry_id", "telemetryId"),
     )
+
+
+class Position(SQLModel, table=True):
+    """
+    Represents position data received from a Meshtastic node.
+    """
+
+    __tablename__ = "positions"
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="forbid",
+        from_attributes=True,
+    )
+
+    db_id: Optional[int] = Field(
+        default=None,
+        exclude=True,
+        sa_column=Column(Integer, primary_key=True, autoincrement=True),
+    )
+
+    node_id: Optional[str] = Field(
+        default=None,
+        sa_column=Column("nodeId", String(9), ForeignKey("nodes.id"), nullable=False),
+    )
+    latitude_i: int = Field(
+        alias="latitudeI",
+        sa_column=Column("latitudeI", Integer, nullable=False),
+    )
+    longitude_i: int = Field(
+        alias="longitudeI",
+        sa_column=Column("longitudeI", Integer, nullable=False),
+    )
+    altitude: int = Field(sa_column=Column("altitude", Integer, nullable=False))
+    time: int = Field(sa_column=Column("time", Integer, nullable=False))
+    location_source: str = Field(
+        alias="locationSource",
+        sa_column=Column("locationSource", String(32), nullable=False),
+    )
+    ground_speed: int = Field(
+        alias="groundSpeed",
+        sa_column=Column("groundSpeed", Integer, nullable=False),
+    )
+    ground_track: int = Field(
+        alias="groundTrack",
+        sa_column=Column("groundTrack", Integer, nullable=False),
+    )
+    precision_bits: int = Field(
+        alias="precisionBits",
+        sa_column=Column("precisionBits", Integer, nullable=False),
+    )
+
+    created_at: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column("createdAt", DateTime, nullable=True),
+        exclude=True,
+    )
+
+    __table_args__ = (
+        Index("ix_positions_node_time", "nodeId", "time"),
+        Index("ix_positions_time", "time"),
+    )
+
+    @computed_field
+    @property
+    def latitude(self) -> float:
+        """Convert latitude from integer (1e7 scale) to decimal degrees."""
+        return self.latitude_i / 1e7
+
+    @computed_field
+    @property
+    def longitude(self) -> float:
+        """Convert longitude from integer (1e7 scale) to decimal degrees."""
+        return self.longitude_i / 1e7
+
+    @computed_field
+    @property
+    def heading(self) -> float:
+        """Convert heading from integer (1e5 scale) to decimal degrees."""
+        return self.ground_track / 1e5
+
+    @computed_field
+    @property
+    def radius(self) -> float:
+        """Calculate precision radius from precision bits."""
+        return 23905787.925008 * (0.5 ** self.precision_bits)
+
+    def __str__(self) -> str:
+        node = self.node_id if self.node_id is not None else "<unset>"
+        return f"Position {node} @ {self.time}: lat={self.latitude}, lon={self.longitude}, heading={self.heading}, ground speed={self.ground_speed}, alt={self.altitude}, radius={self.radius:.2f}"
