@@ -1,7 +1,7 @@
 import atexit
 import logging
 
-from flask import render_template, request
+from flask import render_template, request, redirect
 from flask_socketio import SocketIO, emit
 
 from meshtastic_mqtt_json import MeshtasticMQTT
@@ -50,14 +50,14 @@ def handle_connect_default():
 def handle_disconnect_default():
     pass
 
-@socketio.on('connect', settings.namespace_rawdata)
-def handle_connect_rawdata():
+@socketio.on('connect', settings.namespace_packets)
+def handle_connect_packets():
     # store the sid so we can later send session specific content
     sid = request.sid
     logger.info("Client connected with sid %s", sid)
 
-@socketio.on('disconnect', settings.namespace_rawdata)
-def handle_disconnect_rawdata():
+@socketio.on('disconnect', settings.namespace_packets)
+def handle_disconnect_packets():
     sid = request.sid
     logger.info("Disconnection from sid %s", sid)
 
@@ -65,9 +65,13 @@ def handle_disconnect_rawdata():
 def index():
     return render_template('index.html', version=settings.git_commit)
 
-@app.route(settings.namespace_rawdata)
-def log():
-    return render_template('log.html', settings=settings)
+@app.route(settings.namespace_packets)
+def packets():
+    return render_template('packets.html', settings=settings)
+
+@app.route('/rawlog')
+def rawlog():
+    return redirect(settings.namespace_packets)
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=8080)
