@@ -443,7 +443,7 @@ class Position(SQLModel, table=True):
         alias="longitudeI",
         sa_column=Column("longitudeI", Integer, nullable=False),
     )
-    altitude: int = Field(sa_column=Column("altitude", Integer, nullable=False))
+    altitude: Optional[int] = Field(sa_column=Column("altitude", Integer, nullable=True))
     time: int = Field(sa_column=Column("time", Integer, nullable=False))
     location_source: str = Field(
         alias="locationSource",
