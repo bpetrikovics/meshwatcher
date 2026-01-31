@@ -190,54 +190,6 @@ class MeshtasticPacket(SQLModel, table=True):
                     f"{has_relay}{has_nexthop}{is_response}{want_ack}{want_response}{has_uplink} on {self.channel_name}/{self.channel}")
 
 
-"""
-{'from': 2224738468, 'to': 321385616, 'channel': 31,
-'decoded': {
-    'portnum': 'NODEINFO_APP',
-    'payload': {
-        'id': '!849ad0a4', 'longName': '🇭🇺 HA1ADM HT Mobil', 'shortName': 'ADM4',
-        'macaddr': 'sIGEmtCk', 'hwModel': 'HELTEC_V3', 'role': 'CLIENT_MUTE',
-        'publicKey': '04icuoGGUEY+IsF3BT89Ya2SIKSd8EUMirA/Nc9vHBM='
-        },
-    'wantResponse': True, 'bitfield': 3
-    },
-'id': 1330856275, 'rxTime': 1766442612, 'rxSnr': -3.25, 'hopLimit': 4,
-'rxRssi': -105, 'hopStart': 7, 'nextHop': 112, 'relayNode': 252,
-'uplink': '!a2e19ff0', 'channelName': 'MediumFast'}
-
-{'from': 2956776068, 'to': 382706456, 'channel': 31,
-'decoded': {
-    'portnum': 'NODEINFO_APP',
-    'payload': {
-        'id': '!b03cd284', 'longName': '🇭🇺 Kaszásdűlő 🏢 868', 'shortName': 'KA8B',
-        'hwModel': 'HELTEC_V3', 'role': 'CLIENT_BASE',
-        'publicKey': 'lbIajoQsPuG05U3oAAsmuUO1VEansCoTeNPK0lzMV2g='
-        },
-    'wantResponse': True, 'dest': 382706456, 'requestId': 2384491189, 'bitfield': 3
-    },
-'id': 2468926477, 'rxTime': 1766442726, 'hopLimit': 3, 'wantAck': True,
-'priority': 'RESPONSE', 'hopStart': 3, 'relayNode': 132, 'uplink': '!b03cd284',
-'channelName': 'MediumFast'
-}
-
-{'from': 2956776068, 'to': 3935232448, 'channel': 31,
-'decoded': {
-    'portnum': 'NODEINFO_APP',
-    'payload': {
-        'id': '!b03cd284', 'longName': '🇭🇺 Kaszásdűlő 🏢 868', 'shortName': 'KA8B',
-        'macaddr': 'NM2wPNKE', 'hwModel': 'HELTEC_V3', 'role': 'CLIENT_BASE',
-        'publicKey': 'lbIajoQsPuG05U3oAAsmuUO1VEansCoTeNPK0lzMV2g=',
-        'isUnmessagable': False
-        },
-    'wantResponse': True, 'bitfield': 3
-    },
-'id': 3477936900, 'rxTime': 1766442925, 'hopLimit': 7, 'priority': 'RELIABLE',
-'hopStart': 7, 'relayNode': 132, 'uplink': '!b03cd284', 'channelName': 'MediumFast'
-}
-
-"""
-
-
 class NodeInfo(SQLModel, table=True):
     __tablename__ = "nodes"
 
@@ -299,20 +251,6 @@ class NodeInfo(SQLModel, table=True):
 
         return f"NodeInfo {self.id_}{short_name}{long_name}{model}{role}"
 
-"""
-{'from': 2922542922, 'to': 4294967295,
-'channel': 8,
-'decoded': {
-    'portnum': 'TELEMETRY_APP',
-    'payload': {
-        'time': 1747876154,
-        'deviceMetrics': {
-            'batteryLevel': 91, 'voltage': 4.07, 'channelUtilization': 12.825001, 'airUtilTx': 6.1378055, 'uptimeSeconds': 1063460
-            }
-        },
-    'bitfield': 1},
-'id': 923524629, 'rxTime': 1747876154, 'priority': 'BACKGROUND', 'hopStart': 3, 'relayNode': 74}
-"""
 
 class Telemetry(SQLModel, table=True):
     """

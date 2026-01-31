@@ -79,13 +79,6 @@ class EventManager:
 
     @raw_handler.validate_packet
     def on_nodeinfo(self, packet: MeshtasticPacket):
-        """
-        { 'portnum': 'NODEINFO_APP', 'payload': {
-          'id': '!d45a9a80', 'longName': '🇭🇺 CzD B2', 'shortName': 'czd4', 'macaddr': 'HNvUWpqA','hwModel': 'SEEED_XIAO_S3',
-          'role': 'CLIENT_BASE', 'publicKey': 'sXwaWsSIxXwHHNtaAumip6sBeajxwGbS5gFrLX5r83U=', 'isUnmessagable': True},
-          'requestId': 5571986, 'bitfield': 1
-        }
-        """
         try:
             nodeinfo = self.extract_payload(packet, NodeInfo)
         except ValidationError as exc:
