@@ -283,7 +283,7 @@
     <script type="application/javascript">
         // ===== CONFIGURATION & CONSTANTS =====
         const CONFIG = {
-            SOCKET_NAMESPACE: '{{ settings.namespace_rawdata }}',
+            SOCKET_NAMESPACE: '{{ settings.namespace_packets }}',
             PORT_COLORS: {
                 'NODEINFO_APP': 'port-nodeinfo',
                 'TRACEROUTE_APP': 'port-traceroute', 
@@ -666,7 +666,7 @@
                 console.log('Disconnected from socket');
             });
             
-            socket.on('rawlog', data => {
+            socket.on('packets', data => {
                 UIController.addLogLine(data);
             });
         }

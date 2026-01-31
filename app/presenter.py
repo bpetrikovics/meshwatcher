@@ -109,5 +109,5 @@ class Presenter:
             payload["to_node"] = to_node_payload or {"id": to_id}
     
         self.socketio.emit(
-            "rawlog", payload, namespace=settings.namespace_rawdata
+            "packets", payload, namespace=settings.namespace_packets
         )

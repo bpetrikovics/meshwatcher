@@ -34,7 +34,7 @@ class Settings(BaseSettings):
 
     readonly_mode: bool = False
 
-    namespace_rawdata: str = "/rawlog"
+    namespace_packets: str = "/packets"
 
     node_cache_ttl_seconds: int = 1800
 
