@@ -444,18 +444,18 @@ class Position(SQLModel, table=True):
         sa_column=Column("longitudeI", Integer, nullable=False),
     )
     altitude: Optional[int] = Field(sa_column=Column("altitude", Integer, nullable=True))
-    time: int = Field(sa_column=Column("time", Integer, nullable=False))
+    time: Optional[int] = Field(sa_column=Column("time", Integer, nullable=True))
     location_source: str = Field(
         alias="locationSource",
         sa_column=Column("locationSource", String(32), nullable=False),
     )
-    ground_speed: int = Field(
+    ground_speed: Optional[int] = Field(
         alias="groundSpeed",
-        sa_column=Column("groundSpeed", Integer, nullable=False),
+        sa_column=Column("groundSpeed", Integer, nullable=True),
     )
-    ground_track: int = Field(
+    ground_track: Optional[int] = Field(
         alias="groundTrack",
-        sa_column=Column("groundTrack", Integer, nullable=False),
+        sa_column=Column("groundTrack", Integer, nullable=True),
     )
     precision_bits: int = Field(
         alias="precisionBits",
@@ -489,6 +489,8 @@ class Position(SQLModel, table=True):
     @property
     def heading(self) -> float:
         """Convert heading from integer (1e5 scale) to decimal degrees."""
+        if self.ground_track is None:
+            return 0.0
         return self.ground_track / 1e5
 
     @computed_field
