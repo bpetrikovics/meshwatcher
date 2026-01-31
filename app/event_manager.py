@@ -70,7 +70,12 @@ class EventManager:
         
         node_id = f"!{packet.from_:08x}"
         position.node_id = node_id
+
         self.logger.info(position)
+
+        with self.db_factory() as db:
+            db.merge(NodeInfo(id_=node_id))
+            db.merge(position)
 
     @raw_handler.validate_packet
     def on_nodeinfo(self, packet: MeshtasticPacket):

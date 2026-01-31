@@ -111,17 +111,18 @@ class DbCleanupManager:
         self.logger.info(f"Executing DB purge cycle")
         with db_session() as session:
             # Clean in order of foreign key dependencies:
-            # 1. metrics (depends on telemetry)
-            # 2. telemetry (depends on nodes) 
-            # 3. nodes (referenced by telemetry)
+            # 1. positions (depends on nodes)
+            # 2. telemetry (depends on nodes, cascades to metrics)
+            # 3. nodes (referenced by telemetry/positions)
             # 4. packets (independent)
-            metrics_stats = self._cleanup_table(session, 'metrics', self.metrics_retention_days, self.metrics_timestamp_col)
-            telemetry_stats = self._cleanup_table(session, 'telemetry', self.node_retention_days, self.metrics_timestamp_col)
+            # Note: metrics is cleaned automatically by CASCADE from telemetry deletion
+            position_stats = self._cleanup_table(session, 'positions', self.node_retention_days, 'time')
+            telemetry_stats = self._cleanup_table(session, 'telemetry', self.node_retention_days, 'createdAt')
             node_stats = self._cleanup_table(session, 'nodes', self.node_retention_days, self.node_timestamp_col)
             packet_stats = self._cleanup_table(session, 'packets', self.packet_retention_days, self.packet_timestamp_col)
             
             mode = "DRY-RUN" if self.dry_run else "LIVE"
-            self.logger.info(f"Cleanup cycle: {packet_stats.get('deleted', 0)} packets, {node_stats.get('deleted', 0)} nodes, {telemetry_stats.get('deleted', 0)} telemetry, {metrics_stats.get('deleted', 0)} metrics deleted in {mode} mode, {self.cleanup_interval_minutes=}min")
+            self.logger.info(f"Cleanup cycle: {packet_stats.get('deleted', 0)} packets, {node_stats.get('deleted', 0)} nodes, {telemetry_stats.get('deleted', 0)} telemetry, {position_stats.get('deleted', 0)} positions deleted in {mode} mode, {self.cleanup_interval_minutes=}min")
     
     def start(self):
         if self._running:
