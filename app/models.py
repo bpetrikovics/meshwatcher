@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 from pydantic.config import ConfigDict
 
 from sqlmodel import SQLModel, Field
