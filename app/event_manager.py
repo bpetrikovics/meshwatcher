@@ -70,6 +70,7 @@ class TextMessageExtractor(PayloadExtractor):
         data = {
             "text": text,
             "channel_name": packet.channel_name,
+            "packet_id": packet.id_,
             "timestamp": packet.rx_time
         }
         

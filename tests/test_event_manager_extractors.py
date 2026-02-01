@@ -41,6 +41,7 @@ def test_text_message_extraction_includes_optional_fields():
 
     assert msg.text == "hello"
     assert msg.channel_name == "MediumFast"
+    assert msg.packet_id == 111
     assert msg.timestamp == 1700000000
     assert msg.reply_id == 123
     assert msg.emoji == 1

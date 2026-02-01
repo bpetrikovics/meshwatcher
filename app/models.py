@@ -435,6 +435,10 @@ class TextMessage(SQLModel, table=True):
         default=None,
         sa_column=Column("nodeId", String(9), ForeignKey("nodes.id"), nullable=False),
     )
+    packet_id: int = Field(
+        alias="packetId",
+        sa_column=Column("packetId", BigInteger, nullable=False),
+    )
     text: str = Field(sa_column=Column("text", String(1024), nullable=False))
     channel_name: str = Field(
         alias="channelName",
@@ -443,7 +447,7 @@ class TextMessage(SQLModel, table=True):
     reply_id: Optional[int] = Field(
         default=None,
         alias="replyId",
-        sa_column=Column("replyId", Integer, nullable=True),
+        sa_column=Column("replyId", BigInteger, nullable=True),
     )
     emoji: Optional[int] = Field(
         default=None,
@@ -466,6 +470,7 @@ class TextMessage(SQLModel, table=True):
 
     __table_args__ = (
         Index("ix_messages_node_timestamp", "nodeId", "timestamp"),
+        Index("ix_messages_packet_id", "packetId"),
         Index("ix_messages_reply_id", "replyId"),
     )
 

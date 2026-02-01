@@ -62,6 +62,7 @@ def test_textmessage_validation_rejects_replyid_alias_key_in_this_environment():
     # Ensure we use model field names.
     ok = TextMessage.model_validate(
         {
+            "packet_id": 111,
             "text": "hello",
             "channel_name": "MediumFast",
             "timestamp": 1700000000,
@@ -73,6 +74,7 @@ def test_textmessage_validation_rejects_replyid_alias_key_in_this_environment():
     with pytest.raises(Exception):
         TextMessage.model_validate(
             {
+                "packet_id": 111,
                 "text": "hello",
                 "channel_name": "MediumFast",
                 "timestamp": 1700000000,
