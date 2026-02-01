@@ -7,14 +7,14 @@ from app.models import MeshtasticPacket, TextMessage, Position
 def _packet_base(decoded: dict):
     return MeshtasticPacket.model_validate(
         {
-            "id": 111,
-            "from": 222,
+            "id_": 111,
+            "from_": 222,
             "to": 0xFFFFFFFF,
             "channel": 0,
-            "channelName": "MediumFast",
+            "channel_name": "MediumFast",
             "decoded": decoded,
             "uplink": "!000000de",
-            "rxTime": 1700000000,
+            "rx_time": 1700000000,
         }
     )
 

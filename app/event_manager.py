@@ -74,10 +74,14 @@ class TextMessageExtractor(PayloadExtractor):
         }
         
         # Only add optional fields if they're not None
-        optional_fields = ["replyId", "emoji", "bitfield"]
-        for field in optional_fields:
-            if packet.decoded.get(field) is not None:
-                data[field] = packet.decoded.get(field)
+        decoded_to_model = {
+            "replyId": "reply_id",
+            "emoji": "emoji",
+            "bitfield": "bitfield",
+        }
+        for decoded_key, model_key in decoded_to_model.items():
+            if packet.decoded.get(decoded_key) is not None:
+                data[model_key] = packet.decoded.get(decoded_key)
         
         return class_to_extract.model_validate(data)
 
