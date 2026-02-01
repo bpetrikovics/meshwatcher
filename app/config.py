@@ -28,8 +28,8 @@ class Settings(BaseSettings):
     telemetry_retention_days: int = 7
     db_cleanup_period_minutes: int = 30
 
-    dup_cleanup_period: int = 60
-    dup_cleanup_max_age: int = 120
+    cache_cleanup_interval: int = 60
+    duplicate_detection_window: int = 30
 
     packet_json_log: bool  = False
     packet_sql_log: bool = False

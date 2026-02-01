@@ -82,18 +82,19 @@ class PacketStat:
 
         self.dup_cleanup(now)  # Trigger dup cache cleanup from here - quick and dirty but no scheduler needed
 
-        if packet.id_ in self.cache and (now - self.cache[packet.id_] <= settings.dup_cleanup_max_age):
-            self.logger.debug(f"Packet {hex(packet.id_)} is duplicate")
-            self.cache[packet.id_] = now
-            return True
+        if packet.id_ in self.cache:
+            if now - self.cache[packet.id_] <= settings.duplicate_detection_window:
+                self.logger.debug(f"Packet {hex(packet.id_)} is duplicate")
+                return True
+            # Old entry, will be cleaned up by dup_cleanup()
 
         self.cache[packet.id_] = now
         return False
 
     def dup_cleanup(self, now: float):
         # Cleanup entries older than the max age, but only once every dup_cleanup_period seconds
-        if now - self.dup_cleanup_time >= settings.dup_cleanup_period:
-            expired_keys = [k for k, ts in self.cache.items() if now - ts > settings.dup_cleanup_max_age]
+        if now - self.dup_cleanup_time >= settings.cache_cleanup_interval:
+            expired_keys = [k for k, ts in self.cache.items() if now - ts > settings.duplicate_detection_window]
             for k in expired_keys:
                 # --- if we're writing packet stats using the cache, this is the point to save it to DB
                 del self.cache[k]
