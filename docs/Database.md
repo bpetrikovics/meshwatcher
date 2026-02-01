@@ -2,6 +2,8 @@
 
 This document describes the database schema, tables, relationships, and cleanup behavior for the MeshWatcher application.
 
+*DISCLAIMER*: This documentation was written with AI assistance.
+
 ## Overview
 
 MeshWatcher uses a MySQL database to store Meshtastic packet data, node information, telemetry, positions, and text messages. The database is designed to handle high-volume packet ingestion while maintaining data integrity through proper foreign key relationships.
@@ -69,9 +71,10 @@ Stores text messages sent between nodes.
 **Columns:**
 - `db_id` (Integer, Primary Key, Auto-increment) - Internal record ID
 - `nodeId` (String(9), Foreign Key → nodes.id) - Sender node ID
+- `packetId` (BigInteger, NOT NULL) - Meshtastic packet ID that carried this message
 - `text` (String(1024)) - Message content
 - `channelName` (String(12)) - Channel name where message was received
-- `replyId` (Integer, Nullable) - ID of message being replied to
+- `replyId` (BigInteger, Nullable) - Packet ID of the message being replied to
 - `emoji` (Integer, Nullable) - Emoji flag
 - `bitfield` (Integer, Nullable) - Message bitfield
 - `timestamp` (Integer) - Message timestamp
@@ -82,7 +85,12 @@ Stores text messages sent between nodes.
 
 **Indexes:**
 - `ix_messages_node_timestamp` on (`nodeId`, `timestamp`)
+- `ix_messages_packet_id` on `packetId`
 - `ix_messages_reply_id` on `replyId`
+
+**Notes:**
+- `packetId` is required and stores the Meshtastic packet ID that carried this message.
+- `replyId`, when present, references the `packetId` of the original message being replied to (not the internal `db_id`).
 
 **Retention:** 30 days (configurable via `message_retention_days`)
 
@@ -238,10 +246,14 @@ DB_CLEANUP_PERIOD_MINUTES=30
 1. **Packet Ingestion**: Raw packets are stored in the `packets` table
 2. **Node Processing**: Node information is extracted and stored in `nodes`
 3. **Data Extraction**: Depending on packet type:
-   - Text messages → `messages`
+   - Text messages → `messages` (stores `packetId` from the original packet)
    - Position data → `positions`
    - Telemetry data → `telemetry` → `metrics`
 4. **Automatic Cleanup**: Background process removes old data based on retention policies
+
+### Reply Threading
+- Each `messages` row stores the `packetId` of the Meshtastic packet that carried it.
+- When a message includes `replyId`, it references the `packetId` of the original message, enabling reply threading.
 
 ## Performance Considerations
 
