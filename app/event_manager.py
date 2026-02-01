@@ -9,7 +9,7 @@ from sqlmodel import select
 from meshtastic_mqtt_json import MeshtasticMQTT
 
 from .packet_handling import raw_handler
-from .models import MeshtasticPacket, NodeInfo, Telemetry, Metric, Position
+from .models import MeshtasticPacket, NodeInfo, Telemetry, Metric, Position, TextMessage
 from .presenter import Presenter
 
 
@@ -36,6 +36,31 @@ class EventManager:
 
     @staticmethod
     def extract_payload(packet: MeshtasticPacket, class_to_extract):
+        # Special handling for TEXT_MESSAGE_APP
+        if packet.decoded_portnum == "TEXT_MESSAGE_APP" and class_to_extract == TextMessage:
+            # For text messages, extract data from both payload and decoded dict
+            text = packet.decoded.get("payload", "")
+            if isinstance(text, (bytes, bytearray)):
+                text = text.decode()
+            
+            # Build the data dict, only including non-None values for optional fields
+            data = {
+                "text": text,
+                "channel_name": packet.channel_name,
+                "timestamp": packet.rx_time
+            }
+            
+            # Only add optional fields if they're not None
+            if packet.decoded.get("replyId") is not None:
+                data["replyId"] = packet.decoded.get("replyId")
+            if packet.decoded.get("emoji") is not None:
+                data["emoji"] = packet.decoded.get("emoji")
+            if packet.decoded.get("bitfield") is not None:
+                data["bitfield"] = packet.decoded.get("bitfield")
+            
+            return class_to_extract.model_validate(data)
+        
+        # Standard payload extraction for other packet types
         payload = packet.decoded.get("payload")
         if payload is None:
             return class_to_extract.model_validate({})
@@ -58,7 +83,21 @@ class EventManager:
          'bitfield': 1
         }
         """
-        self.logger.info(packet)
+        try:
+            text_message = self.extract_payload(packet, TextMessage)
+        except ValidationError as exc:
+            self.logger.exception(exc)
+            return
+        
+        node_id = f"!{packet.from_:08x}"
+        text_message.node_id = node_id
+
+        self.logger.info(text_message)
+
+        with self.db_factory() as db:
+            # Allow handling of messages from nodes that don't have nodeinfo yet
+            db.merge(NodeInfo(id_=node_id))
+            db.merge(text_message)
 
     @raw_handler.validate_packet
     def on_position(self, packet: MeshtasticPacket):

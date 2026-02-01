@@ -412,6 +412,71 @@ class Metric(SQLModel, table=True):
     )
 
 
+class TextMessage(SQLModel, table=True):
+    """
+    Represents a text message received from a Meshtastic node.
+    """
+
+    __tablename__ = "messages"
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="forbid",
+        from_attributes=True,
+    )
+
+    db_id: Optional[int] = Field(
+        default=None,
+        exclude=True,
+        sa_column=Column(Integer, primary_key=True, autoincrement=True),
+    )
+
+    node_id: Optional[str] = Field(
+        default=None,
+        sa_column=Column("nodeId", String(9), ForeignKey("nodes.id"), nullable=False),
+    )
+    text: str = Field(sa_column=Column("text", String(1024), nullable=False))
+    channel_name: str = Field(
+        alias="channelName",
+        sa_column=Column("channelName", String(12), nullable=False),
+    )
+    reply_id: Optional[int] = Field(
+        default=None,
+        alias="replyId",
+        sa_column=Column("replyId", Integer, nullable=True),
+    )
+    emoji: Optional[int] = Field(
+        default=None,
+        sa_column=Column("emoji", Integer, nullable=True),
+    )
+    bitfield: Optional[int] = Field(
+        default=None,
+        sa_column=Column("bitfield", Integer, nullable=True),
+    )
+    timestamp: int = Field(
+        alias="rxTime",
+        sa_column=Column("timestamp", Integer, nullable=False),
+    )
+
+    created_at: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column("createdAt", DateTime, nullable=True),
+        exclude=True,
+    )
+
+    __table_args__ = (
+        Index("ix_messages_node_timestamp", "nodeId", "timestamp"),
+        Index("ix_messages_reply_id", "replyId"),
+    )
+
+    def __str__(self) -> str:
+        node = self.node_id if self.node_id is not None else "<unset>"
+        reply_info = f" (reply to {self.reply_id})" if self.reply_id else ""
+        emoji_info = f" [emoji]" if self.emoji else ""
+        channel_info = f" on {self.channel_name}" if self.channel_name else ""
+        return f"TextMessage {node}{reply_info}{emoji_info}{channel_info}: {self.text}"
+
+
 class Position(SQLModel, table=True):
     """
     Represents position data received from a Meshtastic node.
