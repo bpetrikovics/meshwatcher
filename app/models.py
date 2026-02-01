@@ -498,7 +498,7 @@ class Position(SQLModel, table=True):
 
     node_id: Optional[str] = Field(
         default=None,
-        sa_column=Column("nodeId", String(9), ForeignKey("nodes.id"), nullable=False),
+        sa_column=Column("nodeId", String(9), ForeignKey("nodes.id", ondelete="CASCADE"), nullable=False),
     )
     latitude_i: int = Field(
         alias="latitudeI",

@@ -21,9 +21,11 @@ class Settings(BaseSettings):
     mqtt_root_topic: str = "msh/EU_868/HU/2/e/"
     mqtt_channels: dict = {'MediumFast': {'key': 'AQ=='}}
 
-    node_retention_days: int = 1
-    packet_retention_days: int = 1
-    metrics_retention_days: int = 5
+    node_retention_days: int = 14
+    packet_retention_days: int = 7
+    metrics_retention_days: int = 7
+    message_retention_days: int = 7
+    telemetry_retention_days: int = 7
     db_cleanup_period_minutes: int = 30
 
     dup_cleanup_period: int = 60

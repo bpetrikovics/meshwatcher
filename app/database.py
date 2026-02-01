@@ -57,7 +57,8 @@ class DbCleanupManager:
         packet_retention_days: int = settings.packet_retention_days,
         node_retention_days: int = settings.node_retention_days,
         metrics_retention_days: int = settings.metrics_retention_days,
-        message_retention_days: int = settings.node_retention_days,  # Default to same as nodes
+        message_retention_days: int = settings.message_retention_days,
+        telemetry_retention_days: int = settings.telemetry_retention_days,
         cleanup_interval_minutes: int = settings.db_cleanup_period_minutes,
         batch_size: int = 5000,
         dry_run: bool = False,
@@ -67,6 +68,7 @@ class DbCleanupManager:
         self.node_retention_days = node_retention_days
         self.metrics_retention_days = metrics_retention_days
         self.message_retention_days = message_retention_days
+        self.telemetry_retention_days = telemetry_retention_days
         self.cleanup_interval_minutes = cleanup_interval_minutes
         self.batch_size = batch_size
         self.dry_run = dry_run
@@ -77,6 +79,7 @@ class DbCleanupManager:
         self.node_timestamp_col = 'updated'
         self.metrics_timestamp_col = 'createdAt'
         self.message_timestamp_col = 'timestamp'
+        self.telemetry_timestamp_col = 'createdAt'
 
         self.start()
 
@@ -114,21 +117,20 @@ class DbCleanupManager:
         self.logger.info(f"Executing DB purge cycle")
         with db_session() as session:
             # Clean in order of foreign key dependencies:
-            # 1. messages (depends on nodes)
-            # 2. positions (depends on nodes)
-            # 3. telemetry (depends on nodes, cascades to metrics)
-            # 4. nodes (referenced by telemetry/positions/messages)
-            # 5. packets (independent)
+            # 1. messages (depends on nodes, no CASCADE)
+            # 2. telemetry (depends on nodes, no CASCADE)
+            # 3. nodes (referenced by messages/telemetry, cascades to positions)
+            # 4. packets (independent)
             # Note: metrics is cleaned automatically by CASCADE from telemetry deletion
+            # Note: positions is cleaned automatically by CASCADE from nodes deletion
             message_stats = self._cleanup_table(session, 'messages', self.message_retention_days, self.message_timestamp_col)
-            position_stats = self._cleanup_table(session, 'positions', self.node_retention_days, 'time')
-            telemetry_stats = self._cleanup_table(session, 'telemetry', self.node_retention_days, 'createdAt')
+            telemetry_stats = self._cleanup_table(session, 'telemetry', self.telemetry_retention_days, self.telemetry_timestamp_col)
             node_stats = self._cleanup_table(session, 'nodes', self.node_retention_days, self.node_timestamp_col)
             packet_stats = self._cleanup_table(session, 'packets', self.packet_retention_days, self.packet_timestamp_col)
 
             mode = "DRY-RUN" if self.dry_run else "LIVE"
             self.logger.info(
-                f"Cleanup cycle: {packet_stats.get('deleted', 0)} packets, {node_stats.get('deleted', 0)} nodes, {telemetry_stats.get('deleted', 0)} telemetry, {position_stats.get('deleted', 0)} positions, {message_stats.get('deleted', 0)} messages deleted in {mode} mode, {self.cleanup_interval_minutes=}min"
+                f"Cleanup cycle: {packet_stats.get('deleted', 0)} packets, {node_stats.get('deleted', 0)} nodes, {telemetry_stats.get('deleted', 0)} telemetry, {message_stats.get('deleted', 0)} messages deleted in {mode} mode, {self.cleanup_interval_minutes=}min"
             )
 
     def start(self):
@@ -139,7 +141,7 @@ class DbCleanupManager:
 
         def loop():
             self._running = True
-            self.logger.info(f"DB retention thread started. Retention: packets={self.packet_retention_days}d, nodes={self.node_retention_days}d, metrics={self.metrics_retention_days}d, messages={self.message_retention_days}d")
+            self.logger.info(f"DB retention thread started. Retention: packets={self.packet_retention_days}d, nodes={self.node_retention_days}d, metrics={self.metrics_retention_days}d, messages={self.message_retention_days}d, telemetry={self.telemetry_retention_days}d")
 
             while self._running:
                 try:

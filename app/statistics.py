@@ -88,19 +88,6 @@ class PacketStat:
             return True
 
         self.cache[packet.id_] = now
-        # self.cache[packet.id_] = {
-        #     'stamp': now,
-        #     'sources': [
-        #         {
-        #             'uplink': packet.uplink,
-        #             'relay': packet.relay_node,
-        #             'nexthop': packet.nexthop,
-        #             'hoplimit': packet.hop_limit,
-        #             'hopstart': packet.hop_start,
-        #             'rssi': packet.rx_rssi,
-        #             'snr': packet.rx_snr
-        #         }]}
-
         return False
 
     def dup_cleanup(self, now: float):
