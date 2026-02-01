@@ -35,8 +35,6 @@ class RawPacketHandler:
         - Perform packet level logging, statistics and deduplication
         - Calls any low packet level callbacks
         - Passes the packet on to the wrapper callback
-
-            At the end, MQTT callback functions should receive deduplicated packets only.
         """
         def decorator(method: Callable):
             def wrapper(target_self, json_data: Any) -> MeshtasticPacket:
