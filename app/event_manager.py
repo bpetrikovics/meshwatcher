@@ -1,7 +1,7 @@
 import json
 import logging
 
-from typing import Callable
+from typing import Callable, Any
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
@@ -13,7 +13,115 @@ from .models import MeshtasticPacket, NodeInfo, Telemetry, Metric, Position, Tex
 from .presenter import Presenter
 
 
+class PayloadExtractor:
+    """
+    Base class for payload extraction strategies.
+    
+    This strategy pattern allows for extensible payload extraction from different
+    Meshtastic packet types. Each strategy handles the specific extraction logic
+    for a particular packet type and target class combination.
+    
+    Usage:
+        extractor = TextMessageExtractor()
+        result = extractor.extract(packet, TextMessage)
+    """
+    
+    def extract(self, packet: MeshtasticPacket, class_to_extract: type):
+        """
+        Extract and validate payload from packet to target class.
+        
+        Args:
+            packet: The Meshtastic packet to extract from
+            class_to_extract: Target class for validation (e.g., TextMessage, Position)
+            
+        Returns:
+            Validated instance of class_to_extract
+            
+        Raises:
+            NotImplementedError: Must be implemented by subclasses
+        """
+        raise NotImplementedError
+
+
+class TextMessageExtractor(PayloadExtractor):
+    """
+    Extractor for TEXT_MESSAGE_APP packets.
+    
+    Handles the special case where text message data is spread across both
+    the payload field and the decoded dictionary, including optional fields
+    like replyId, emoji, and bitfield.
+    """
+    
+    def extract(self, packet: MeshtasticPacket, class_to_extract: type):
+        """
+        Extract payload specifically for text messages.
+        
+        Args:
+            packet: The Meshtastic packet to extract from
+            class_to_extract: Target class (should be TextMessage)
+            
+        Returns:
+            Validated TextMessage instance
+        """
+        text = packet.decoded.get("payload", "")
+        if isinstance(text, (bytes, bytearray)):
+            text = text.decode()
+        
+        data = {
+            "text": text,
+            "channel_name": packet.channel_name,
+            "timestamp": packet.rx_time
+        }
+        
+        # Only add optional fields if they're not None
+        optional_fields = ["replyId", "emoji", "bitfield"]
+        for field in optional_fields:
+            if packet.decoded.get(field) is not None:
+                data[field] = packet.decoded.get(field)
+        
+        return class_to_extract.model_validate(data)
+
+
+class DefaultExtractor(PayloadExtractor):
+    """
+    Default extractor for standard packet types.
+    
+    Handles the common case where payload data is contained within the
+    decoded['payload'] field and can be directly validated using Pydantic.
+    """
+    
+    def extract(self, packet: MeshtasticPacket, class_to_extract: type):
+        """
+        Standard payload extraction for other packet types.
+        
+        Args:
+            packet: The Meshtastic packet to extract from
+            class_to_extract: Target class for validation
+            
+        Returns:
+            Validated instance of class_to_extract
+        """
+        payload = packet.decoded.get("payload")
+        if payload is None:
+            return class_to_extract.model_validate({})
+
+        if isinstance(payload, (bytes, bytearray)):
+            payload = payload.decode()
+
+        if isinstance(payload, str):
+            return class_to_extract.model_validate_json(payload)
+
+        try:
+            return class_to_extract.model_validate(payload)
+        except ValidationError:
+            return class_to_extract.model_validate_json(json.dumps(payload))
+
+
 class EventManager:
+    # Class-level constants to avoid repeated instantiation
+    _TEXT_EXTRACTOR = TextMessageExtractor()
+    _DEFAULT_EXTRACTOR = DefaultExtractor()
+    
     def __init__(self, mqtt_client: MeshtasticMQTT, db_factory: Callable, presenter: Presenter):
         self.logger = logging.getLogger(__name__)
         self.mqtt = mqtt_client
@@ -35,46 +143,35 @@ class EventManager:
         self.logger.info("Initialized")
 
     @staticmethod
-    def extract_payload(packet: MeshtasticPacket, class_to_extract):
-        # Special handling for TEXT_MESSAGE_APP
-        if packet.decoded_portnum == "TEXT_MESSAGE_APP" and class_to_extract == TextMessage:
-            # For text messages, extract data from both payload and decoded dict
-            text = packet.decoded.get("payload", "")
-            if isinstance(text, (bytes, bytearray)):
-                text = text.decode()
-            
-            # Build the data dict, only including non-None values for optional fields
-            data = {
-                "text": text,
-                "channel_name": packet.channel_name,
-                "timestamp": packet.rx_time
-            }
-            
-            # Only add optional fields if they're not None
-            if packet.decoded.get("replyId") is not None:
-                data["replyId"] = packet.decoded.get("replyId")
-            if packet.decoded.get("emoji") is not None:
-                data["emoji"] = packet.decoded.get("emoji")
-            if packet.decoded.get("bitfield") is not None:
-                data["bitfield"] = packet.decoded.get("bitfield")
-            
-            return class_to_extract.model_validate(data)
+    def extract_payload(packet: MeshtasticPacket, class_to_extract: type) -> Any:
+        """
+        Extract and validate payload using strategy pattern.
         
-        # Standard payload extraction for other packet types
-        payload = packet.decoded.get("payload")
-        if payload is None:
-            return class_to_extract.model_validate({})
-
-        if isinstance(payload, (bytes, bytearray)):
-            payload = payload.decode()
-
-        if isinstance(payload, str):
-            return class_to_extract.model_validate_json(payload)
-
-        try:
-            return class_to_extract.model_validate(payload)
-        except ValidationError:
-            return class_to_extract.model_validate_json(json.dumps(payload))
+        This method implements the Strategy pattern to select the appropriate
+        extractor based on the packet type and target class. The pattern allows
+        for easy extension with new packet types without modifying existing code.
+        
+        Args:
+            packet: The Meshtastic packet to extract from
+            class_to_extract: Target class for validation (e.g., TextMessage, Position)
+            
+        Returns:
+            Validated instance of class_to_extract
+            
+        Raises:
+            ValueError: If packet is missing required fields
+            ValidationError: If payload cannot be validated
+        """
+        if not packet.decoded_portnum:
+            raise ValueError("Packet missing decoded_portnum")
+        
+        extractor_map = {
+            ("TEXT_MESSAGE_APP", TextMessage): EventManager._TEXT_EXTRACTOR,
+        }
+        
+        key: tuple[str, type] = (packet.decoded_portnum, class_to_extract)
+        extractor = extractor_map.get(key, EventManager._DEFAULT_EXTRACTOR)
+        return extractor.extract(packet, class_to_extract)
 
     @raw_handler.validate_packet
     def on_text_message(self, packet: MeshtasticPacket):
