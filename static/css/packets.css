@@ -1,0 +1,257 @@
+/* ===== CSS VARIABLES ===== */
+:root {
+    --header-height: 56px;
+    --spacing-xs: 2px;
+    --spacing-sm: 4px;
+    --spacing-md: 6px;
+    --spacing-lg: 8px;
+    --bg-primary: #1b1d24;
+    --bg-secondary: rgba(255,255,255,0.08);
+    --bg-hover: rgba(255,255,255,0.12);
+    --bg-expanded: rgba(255,255,255,0.14);
+    --text-primary: #eee;
+    --text-secondary: #ccc;
+    --border-color: rgba(255,255,255,0.15);
+    --border-hover: rgba(255,255,255,0.3);
+    --header-bg: rgba(74, 114, 223, 0.75);
+    --header-text: rgb(255, 244, 229);
+    --port-nodeinfo: rgba(100, 180, 120, 0.3);
+    --port-traceroute: rgba(180, 120, 100, 0.3);
+    --port-textmsg: rgba(53, 102, 199, 0.3);
+    --port-position: rgba(180, 140, 100, 0.3);
+    --port-routing: rgba(120, 100, 160, 0.3);
+    --port-telemetry: rgba(80, 170, 200, 0.3);
+}
+
+/* ===== BASE STYLES ===== */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: monospace;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* ===== LAYOUT COMPONENTS ===== */
+#header {
+    background: var(--header-bg);
+    color: var(--header-text);
+    text-align: center;
+    font-size: 1.1em;
+    padding: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.header-title {
+    flex: 1;
+    text-align: center;
+    font-size: clamp(0.9em, 4vw, 1.1em);
+}
+
+.header-buttons {
+    display: flex;
+    gap: 4px;
+}
+
+.header-btn {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: clamp(0.7em, 3vw, 0.8em);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.header-btn:hover {
+    background: rgba(255,255,255,0.3);
+    border-color: rgba(255,255,255,0.5);
+}
+
+#log {
+    height: calc(100vh - var(--header-height));
+    padding: 8px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* ===== LOG LINE COMPONENTS ===== */
+.log-line {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-bottom: var(--spacing-sm);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.log-line:hover {
+    background: var(--bg-hover);
+}
+
+.log-line.expanded {
+    background: var(--bg-expanded);
+    border-color: var(--border-hover);
+}
+
+.compact-row {
+    padding: var(--spacing-md) var(--spacing-lg);
+    position: relative;
+}
+
+/* ===== PORT COLOR THEMES ===== */
+.compact-row table.port-nodeinfo { background: var(--port-nodeinfo); }
+.compact-row table.port-traceroute { background: var(--port-traceroute); }
+.compact-row table.port-textmsg { background: var(--port-textmsg); }
+.compact-row table.port-position { background: var(--port-position); }
+.compact-row table.port-routing { background: var(--port-routing); }
+.compact-row table.port-telemetry { background: var(--port-telemetry); }
+
+/* ===== DESKTOP LAYOUT ===== */
+@media (min-width: 768px) {
+    .compact-row table {
+        table-layout: fixed;
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.95em;
+    }
+
+    .compact-row td {
+        padding: 1px 3px;
+        border: 1px solid rgba(255,255,255,0.1);
+        background: rgba(0,0,0,0.3);
+        vertical-align: top;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .col-received { width: 16%; }
+    .col-id { width: 8%; }
+    .col-from { width: 9%; }
+    .col-to { width: 9%; }
+    .col-channel { width: 12%; }
+    .col-port { width: 8%; }
+    .col-uplink { width: 10%; }
+    .col-relay { width: 10%; }
+    .col-next { width: 10%; }
+}
+
+/* ===== MOBILE LAYOUT ===== */
+@media (max-width: 767px) {
+    .compact-row {
+        padding: 6px;
+        display: grid;
+        gap: 4px;
+        font-size: 0.85em;
+    }
+
+    .compact-row::before {
+        content: attr(data-summary);
+        display: block;
+        font-weight: bold;
+        color: #fff;
+        margin-bottom: 4px;
+        padding: 2px 4px;
+        background: rgba(0,0,0,0.4);
+        border-radius: 2px;
+    }
+
+    .compact-row > div {
+        display: flex;
+        flex-direction: column;
+        padding: 2px 4px;
+        background: rgba(0,0,0,0.4);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 2px;
+    }
+
+    .compact-label {
+        font-size: 0.65em;
+        opacity: 0.9;
+        font-weight: bold;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+    }
+
+    .compact-value {
+        font-family: monospace;
+        color: #fff;
+        font-size: 0.8em;
+        word-break: break-all;
+    }
+
+    .expand-indicator {
+        display: none;
+    }
+}
+
+/* ===== TEXT COMPONENTS ===== */
+.compact-label {
+    font-size: 0.75em;
+    opacity: 0.8;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.compact-value {
+    font-family: monospace;
+    color: #fff;
+    font-size: 0.9em;
+}
+
+.full-json {
+    padding: 8px;
+    background: #2b2b2b;
+    border-top: 1px solid var(--border-color);
+    margin: 0;
+    font-size: 0.9em;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.35;
+    max-height: 250px;
+    overflow-y: auto;
+    border-radius: 0 0 4px 4px;
+}
+
+/* ===== INDICATORS ===== */
+.expand-indicator {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.05em;
+    opacity: 0.7;
+    pointer-events: none;
+    font-weight: bold;
+    transition: transform 0.2s;
+}
+
+.log-line.expanded .expand-indicator {
+    transform: translateY(-50%) rotate(180deg);
+}
+
+.duplicate-indicator {
+    position: absolute;
+    right: 28px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.9em;
+    opacity: 0.8;
+    color: #ff6b6b;
+    font-weight: bold;
+    cursor: help;
+}
