@@ -515,9 +515,10 @@ class Position(SQLModel, table=True):
     )
     altitude: Optional[int] = Field(sa_column=Column("altitude", Integer, nullable=True))
     time: Optional[int] = Field(sa_column=Column("time", Integer, nullable=True))
-    location_source: str = Field(
+    location_source: Optional[str] = Field(
         alias="locationSource",
-        sa_column=Column("locationSource", String(32), nullable=False),
+        default=None,
+        sa_column=Column("locationSource", String(32), nullable=True),
     )
     ground_speed: Optional[int] = Field(
         alias="groundSpeed",
