@@ -113,6 +113,46 @@ class DbCleanupManager:
             session.rollback()
             return {'table': table, 'error': str(e)}
 
+    def _cleanup_nodes(self, session: Session, days: int) -> Dict[str, Any]:
+        """Clean up old nodes, ensuring no foreign key constraint violations."""
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        self.logger.info("Starting cleanup for nodes with cutoff %s", cutoff.strftime('%Y-%m-%d %H:%M %Z'))
+
+        try:
+            # Count nodes older than cutoff
+            count_query = text("SELECT COUNT(*) FROM `nodes` WHERE `updated` < :cutoff")
+            count_result = session.execute(count_query, {'cutoff': cutoff})
+            count_before = count_result.scalar() or 0
+
+            if count_before == 0:
+                return {'table': 'nodes', 'count_before': 0, 'deleted': 0}
+
+            if self.dry_run:
+                self.logger.info("dry_run is true, returning")
+                return {'table': 'nodes', 'count_before': count_before, 'deleted': 0}
+
+            # Delete nodes that have no dependent messages or telemetry records
+            # This prevents foreign key constraint violations
+            delete_query = text("""
+                DELETE FROM `nodes` 
+                WHERE `updated` < :cutoff 
+                AND `id` NOT IN (
+                    SELECT DISTINCT `nodeId` FROM `messages`
+                    UNION
+                    SELECT DISTINCT `nodeId` FROM `telemetry`
+                )
+                LIMIT :batch_size
+            """)
+            delete_result = session.execute(delete_query, {'cutoff': cutoff, 'batch_size': self.batch_size})
+            deleted = delete_result.rowcount or 0
+
+            return {'table': 'nodes', 'count_before': count_before, 'deleted': deleted}
+
+        except Exception as e:
+            self.logger.exception(e)
+            session.rollback()
+            return {'table': 'nodes', 'error': str(e)}
+
     def _cleanup_cycle(self):
         self.logger.info(f"Executing DB purge cycle")
         with db_session() as session:
@@ -125,7 +165,7 @@ class DbCleanupManager:
             # Note: positions is cleaned automatically by CASCADE from nodes deletion
             message_stats = self._cleanup_table(session, 'messages', self.message_retention_days, self.message_timestamp_col)
             telemetry_stats = self._cleanup_table(session, 'telemetry', self.telemetry_retention_days, self.telemetry_timestamp_col)
-            node_stats = self._cleanup_table(session, 'nodes', self.node_retention_days, self.node_timestamp_col)
+            node_stats = self._cleanup_nodes(session, self.node_retention_days)
             packet_stats = self._cleanup_table(session, 'packets', self.packet_retention_days, self.packet_timestamp_col)
 
             mode = "DRY-RUN" if self.dry_run else "LIVE"
