@@ -309,10 +309,26 @@ const UIController = {
      */
     expandLine(logLine) {
         const rawData = JSON.parse(logLine.dataset.rawData);
+        const jsonContainer = document.createElement('div');
+        jsonContainer.className = 'json-container';
+        
+        // Create copy button
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'copy-btn';
+        copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+        copyBtn.title = 'Copy to clipboard';
+        copyBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.copyToClipboard(JSON.stringify(rawData, null, 2));
+        });
+        
         const jsonDiv = document.createElement('div');
         jsonDiv.className = 'full-json';
         jsonDiv.textContent = JSON.stringify(rawData, null, 2);
-        logLine.appendChild(jsonDiv);
+        
+        jsonContainer.appendChild(copyBtn);
+        jsonContainer.appendChild(jsonDiv);
+        logLine.appendChild(jsonContainer);
         logLine.classList.add('expanded');
         logLine.dataset.isExpanded = 'true';
     },
@@ -322,10 +338,48 @@ const UIController = {
      * @param {HTMLElement} logLine - Log line element
      */
     collapseLine(logLine) {
-        const jsonBlock = logLine.querySelector('.full-json');
-        if (jsonBlock) jsonBlock.remove();
+        const jsonContainer = logLine.querySelector('.json-container');
+        if (jsonContainer) jsonContainer.remove();
         logLine.classList.remove('expanded');
         logLine.dataset.isExpanded = 'false';
+    },
+
+    /**
+     * Copy text to clipboard
+     * @param {string} text - Text to copy
+     */
+    async copyToClipboard(text) {
+        try {
+            await navigator.clipboard.writeText(text);
+            // Show brief feedback
+            const originalTitle = event.target.title;
+            event.target.title = 'Copied!';
+            event.target.style.backgroundColor = '#4CAF50';
+            setTimeout(() => {
+                event.target.title = originalTitle;
+                event.target.style.backgroundColor = '';
+            }, 1000);
+        } catch (err) {
+            console.error('Failed to copy text: ', err);
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                const originalTitle = event.target.title;
+                event.target.title = 'Copied!';
+                event.target.style.backgroundColor = '#4CAF50';
+                setTimeout(() => {
+                    event.target.title = originalTitle;
+                    event.target.style.backgroundColor = '';
+                }, 1000);
+            } catch (fallbackErr) {
+                console.error('Fallback copy failed: ', fallbackErr);
+            }
+            document.body.removeChild(textArea);
+        }
     },
 
     /**
