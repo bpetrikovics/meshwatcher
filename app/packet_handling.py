@@ -54,7 +54,7 @@ class RawPacketHandler:
                 packet._is_duplicate = is_duplicate
 
                 if settings.packet_sql_log:
-                    logger.info("Saving packet to database: %s", packet)
+                    logger.debug("Saving packet to database: %s", packet)
                     with db_session() as db:
                         db.add(packet)
                         # create a detached copy of the packet that can be passed on to callbacks

@@ -92,8 +92,7 @@ class MeshtasticPacket(SQLModel, table=True):
 
     created_at: Optional[datetime] = Field(
         default_factory=lambda: datetime.now(timezone.utc),
-        sa_column=Column("createdAt", DateTime, nullable=True),
-        exclude=True
+        sa_column=Column("createdAt", DateTime, nullable=True)
     )
 
     # These computed fields are in the decoded dict, but not part of the actual app payload.

@@ -62,14 +62,23 @@ const Utils = {
     },
 
     /**
-     * Format Unix timestamp to readable string
-     * @param {number} unixTime - Unix timestamp
+     * Format Unix timestamp or datetime string to readable string
+     * @param {number|string} timeValue - Unix timestamp or datetime string
      * @returns {string} Formatted date/time
      */
-    formatTimestamp(unixTime) {
-        if (!unixTime || unixTime === null || unixTime === undefined) return 'N/A';
+    formatTimestamp(timeValue) {
+        if (!timeValue || timeValue === null || timeValue === undefined) return 'N/A';
         try {
-            const date = new Date(unixTime * 1000);
+            let date;
+            if (typeof timeValue === 'number') {
+                // Unix timestamp (seconds)
+                date = new Date(timeValue * 1000);
+            } else if (typeof timeValue === 'string') {
+                // ISO datetime string
+                date = new Date(timeValue);
+            } else {
+                return 'Invalid';
+            }
             return date.toLocaleString();
         } catch (e) {
             return 'Invalid';
@@ -148,7 +157,7 @@ const DataProcessor = {
         const portnum = lineData.decoded?.portnum || 'N/A';
         const relay_node = lineData.relay_node !== null ? Utils.toHex(lineData.relay_node, 2) : 'N/A';
         const next_hop = lineData.next_hop !== null ? Utils.toHex(lineData.next_hop, 2) : 'N/A';
-        const received = Utils.formatTimestamp(lineData.rx_time);
+        const received = Utils.formatTimestamp(lineData.created_at);
 
         return {
             ...lineData,
