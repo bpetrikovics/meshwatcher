@@ -33,6 +33,7 @@ class Settings(BaseSettings):
 
     packet_json_log: bool  = False # Log packets to stdout in JSON format
     packet_sql_log: bool = False # Log raw packets to database (e.g. not just processed data)
+    raw_telemetry_log: bool = False # Log raw telemetry packets to database (e.g. not just extracted metrics)
 
     readonly_mode: bool = False # Disable write operations to the database
 

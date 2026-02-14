@@ -382,12 +382,13 @@ class Metric(SQLModel, table=True):
         sa_column=Column(Integer, primary_key=True, autoincrement=True),
     )
 
-    telemetry_id: int = Field(
+    telemetry_id: Optional[int] = Field(
+        default=None,
         sa_column=Column(
             "telemetryId",
             Integer,
             ForeignKey("telemetry.db_id", ondelete="CASCADE"),
-            nullable=False,
+            nullable=True,
         )
     )
 
@@ -419,7 +420,7 @@ class TextMessage(SQLModel, table=True):
     __tablename__ = "messages"
 
     model_config = ConfigDict(
-        populate_by_name=True,
+        populate_by_name=False,
         extra="forbid",
         from_attributes=True,
     )

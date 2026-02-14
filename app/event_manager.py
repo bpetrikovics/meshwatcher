@@ -11,6 +11,7 @@ from meshtastic_mqtt_json import MeshtasticMQTT
 from .packet_handling import raw_handler
 from .models import MeshtasticPacket, NodeInfo, Telemetry, Metric, Position, TextMessage
 from .presenter import Presenter
+from .config import settings
 
 
 class PayloadExtractor:
@@ -275,39 +276,46 @@ class EventManager:
         node_id = f"!{packet.from_:08x}"
 
         try:
-            metric = self.extract_payload(packet, Telemetry)
+            telemetry_obj = self.extract_payload(packet, Telemetry)
         except ValidationError as exc:
             self.logger.exception(exc)
             return
 
-        metric.node_id = node_id
-        self.logger.info(metric)
+        telemetry_obj.node_id = node_id
+        self.logger.info(telemetry_obj)
+
+        # Validate payload before any database operations
+        if not isinstance(telemetry_obj.payload, dict):
+            return
 
         with self.db_factory() as db:
             # Allow handling of telemetry before nodeinfo received for the corresponding node
             db.merge(NodeInfo(id_=node_id))
 
-            try:
-                db.add(metric)
-                db.flush()
-                telemetry_row = metric
-            except IntegrityError:
-                db.rollback()
-                return
+            telemetry_id = None
 
-            if not isinstance(telemetry_row.payload, dict):
-                return
+            # Conditionally save raw telemetry packet based on configuration
+            # When disabled, only individual metrics are saved (telemetry_id=None)
+            if settings.raw_telemetry_log:
+                try:
+                    db.add(telemetry_obj)
+                    db.flush()
+                    telemetry_id = telemetry_obj.db_id
+                except IntegrityError:
+                    db.rollback()
+                    return
 
+            # Extract and save individual metrics from telemetry payload
             metric_rows = []
-            for k, v in telemetry_row.payload.items():
+            for k, v in telemetry_obj.payload.items():
                 if isinstance(v, (int, float)):
                     metric_rows.append(
                         Metric(
-                            telemetry_id=telemetry_row.db_id,
-                            node_id=telemetry_row.node_id,
-                            metric_type=telemetry_row.metric_type,
+                            telemetry_id=telemetry_id,
+                            node_id=telemetry_obj.node_id,
+                            metric_type=telemetry_obj.metric_type,
                             metric=str(k),
-                            ts=telemetry_row.ts,
+                            ts=telemetry_obj.ts,
                             value=float(v),
                         )
                     )
