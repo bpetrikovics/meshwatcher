@@ -420,7 +420,7 @@ class TextMessage(SQLModel, table=True):
     __tablename__ = "messages"
 
     model_config = ConfigDict(
-        populate_by_name=False,
+        populate_by_name=True,
         extra="forbid",
         from_attributes=True,
     )
