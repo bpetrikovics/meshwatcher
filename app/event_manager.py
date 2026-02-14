@@ -190,7 +190,7 @@ class EventManager:
             text_message = self.extract_payload(packet, TextMessage)
         except ValidationError as exc:
             self.logger.exception(exc)
-            self.logger.error(packet.model_dump_json)
+            self.logger.error(packet.model_dump_json())
             return
         
         node_id = f"!{packet.from_:08x}"
