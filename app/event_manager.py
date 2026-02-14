@@ -146,7 +146,7 @@ class EventManager:
         raw_handler.register_callback("raw", self.presenter.raw_packet_callback)
 
         self.mqtt.loop_start()
-        self.logger.info("Initialized")
+        self.logger.info("Initialized // version: %s", settings.git_commit)
 
     @staticmethod
     def extract_payload(packet: MeshtasticPacket, class_to_extract: type) -> Any:
