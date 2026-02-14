@@ -28,13 +28,13 @@ class Settings(BaseSettings):
     telemetry_retention_days: int = 7
     db_cleanup_period_minutes: int = 30
 
-    cache_cleanup_interval: int = 60
-    duplicate_detection_window: int = 30
+    cache_cleanup_interval: int = 60 # Clean up cache every N minutes
+    duplicate_detection_window: int = 30 # Detect duplicate packets within N seconds
 
-    packet_json_log: bool  = False
-    packet_sql_log: bool = False
+    packet_json_log: bool  = False # Log packets to stdout in JSON format
+    packet_sql_log: bool = False # Log raw packets to database (e.g. not just processed data)
 
-    readonly_mode: bool = False
+    readonly_mode: bool = False # Disable write operations to the database
 
     namespace_packets: str = "/packets"
 
