@@ -119,6 +119,24 @@ body {
 .compact-row table.port-routing { background: var(--port-routing); }
 .compact-row table.port-telemetry { background: var(--port-telemetry); }
 
+/* ===== ROUTING ERROR SEVERITY THEMES ===== */
+.compact-row table.routing-success { 
+    background: linear-gradient(135deg, var(--port-routing) 0%, rgba(76, 175, 80, 0.3) 100%);
+    border-left: 3px solid #4caf50;
+}
+.compact-row table.routing-warning { 
+    background: linear-gradient(135deg, var(--port-routing) 0%, rgba(255, 193, 7, 0.3) 100%);
+    border-left: 3px solid #ffc107;
+}
+.compact-row table.routing-error { 
+    background: linear-gradient(135deg, var(--port-routing) 0%, rgba(244, 67, 54, 0.3) 100%);
+    border-left: 3px solid #f44336;
+}
+.compact-row table.routing-info { 
+    background: linear-gradient(135deg, var(--port-routing) 0%, rgba(255, 152, 0, 0.3) 100%);
+    border-left: 3px solid #ff9800;
+}
+
 /* ===== DESKTOP LAYOUT ===== */
 @media (min-width: 768px) {
     .compact-row table {

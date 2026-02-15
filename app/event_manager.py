@@ -9,7 +9,7 @@ from sqlmodel import select
 from meshtastic_mqtt_json import MeshtasticMQTT
 
 from .packet_handling import raw_handler
-from .models import MeshtasticPacket, NodeInfo, Telemetry, Metric, Position, TextMessage
+from .models import MeshtasticPacket, NodeInfo, Telemetry, Metric, Position, TextMessage, Routing
 from .presenter import Presenter
 from .config import settings
 
@@ -123,10 +123,43 @@ class DefaultExtractor(PayloadExtractor):
             return class_to_extract.model_validate_json(json.dumps(payload))
 
 
+class RoutingExtractor(PayloadExtractor):
+    """
+    Extractor for ROUTING_APP packets.
+    
+    Handles routing packets that may contain error information and request/response
+    correlation data. Extracts error reasons and request IDs for network analysis.
+    """
+    
+    def extract(self, packet: MeshtasticPacket, class_to_extract: type):
+        """
+        Extract payload specifically for routing packets.
+        
+        Args:
+            packet: The Meshtastic packet to extract from
+            class_to_extract: Target class (should be Routing)
+            
+        Returns:
+            Validated Routing instance
+        """
+        payload = packet.decoded.get("payload", {})
+        
+        data = {
+            "node_id": f"!{packet.from_:08x}",
+            "packet_id": packet.id_,
+            "timestamp": packet.rx_time,
+            "request_id": packet.decoded.get("requestId"),
+            "error_reason": payload.get("errorReason"),
+        }
+        
+        return class_to_extract.model_validate(data)
+
+
 class EventManager:
     # Class-level constants to avoid repeated instantiation
     _TEXT_EXTRACTOR = TextMessageExtractor()
     _DEFAULT_EXTRACTOR = DefaultExtractor()
+    _ROUTING_EXTRACTOR = RoutingExtractor()
     
     def __init__(self, mqtt_client: MeshtasticMQTT, db_factory: Callable, presenter: Presenter):
         self.logger = logging.getLogger(__name__)
@@ -173,6 +206,7 @@ class EventManager:
         
         extractor_map = {
             ("TEXT_MESSAGE_APP", TextMessage): EventManager._TEXT_EXTRACTOR,
+            ("ROUTING_APP", Routing): EventManager._ROUTING_EXTRACTOR,
         }
         
         key: tuple[str, type] = (packet.decoded_portnum, class_to_extract)
@@ -339,7 +373,8 @@ class EventManager:
         """
         pass
 
-    def on_routing(self, json_data):
+    @raw_handler.validate_packet
+    def on_routing(self, packet: MeshtasticPacket):
         """
         {'from': 977800444, 'to': 2224788660, 'channel': 31,
         'decoded': {
@@ -350,7 +385,17 @@ class EventManager:
             'rxRssi': -54, 'hopStart': 6, 'relayNode': 186, 'transportMechanism': 'TRANSPORT_LORA',
             'channelName': 'MediumFast'}        
         """
-        pass
+        try:
+            routing = self.extract_payload(packet, Routing)
+        except ValidationError as exc:
+            self.logger.exception(exc)
+            self.logger.error(packet.model_dump_json())
+            return
+
+        self.logger.info(routing)
+
+        # For now, we're not storing routing packets in database as requested
+        # The routing data is parsed and logged for analysis purposes only
 
     def on_store_forward(self, json_data):
         pass

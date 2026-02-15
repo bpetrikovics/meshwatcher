@@ -573,3 +573,64 @@ class Position(SQLModel, table=True):
     def __str__(self) -> str:
         node = self.node_id if self.node_id is not None else "<unset>"
         return f"Position {node} @ {self.time}: lat={self.latitude}, lon={self.longitude}, heading={self.heading}, ground speed={self.ground_speed}, alt={self.altitude}, radius={self.radius:.2f}"
+
+
+class Routing(SQLModel, table=False):
+    """
+    Represents routing data received from a Meshtastic node.
+    """
+
+    __tablename__ = "routing"
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="forbid",
+        from_attributes=True,
+    )
+
+    db_id: Optional[int] = Field(
+        default=None,
+        exclude=True,
+        sa_column=Column(Integer, primary_key=True, autoincrement=True),
+    )
+
+    node_id: Optional[str] = Field(
+        default=None,
+        sa_column=Column("nodeId", String(9), ForeignKey("nodes.id"), nullable=False),
+    )
+    packet_id: int = Field(
+        alias="packetId",
+        sa_column=Column("packetId", BigInteger, nullable=False),
+    )
+    request_id: Optional[int] = Field(
+        default=None,
+        alias="requestId",
+        sa_column=Column("requestId", BigInteger, nullable=True),
+    )
+    error_reason: Optional[str] = Field(
+        default=None,
+        alias="errorReason",
+        sa_column=Column("errorReason", String(32), nullable=True),
+    )
+    timestamp: int = Field(
+        alias="rxTime",
+        sa_column=Column("timestamp", Integer, nullable=False),
+    )
+
+    created_at: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column("createdAt", DateTime, nullable=True),
+        exclude=True,
+    )
+
+    __table_args__ = (
+        Index("ix_routing_node_timestamp", "nodeId", "timestamp"),
+        Index("ix_routing_request_id", "requestId"),
+        Index("ix_routing_error_reason", "errorReason"),
+    )
+
+    def __str__(self) -> str:
+        node = self.node_id if self.node_id is not None else "<unset>"
+        error_info = f" error={self.error_reason}" if self.error_reason else " success"
+        request_info = f" req={hex(self.request_id)}" if self.request_id else ""
+        return f"Routing {node}{error_info}{request_info} @ {self.timestamp}"

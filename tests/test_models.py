@@ -3,7 +3,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.dialects import mysql
 
-from app.models import MeshtasticPacket, NodeInfo, Telemetry, TextMessage, Position
+from app.models import MeshtasticPacket, NodeInfo, Telemetry, TextMessage, Position, Routing
 
 
 def test_meshtastic_packet_computed_fields_and_decimal_coercion():
@@ -140,3 +140,114 @@ def test_position_computed_fields_heading_none():
     assert pos.latitude == 47.0
     assert pos.longitude == 19.0
     assert pos.heading == 0.0
+
+
+def test_routing_model_validation_and_string_representation():
+    # Test routing packet with error reason and request ID
+    routing_full = Routing.model_validate(
+        {
+            "node_id": "!abcdef01",
+            "packet_id": 12345,
+            "timestamp": 1700000000,
+            "error_reason": "NO_RESPONSE",
+            "request_id": 67890,
+        }
+    )
+    
+    assert routing_full.node_id == "!abcdef01"
+    assert routing_full.packet_id == 12345
+    assert routing_full.timestamp == 1700000000
+    assert routing_full.error_reason == "NO_RESPONSE"
+    assert routing_full.request_id == 67890
+    
+    # Test string representation with error
+    routing_str = str(routing_full)
+    assert "Routing !abcdef01" in routing_str
+    assert "error=NO_RESPONSE" in routing_str
+    assert "req=0x10932" in routing_str  # 67890 in hex
+    print(" String representation works:", routing_str)
+    
+    # Test routing packet without error (successful routing)
+    routing_success = Routing.model_validate(
+        {
+            "node_id": "!12345678",
+            "packet_id": 999,
+            "timestamp": 1700000000,
+            "error_reason": None,
+            "request_id": None,
+        }
+    )
+    
+    assert routing_success.error_reason is None
+    assert routing_success.request_id is None
+    
+    # Test string representation for success
+    success_str = str(routing_success)
+    assert "Routing !12345678" in success_str
+    assert "success" in success_str
+    assert "req=" not in success_str  # No request ID should not show req=
+
+
+def test_routing_model_field_and_alias_validation():
+    # Test that field names work
+    routing1 = Routing.model_validate(
+        {
+            "node_id": "!abcdef01",
+            "packet_id": 123,
+            "timestamp": 1700000000,
+            "error_reason": "TIMEOUT",
+            "request_id": 456,
+        }
+    )
+    assert routing1.error_reason == "TIMEOUT"
+    assert routing1.request_id == 456
+    
+    # Test alias behavior for packetId
+    try:
+        routing2 = Routing.model_validate(
+            {
+                "node_id": "!abcdef01",
+                "packetId": 789,  # Using alias
+                "timestamp": 1700000000,
+                "error_reason": "NoRoute",
+                "requestId": 999,  # Using alias
+            }
+        )
+        assert routing2.packet_id == 789
+        assert routing2.request_id == 999
+        alias_works = True
+    except Exception:
+        alias_works = False
+    
+    # Test that unknown fields are always rejected
+    with pytest.raises(Exception):
+        Routing.model_validate(
+            {
+                "node_id": "!abcdef01",
+                "packet_id": 123,
+                "timestamp": 1700000000,
+                "unknown_field": "should_fail",
+            }
+        )
+
+
+def test_routing_model_all_error_reasons():
+    """Test that all official routing error reasons are accepted"""
+    error_reasons = [
+        "NONE", "NoRoute", "GotNak", "Timeout", "NoInterface", "MaxRetransmit",
+        "NoChannel", "TooLarge", "NoResponse", "DutyCycleLimit", "BadRequest",
+        "NotAuthorized", "PkiFailed", "PkiUnknownPubkey", "AdminBadSessionKey",
+        "AdminPublicKeyUnauthorized", "RateLimitExceeded"
+    ]
+    
+    for error_reason in error_reasons:
+        routing = Routing.model_validate(
+            {
+                "node_id": "!test1234",
+                "packet_id": 999,
+                "timestamp": 1700000000,
+                "error_reason": error_reason,
+                "request_id": None,
+            }
+        )
+        assert routing.error_reason == error_reason

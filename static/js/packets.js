@@ -133,6 +133,72 @@ const Utils = {
      */
     formatNodeWithName(idText, nameText) {
         return nameText ? `${idText} (${nameText})` : idText;
+    },
+
+    /**
+     * Format routing error reason with human-readable description
+     * @param {string} errorReason - Raw error reason from packet
+     * @returns {string} Formatted error description
+     */
+    formatRoutingError(errorReason) {
+        const errorMap = {
+            'NONE': 'Success',
+            'NoRoute': 'No Route',
+            'GotNak': 'Received NAK',
+            'Timeout': 'Timeout',
+            'NoInterface': 'No Interface',
+            'MaxRetransmit': 'Max Retransmit',
+            'NoChannel': 'No Channel',
+            'TooLarge': 'Packet Too Large',
+            'NoResponse': 'No Response',
+            'DutyCycleLimit': 'Duty Cycle Limit',
+            'BadRequest': 'Bad Request',
+            'NotAuthorized': 'Not Authorized',
+            'PkiFailed': 'PKI Failed',
+            'PkiUnknownPubkey': 'Unknown PKI Key',
+            'AdminBadSessionKey': 'Bad Admin Session',
+            'AdminPublicKeyUnauthorized': 'Unauthorized Admin Key',
+            'RateLimitExceeded': 'Rate Limit Exceeded'
+        };
+        return errorMap[errorReason] || errorReason || 'Success';
+    },
+
+    /**
+     * Determine routing error severity for styling
+     * @param {string} errorReason - Raw error reason from packet
+     * @returns {string} Severity level: 'success', 'warning', 'error', 'info'
+     */
+    getRoutingErrorSeverity(errorReason) {
+        if (!errorReason || errorReason === 'NONE') return 'success';
+        
+        // Critical errors (red)
+        const critical = ['NoResponse', 'NotAuthorized', 'PkiFailed', 'AdminBadSessionKey', 'AdminPublicKeyUnauthorized'];
+        if (critical.includes(errorReason)) return 'error';
+        
+        // Warnings (yellow)
+        const warnings = ['NoRoute', 'Timeout', 'NoChannel', 'MaxRetransmit', 'DutyCycleLimit', 'RateLimitExceeded'];
+        if (warnings.includes(errorReason)) return 'warning';
+        
+        // Minor issues (orange)
+        return 'info';
+    },
+
+    /**
+     * Extract routing error reason from packet data
+     * @param {object} packetData - Packet data object
+     * @returns {string|null} Error reason or null if successful
+     */
+    extractRoutingErrorReason(packetData) {
+        return packetData?.decoded?.payload?.errorReason || null;
+    },
+
+    /**
+     * Extract routing request ID from packet data
+     * @param {object} packetData - Packet data object
+     * @returns {number|null} Request ID or null if not present
+     */
+    extractRoutingRequestId(packetData) {
+        return packetData?.decoded?.requestId || null;
     }
 };
 
@@ -159,7 +225,8 @@ const DataProcessor = {
         const next_hop = lineData.next_hop !== null ? Utils.toHex(lineData.next_hop, 2) : 'N/A';
         const received = Utils.formatTimestamp(lineData.created_at);
 
-        return {
+        // Process routing-specific fields
+        const processedData = {
             ...lineData,
             id_,
             fromDisplay,
@@ -171,6 +238,17 @@ const DataProcessor = {
             next_hop,
             received
         };
+
+        // Add routing-specific processing if this is a routing packet
+        if (portnum === 'ROUTING_APP') {
+            processedData.routingErrorReason = Utils.extractRoutingErrorReason(lineData);
+            processedData.routingErrorDisplay = Utils.formatRoutingError(processedData.routingErrorReason);
+            processedData.routingErrorSeverity = Utils.getRoutingErrorSeverity(processedData.routingErrorReason);
+            processedData.routingRequestId = Utils.extractRoutingRequestId(lineData);
+            processedData.routingRequestIdDisplay = processedData.routingRequestId ? `0x${Utils.toHex(processedData.routingRequestId)}` : 'N/A';
+        }
+
+        return processedData;
     }
 };
 
@@ -215,8 +293,13 @@ const Renderer = {
         const compactRow = document.createElement('div');
         compactRow.className = 'compact-row';
         
-        // Mobile summary
-        const mobileSummary = `Port: ${processedData.portnum} | ${processedData.fromDisplay} → ${processedData.toDisplay}`;
+        // Mobile summary - enhance for routing packets
+        let mobileSummary = `Port: ${processedData.portnum} | ${processedData.fromDisplay} → ${processedData.toDisplay}`;
+        if (processedData.portnum === 'ROUTING_APP') {
+            const errorInfo = processedData.routingErrorDisplay || 'Success';
+            const requestIdInfo = processedData.routingRequestIdDisplay ? ` [Req: ${processedData.routingRequestIdDisplay}]` : '';
+            mobileSummary = `ROUTING: ${errorInfo} | ${processedData.fromDisplay} → ${processedData.toDisplay}${requestIdInfo}`;
+        }
         compactRow.dataset.summary = mobileSummary;
 
         const table = this.createTable(processedData);
@@ -239,8 +322,14 @@ const Renderer = {
             table.classList.add(portColorClass);
         }
 
+        // Add routing severity class for routing packets
+        if (processedData.portnum === 'ROUTING_APP' && processedData.routingErrorSeverity) {
+            table.classList.add(`routing-${processedData.routingErrorSeverity}`);
+        }
+
         const row = table.insertRow();
         
+        // Use consistent fields for all packets
         CONFIG.TABLE_FIELDS.forEach(field => {
             const cell = row.insertCell();
             cell.className = field.colClass;

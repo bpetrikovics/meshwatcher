@@ -1,7 +1,7 @@
 import pytest
 
 from app.event_manager import EventManager
-from app.models import MeshtasticPacket, TextMessage, Position
+from app.models import MeshtasticPacket, TextMessage, Position, Routing
 
 
 def _packet_base(decoded: dict):
@@ -60,3 +60,101 @@ def test_default_extractor_parses_json_string_payload():
 
     assert pos.latitude == 47.0
     assert pos.longitude == 19.0
+
+
+def test_routing_extraction_with_error_reason():
+    packet = _packet_base(
+        {
+            "portnum": "ROUTING_APP",
+            "payload": {
+                "errorReason": "NO_RESPONSE"
+            },
+            "requestId": 43532287,
+        }
+    )
+
+    routing = EventManager.extract_payload(packet, Routing)
+
+    assert routing.node_id == "!000000de"
+    assert routing.packet_id == 111
+    assert routing.timestamp == 1700000000
+    assert routing.error_reason == "NO_RESPONSE"
+    assert routing.request_id == 43532287
+
+
+def test_routing_extraction_without_error_reason():
+    packet = _packet_base(
+        {
+            "portnum": "ROUTING_APP",
+            "payload": {},
+            "requestId": 12345,
+        }
+    )
+
+    routing = EventManager.extract_payload(packet, Routing)
+
+    assert routing.node_id == "!000000de"
+    assert routing.packet_id == 111
+    assert routing.timestamp == 1700000000
+    assert routing.error_reason is None
+    assert routing.request_id == 12345
+
+
+def test_routing_extraction_without_request_id():
+    packet = _packet_base(
+        {
+            "portnum": "ROUTING_APP",
+            "payload": {
+                "errorReason": "TIMEOUT"
+            },
+        }
+    )
+
+    routing = EventManager.extract_payload(packet, Routing)
+
+    assert routing.node_id == "!000000de"
+    assert routing.packet_id == 111
+    assert routing.timestamp == 1700000000
+    assert routing.error_reason == "TIMEOUT"
+    assert routing.request_id is None
+
+
+def test_routing_extraction_all_error_types():
+    """Test that all official routing error reasons are handled correctly"""
+    error_reasons = [
+        "NONE", "NoRoute", "GotNak", "Timeout", "NoInterface", "MaxRetransmit",
+        "NoChannel", "TooLarge", "NoResponse", "DutyCycleLimit", "BadRequest",
+        "NotAuthorized", "PkiFailed", "PkiUnknownPubkey", "AdminBadSessionKey",
+        "AdminPublicKeyUnauthorized", "RateLimitExceeded"
+    ]
+    
+    for error_reason in error_reasons:
+        packet = _packet_base(
+            {
+                "portnum": "ROUTING_APP",
+                "payload": {"errorReason": error_reason},
+                "requestId": 999,
+            }
+        )
+
+        routing = EventManager.extract_payload(packet, Routing)
+        assert routing.error_reason == error_reason
+        assert routing.request_id == 999
+
+
+def test_routing_extraction_minimal_packet():
+    """Test routing packet with minimal required fields"""
+    packet = _packet_base(
+        {
+            "portnum": "ROUTING_APP",
+            "payload": {},
+        }
+    )
+
+    routing = EventManager.extract_payload(packet, Routing)
+
+    assert routing.node_id == "!000000de"
+    assert routing.packet_id == 111
+    assert routing.timestamp == 1700000000
+    assert routing.error_reason is None
+    assert routing.request_id is None
