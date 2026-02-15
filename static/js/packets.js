@@ -23,12 +23,7 @@ const CONFIG = {
 };
 
 // ===== DOM ELEMENT REFERENCES =====
-const DOM = {
-    logDiv: document.getElementById('log'),
-    collapseAllBtn: document.getElementById('collapse-all'),
-    clearAllBtn: document.getElementById('clear-all'),
-    showDuplicatesCheckbox: document.getElementById('show-duplicates')
-};
+let DOM = {};
 
 // ===== SOCKET.IO CLIENT =====
 const socket = io(CONFIG.SOCKET_NAMESPACE);
@@ -519,6 +514,15 @@ const UIController = {
 };
 
 // ===== EVENT LISTENERS =====
+function initializeDOMReferences() {
+    DOM = {
+        logDiv: document.getElementById('log'),
+        collapseAllBtn: document.getElementById('collapse-all'),
+        clearAllBtn: document.getElementById('clear-all'),
+        showDuplicatesCheckbox: document.getElementById('show-duplicates')
+    };
+}
+
 function initializeEventListeners() {
     DOM.collapseAllBtn.addEventListener('click', UIController.collapseAll);
     DOM.clearAllBtn.addEventListener('click', UIController.clearAll);
@@ -542,6 +546,7 @@ function initializeSocketHandlers() {
 
 // ===== INITIALIZATION =====
 function initializeApp() {
+    initializeDOMReferences();
     initializeEventListeners();
     initializeSocketHandlers();
     initializeCommitDisplay();
