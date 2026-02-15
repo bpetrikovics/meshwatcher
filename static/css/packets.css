@@ -51,6 +51,25 @@ body {
     gap: 6px;
 }
 
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.commit-sha {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.9em;
+    font-weight: bold;
+    color: #4caf50;
+    border: 1px solid rgba(76, 175, 80, 0.5);
+    white-space: nowrap;
+}
+
 .header-title {
     flex: 1;
     text-align: center;

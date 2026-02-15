@@ -544,6 +544,43 @@ function initializeSocketHandlers() {
 function initializeApp() {
     initializeEventListeners();
     initializeSocketHandlers();
+    initializeCommitDisplay();
+}
+
+function initializeCommitDisplay() {
+    const commitElement = document.getElementById('commit-sha');
+    if (!commitElement) return;
+    
+    // Validate config structure
+    if (!window.APP_CONFIG || typeof window.APP_CONFIG.GIT_COMMIT !== 'string') {
+        commitElement.textContent = 'unknown version';
+        return;
+    }
+    
+    const gitCommit = window.APP_CONFIG.GIT_COMMIT.trim();
+    if (!gitCommit) {
+        commitElement.textContent = 'unknown version';
+        return;
+    }
+    
+    // Configuration: length of short SHA (standard git default is 7)
+    const SHORT_SHA_LENGTH = 7;
+    
+    // Check if it looks like a git SHA (hexadecimal string)
+    const isGitSha = /^[a-fA-F0-9]+$/.test(gitCommit);
+    
+    if (isGitSha) {
+        // Shorten to specified length
+        const shortCommit = gitCommit.length >= SHORT_SHA_LENGTH 
+            ? gitCommit.substring(0, SHORT_SHA_LENGTH) 
+            : gitCommit;
+        commitElement.textContent = shortCommit;
+        commitElement.title = `Full commit: ${gitCommit}`;
+    } else {
+        // Not a SHA, show as-is with "unknown version" fallback
+        commitElement.textContent = gitCommit === '(unknown version)' ? 'unknown version' : gitCommit;
+        commitElement.title = gitCommit;
+    }
 }
 
 // Start the application when DOM is ready

@@ -10,7 +10,10 @@
 </head>
 <body>
     <div id="header">
-        <div class="header-title">Real-time mesh packet log via {{ settings.mqtt_server }} | Raw data without deduplication</div>
+        <div class="header-left">
+            <span id="commit-sha" class="commit-sha"></span>
+            <div class="header-title">Real-time mesh packet log via {{ settings.mqtt_server }} | Raw data without deduplication</div>
+        </div>
         <div class="header-buttons">
             <label class="header-btn" style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
                 <input type="checkbox" id="show-duplicates" checked>
@@ -25,7 +28,8 @@
     <script>
         // Configuration passed from Flask template
         window.APP_CONFIG = {
-            SOCKET_NAMESPACE: '{{ settings.namespace_packets }}'
+            SOCKET_NAMESPACE: '{{ settings.namespace_packets }}',
+            GIT_COMMIT: '{{ settings.git_commit | e }}'
         };
     </script>
     <script src="/static/js/packets.js"></script>
