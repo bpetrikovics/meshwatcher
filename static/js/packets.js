@@ -524,9 +524,9 @@ function initializeDOMReferences() {
 }
 
 function initializeEventListeners() {
-    DOM.collapseAllBtn.addEventListener('click', UIController.collapseAll);
-    DOM.clearAllBtn.addEventListener('click', UIController.clearAll);
-    DOM.showDuplicatesCheckbox.addEventListener('change', UIController.filterExistingPackets);
+    DOM.collapseAllBtn.addEventListener('click', UIController.collapseAll.bind(UIController));
+    DOM.clearAllBtn.addEventListener('click', UIController.clearAll.bind(UIController));
+    DOM.showDuplicatesCheckbox.addEventListener('change', UIController.filterExistingPackets.bind(UIController));
 }
 
 // ===== SOCKET.IO EVENT HANDLERS =====
