@@ -234,7 +234,9 @@ class EventManager:
 
         with self.db_factory() as db:
             # Allow handling of messages from nodes that don't have nodeinfo yet
-            db.merge(NodeInfo(id_=node_id))
+            existing_node = db.get(NodeInfo, node_id)
+            if not existing_node:
+                db.add(NodeInfo(id_=node_id))
             db.merge(text_message)
 
     @raw_handler.validate_packet
@@ -251,7 +253,9 @@ class EventManager:
         self.logger.info(position)
 
         with self.db_factory() as db:
-            db.merge(NodeInfo(id_=node_id))
+            existing_node = db.get(NodeInfo, node_id)
+            if not existing_node:
+                db.add(NodeInfo(id_=node_id))
             db.merge(position)
 
     @raw_handler.validate_packet
@@ -325,7 +329,9 @@ class EventManager:
 
         with self.db_factory() as db:
             # Allow handling of telemetry before nodeinfo received for the corresponding node
-            db.merge(NodeInfo(id_=node_id))
+            existing_node = db.get(NodeInfo, node_id)
+            if not existing_node:
+                db.add(NodeInfo(id_=node_id))
 
             telemetry_id = None
 
