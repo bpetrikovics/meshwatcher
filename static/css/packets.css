@@ -15,12 +15,12 @@
     --border-hover: rgba(255,255,255,0.3);
     --header-bg: rgba(74, 114, 223, 0.75);
     --header-text: rgb(255, 244, 229);
-    --port-nodeinfo: rgba(100, 180, 120, 0.3);
-    --port-traceroute: rgba(180, 120, 100, 0.3);
-    --port-textmsg: rgba(53, 102, 199, 0.3);
-    --port-position: rgba(180, 140, 100, 0.3);
-    --port-routing: rgba(120, 100, 160, 0.3);
-    --port-telemetry: rgba(80, 170, 200, 0.3);
+    --port-nodeinfo: rgba(100, 180, 120, 0.5);
+    --port-traceroute: rgba(180, 120, 100, 0.5);
+    --port-textmsg: rgba(53, 102, 199, 0.5);
+    --port-position: rgba(180, 140, 100, 0.5);
+    --port-routing: rgba(120, 100, 160, 0.5);
+    --port-telemetry: rgba(80, 170, 200, 0.5);
 }
 
 /* ===== BASE STYLES ===== */
