@@ -513,8 +513,8 @@ class Position(SQLModel, table=True):
         alias="longitudeI",
         sa_column=Column("longitudeI", Integer, nullable=False),
     )
-    altitude: Optional[int] = Field(sa_column=Column("altitude", Integer, nullable=True))
-    time: Optional[int] = Field(sa_column=Column("time", Integer, nullable=True))
+    altitude: Optional[int] = Field(default=None, sa_column=Column("altitude", Integer, nullable=True))
+    time: Optional[int] = Field(default=None, sa_column=Column("time", Integer, nullable=True))
     location_source: Optional[str] = Field(
         alias="locationSource",
         default=None,
@@ -522,15 +522,18 @@ class Position(SQLModel, table=True):
     )
     ground_speed: Optional[int] = Field(
         alias="groundSpeed",
+        default=None,
         sa_column=Column("groundSpeed", Integer, nullable=True),
     )
     ground_track: Optional[int] = Field(
         alias="groundTrack",
+        default=None,
         sa_column=Column("groundTrack", Integer, nullable=True),
     )
-    precision_bits: int = Field(
+    precision_bits: Optional[int] = Field(
         alias="precisionBits",
-        sa_column=Column("precisionBits", Integer, nullable=False),
+        default=None,
+        sa_column=Column("precisionBits", Integer, nullable=True),
     )
 
     created_at: Optional[datetime] = Field(
@@ -568,6 +571,8 @@ class Position(SQLModel, table=True):
     @property
     def radius(self) -> float:
         """Calculate precision radius from precision bits."""
+        if self.precision_bits is None:
+            return 0.0
         return 23905787.925008 * (0.5 ** self.precision_bits)
 
     def __str__(self) -> str:
