@@ -5,8 +5,6 @@
     --z-fixed: 1030;
     --z-modal-backdrop: 1040;
     --z-modal: 1050;
-    --z-popover: 1060;
-    --z-tooltip: 1070;
     
     --panel-left-width: 300px;
     --panel-right-width: 350px;
@@ -111,35 +109,6 @@ header.bg-gray-800 h1 {
     }
 }
 
-/* Custom styles for resize handles */
-.resize-handle-left,
-.resize-handle-right,
-.resize-handle-top {
-    transition: background-color 0.2s ease;
-}
-
-.resize-handle-left:hover,
-.resize-handle-right:hover,
-.resize-handle-top:hover {
-    background-color: #3b82f6 !important;
-}
-
-/* Reduce header height for all screen sizes */
-header.bg-gray-800 {
-    padding: 8px 16px !important;
-    min-height: 56px !important;
-}
-
-/* Override button padding in header */
-header.bg-gray-800 button.p-2 {
-    padding: 6px !important;
-}
-
-/* Override title size in header */
-header.bg-gray-800 h1.text-xl {
-    font-size: 1.125rem !important;
-    margin: 0 !important;
-}
 
 /* Make bottom resize handle more visible */
 .resize-handle-top {
@@ -213,10 +182,6 @@ body.modal-open #map {
     background: #a8a8a8;
 }
 
-/* Modal backdrop blur */
-.backdrop-blur {
-    backdrop-filter: blur(4px);
-}
 
 /* Map controls styling */
 .leaflet-control-container .leaflet-top.leaflet-left {
@@ -239,30 +204,3 @@ footer.glass-panel {
     border-top: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-/* Custom animations */
-@keyframes slideInLeft {
-    from {
-        transform: translateX(-100%);
-    }
-    to {
-        transform: translateX(0);
-    }
-}
-
-@keyframes slideInRight {
-    from {
-        transform: translateX(100%);
-    }
-    to {
-        transform: translateX(0);
-    }
-}
-
-@keyframes slideInUp {
-    from {
-        transform: translateY(100%);
-    }
-    to {
-        transform: translateY(0);
-    }
-}
