@@ -13,6 +13,35 @@
     --panel-bottom-height: 200px;
 }
 
+/* CSS Custom styles for resize handles */
+.resize-handle-left,
+.resize-handle-right,
+.resize-handle-top {
+    transition: background-color 0.2s ease;
+}
+
+.resize-handle-left:hover,
+.resize-handle-right:hover,
+.resize-handle-top:hover {
+    background-color: #3b82f6 !important;
+}
+
+/* Header Base Styles - All Screen Sizes */
+header.bg-gray-800 {
+    padding: 8px 16px;
+    min-height: 56px;
+}
+
+/* Header Components */
+header.bg-gray-800 button {
+    padding: 6px;
+}
+
+header.bg-gray-800 h1 {
+    font-size: 1.125rem;
+    margin: 0;
+}
+
 /* Mobile Responsive Styles */
 @media (max-width: 768px) {
     /* Stack layout vertically on mobile */
@@ -55,29 +84,18 @@
         min-width: 44px;
     }
     
-    /* Adjust header for mobile - HIGHER SPECIFICITY */
-    body header.bg-gray-800.text-white.px-4.py-2 {
-        padding: 4px 8px !important;
-        flex-wrap: wrap !important;
-        min-height: 48px !important;
-        height: 48px !important;
+    /* Mobile Header Overrides */
+    header.bg-gray-800 {
+        padding: 4px 8px;
+        min-height: 48px;
     }
     
-    /* Override button padding in header */
-    body header.bg-gray-800 button.p-2 {
-        padding: 6px !important;
+    header.bg-gray-800 button {
+        padding: 6px;
     }
     
-    /* Override title size in header */
-    body header.bg-gray-800 h1.text-xl {
-        font-size: 1rem !important;
-        margin: 0 !important;
-    }
-    
-    /* Override flex items in header */
-    body header.bg-gray-800 .flex.items-center {
-        align-items: center !important;
-        min-height: 40px !important;
+    header.bg-gray-800 h1 {
+        font-size: 1rem;
     }
     
     /* Hide side panels on mobile by default */
