@@ -62,13 +62,7 @@
             
             <!-- Left Sidebar -->
             <aside x-show="panels.left.visible" 
-                   x-transition:enter="transition ease-out duration-300"
-                   x-transition:enter-start="-translate-x-full"
-                   x-transition:enter-end="translate-x-0"
-                   x-transition:leave="transition ease-in duration-300"
-                   x-transition:leave-start="translate-x-0"
-                   x-transition:leave-end="-translate-x-full"
-                   class="absolute left-0 top-0 h-full bg-white border-r border-gray-200 z-40 flex panel mobile-hidden"
+                   class="fixed left-0 top-16 h-full glass-panel z-40 flex panel mobile-hidden"
                    :style="`width: ${panels.left.width}px`">
                 
                 <!-- Resize Handle -->
@@ -84,7 +78,7 @@
             </aside>
 
             <!-- Map Container -->
-            <div class="flex-1 relative map-container" :style="`margin-left: ${panels.left.visible ? panels.left.width : 0}px; margin-right: ${panels.right.visible ? panels.right.width : 0}px; margin-bottom: ${panels.bottom.visible ? panels.bottom.height : 0}px`">
+            <div class="flex-1 relative map-container">
                 <div id="map" class="w-full h-full"></div>
                 
                 <!-- Map Controls Overlay -->
@@ -99,13 +93,7 @@
 
             <!-- Right Sidebar -->
             <aside x-show="panels.right.visible" 
-                   x-transition:enter="transition ease-out duration-300"
-                   x-transition:enter-start="translate-x-full"
-                   x-transition:enter-end="translate-x-0"
-                   x-transition:leave="transition ease-in duration-300"
-                   x-transition:leave-start="translate-x-0"
-                   x-transition:leave-end="translate-x-full"
-                   class="absolute right-0 top-0 h-full bg-white border-l border-gray-200 z-40 flex panel mobile-hidden"
+                   class="fixed right-0 top-16 h-full glass-panel z-40 flex panel mobile-hidden"
                    :style="`width: ${panels.right.width}px`">
                 
                 <!-- Resize Handle -->
@@ -123,13 +111,7 @@
 
         <!-- Bottom Panel -->
         <footer x-show="panels.bottom.visible" 
-                x-transition:enter="transition ease-out duration-300"
-                x-transition:enter-start="translate-y-full"
-                x-transition:enter-end="translate-y-0"
-                x-transition:leave="transition ease-in duration-300"
-                x-transition:leave-start="translate-y-0"
-                x-transition:leave-end="translate-y-full"
-                class="bg-white border-t border-gray-200 z-40 flex fixed bottom-0 left-0 right-0 panel"
+                class="glass-panel z-40 flex fixed bottom-0 left-0 right-0 panel"
                 :style="`height: ${panels.bottom.height}px`">
             
             <!-- Resize Handle -->

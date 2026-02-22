@@ -11,6 +11,7 @@
     --panel-left-width: 300px;
     --panel-right-width: 350px;
     --panel-bottom-height: 200px;
+    --panel-opacity: 0.65;
 }
 
 /* CSS Custom styles for resize handles */
@@ -217,14 +218,25 @@ body.modal-open #map {
     backdrop-filter: blur(4px);
 }
 
-/* Panel transitions */
-.panel-transition {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
 /* Map controls styling */
 .leaflet-control-container .leaflet-top.leaflet-left {
     top: 60px; /* Account for header */
+}
+
+/* Glass Panel Styling */
+.glass-panel {
+    background: rgba(255, 255, 255, var(--panel-opacity));
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    z-index: 1100; /* Ensure panels appear above map and controls */
+}
+
+/* Ensure bottom panel has identical top border */
+footer.glass-panel {
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 /* Custom animations */
