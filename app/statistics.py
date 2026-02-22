@@ -63,7 +63,7 @@ class PacketStat:
                 if hops_taken == 0:
                     # TODO: DOUBLE CHECK THIS!
                     self.logger.info("Packet %s !%08x and %s are directly connected", hex(packet.id_), packet.from_, packet.uplink)
-                    if f"{packet.relay_node:02x}" == f"{packet.from_:08x}"[-2:]:
+                    if packet.relay_node is not None and f"{packet.relay_node:02x}" == f"{packet.from_:08x}"[-2:]:
                         self.logger.info("Packet %s relay_node %02x for %s is !%08x", hex(packet.id_), packet.relay_node, packet.uplink, packet.from_)
 
         self.total_packets += 1
