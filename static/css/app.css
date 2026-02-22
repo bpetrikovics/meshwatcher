@@ -1,0 +1,113 @@
+/* Custom styles for resize handles */
+.resize-handle-left,
+.resize-handle-right,
+.resize-handle-top {
+    transition: background-color 0.2s ease;
+}
+
+.resize-handle-left:hover,
+.resize-handle-right:hover,
+.resize-handle-top:hover {
+    background-color: #3b82f6 !important;
+}
+
+/* Make bottom resize handle more visible */
+.resize-handle-top {
+    position: absolute;
+    top: -2px;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(to bottom, #d1d5db, #9ca3af);
+    cursor: row-resize;
+}
+
+.resize-handle-top:hover {
+    background: linear-gradient(to bottom, #3b82f6, #2563eb);
+}
+
+/* Ensure map container fills available space */
+#map {
+    min-height: 400px;
+    z-index: 1;
+}
+
+/* Prevent map from interfering with modal */
+body.modal-open #map {
+    pointer-events: none;
+}
+
+/* Ensure modal content is always interactive */
+.pointer-events-auto {
+    pointer-events: auto !important;
+}
+
+/* Fix Leaflet control z-index */
+.leaflet-control-container {
+    z-index: 10;
+}
+
+.leaflet-top {
+    z-index: 10;
+}
+
+/* Custom scrollbar styles */
+.overflow-y-auto::-webkit-scrollbar {
+    width: 6px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Modal backdrop blur */
+.backdrop-blur {
+    backdrop-filter: blur(4px);
+}
+
+/* Panel transitions */
+.panel-transition {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Map controls styling */
+.leaflet-control-container .leaflet-top.leaflet-left {
+    top: 60px; /* Account for header */
+}
+
+/* Custom animations */
+@keyframes slideInLeft {
+    from {
+        transform: translateX(-100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideInUp {
+    from {
+        transform: translateY(100%);
+    }
+    to {
+        transform: translateY(0);
+    }
+}
