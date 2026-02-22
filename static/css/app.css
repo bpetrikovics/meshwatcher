@@ -1,3 +1,78 @@
+/* CSS Custom Properties for Configuration */
+:root {
+    --z-dropdown: 1000;
+    --z-sticky: 1020;
+    --z-fixed: 1030;
+    --z-modal-backdrop: 1040;
+    --z-modal: 1050;
+    --z-popover: 1060;
+    --z-tooltip: 1070;
+    
+    --panel-left-width: 300px;
+    --panel-right-width: 350px;
+    --panel-bottom-height: 200px;
+}
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+    /* Stack layout vertically on mobile */
+    .flex {
+        flex-direction: column !important;
+    }
+    
+    /* Full-width panels on mobile */
+    .panel {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        position: relative !important;
+        transform: none !important;
+    }
+    
+    /* Reset margins on mobile */
+    .map-container {
+        margin: 0 !important;
+        height: 50vh !important; /* Half screen height */
+        min-height: 300px !important;
+    }
+    
+    /* Larger touch targets */
+    .resize-handle-top {
+        height: 12px !important;
+        top: -6px !important;
+        background: linear-gradient(to bottom, #374151, #6b7280) !important;
+    }
+    
+    .resize-handle-left,
+    .resize-handle-right {
+        width: 12px !important;
+        background: linear-gradient(to right, #374151, #6b7280) !important;
+    }
+    
+    /* Mobile-friendly buttons */
+    button {
+        min-height: 44px; /* iOS touch target minimum */
+        min-width: 44px;
+    }
+    
+    /* Adjust header for mobile */
+    header {
+        padding: 8px !important;
+        flex-wrap: wrap !important;
+    }
+    
+    /* Hide side panels on mobile by default */
+    .mobile-hidden {
+        display: none !important;
+    }
+    
+    /* Mobile modal adjustments */
+    .modal-content {
+        margin: 16px !important;
+        max-width: calc(100vw - 32px) !important;
+    }
+}
+
 /* Custom styles for resize handles */
 .resize-handle-left,
 .resize-handle-right,
@@ -20,6 +95,7 @@
     height: 4px;
     background: linear-gradient(to bottom, #d1d5db, #9ca3af);
     cursor: row-resize;
+    z-index: var(--z-dropdown);
 }
 
 .resize-handle-top:hover {
@@ -44,11 +120,24 @@ body.modal-open #map {
 
 /* Fix Leaflet control z-index */
 .leaflet-control-container {
-    z-index: 10;
+    z-index: var(--z-sticky);
 }
 
 .leaflet-top {
-    z-index: 10;
+    z-index: var(--z-sticky);
+}
+
+/* Mobile touch feedback */
+@media (hover: none) and (pointer: coarse) {
+    .resize-handle-top {
+        background: linear-gradient(to bottom, #374151, #6b7280) !important;
+        height: 12px !important;
+    }
+    
+    button:active {
+        background-color: #1f2937 !important;
+        transform: scale(0.95);
+    }
 }
 
 /* Custom scrollbar styles */

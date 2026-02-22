@@ -22,29 +22,37 @@
     <div x-data="meshApp()" x-init="init()" class="h-screen flex flex-col overflow-hidden">
         
         <!-- Top Menu Bar -->
-        <header class="bg-gray-800 text-white px-4 py-2 flex items-center justify-between z-50">
+        <header class="bg-gray-800 text-white px-4 py-2 flex items-center justify-between" style="z-index: var(--z-fixed);">
             <div class="flex items-center space-x-4">
                 <button @click="togglePanel('left')" 
                         class="p-2 hover:bg-gray-700 rounded transition-colors"
-                        :class="panels.left.visible ? 'bg-gray-700' : ''">
-                    <i class="mdi mdi-menu text-xl"></i>
+                        :class="panels.left.visible ? 'bg-gray-700' : ''"
+                        :aria-expanded="panels.left.visible"
+                        aria-label="Toggle left panel">
+                    <i class="mdi mdi-menu text-xl" aria-hidden="true"></i>
                 </button>
                 <h1 class="text-xl font-semibold">Mesh Watcher</h1>
             </div>
             
             <div class="flex items-center space-x-2">
-                <button @click="showModal('test')" class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700">
+                <button @click="showModal('test')" 
+                        class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                        aria-label="Open test modal">
                     Test Modal (Header)
                 </button>
                 <button @click="togglePanel('right')" 
                         class="p-2 hover:bg-gray-700 rounded transition-colors"
-                        :class="panels.right.visible ? 'bg-gray-700' : ''">
-                    <i class="mdi mdi-information text-xl"></i>
+                        :class="panels.right.visible ? 'bg-gray-700' : ''"
+                        :aria-expanded="panels.right.visible"
+                        aria-label="Toggle right panel">
+                    <i class="mdi mdi-information text-xl" aria-hidden="true"></i>
                 </button>
                 <button @click="togglePanel('bottom')" 
                         class="p-2 hover:bg-gray-700 rounded transition-colors"
-                        :class="panels.bottom.visible ? 'bg-gray-700' : ''">
-                    <i class="mdi mdi-console text-xl"></i>
+                        :class="panels.bottom.visible ? 'bg-gray-700' : ''"
+                        :aria-expanded="panels.bottom.visible"
+                        aria-label="Toggle bottom panel">
+                    <i class="mdi mdi-console text-xl" aria-hidden="true"></i>
                 </button>
             </div>
         </header>
@@ -60,12 +68,13 @@
                    x-transition:leave="transition ease-in duration-300"
                    x-transition:leave-start="translate-x-0"
                    x-transition:leave-end="-translate-x-full"
-                   class="absolute left-0 top-0 h-full bg-white border-r border-gray-200 z-40 flex"
+                   class="absolute left-0 top-0 h-full bg-white border-r border-gray-200 z-40 flex panel mobile-hidden"
                    :style="`width: ${panels.left.width}px`">
                 
                 <!-- Resize Handle -->
                 <div class="resize-handle-right absolute right-0 top-0 w-1 h-full bg-gray-300 hover:bg-blue-500 cursor-col-resize z-50"
-                     @mousedown="startResize('left', $event)"></div>
+                     @mousedown="startResize('left', $event)"
+                     @touchstart="startResize('left', $event)"></div>
                 
                 <!-- Panel Content -->
                 <div class="flex-1 p-4 overflow-y-auto">
@@ -75,12 +84,14 @@
             </aside>
 
             <!-- Map Container -->
-            <div class="flex-1 relative" :style="`margin-left: ${panels.left.visible ? panels.left.width : 0}px; margin-right: ${panels.right.visible ? panels.right.width : 0}px; margin-bottom: ${panels.bottom.visible ? panels.bottom.height : 0}px`">
+            <div class="flex-1 relative map-container" :style="`margin-left: ${panels.left.visible ? panels.left.width : 0}px; margin-right: ${panels.right.visible ? panels.right.width : 0}px; margin-bottom: ${panels.bottom.visible ? panels.bottom.height : 0}px`">
                 <div id="map" class="w-full h-full"></div>
                 
                 <!-- Map Controls Overlay -->
-                <div class="absolute top-4 left-4 bg-white rounded shadow-lg p-2 z-30">
-                    <button @click="showModal('test')" class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
+                <div class="absolute top-4 left-4 bg-white rounded shadow-lg p-2" style="z-index: var(--z-sticky);">
+                    <button @click="showModal('test')" 
+                            class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                            aria-label="Open test modal">
                         Test Modal
                     </button>
                 </div>
@@ -94,12 +105,13 @@
                    x-transition:leave="transition ease-in duration-300"
                    x-transition:leave-start="translate-x-0"
                    x-transition:leave-end="translate-x-full"
-                   class="absolute right-0 top-0 h-full bg-white border-l border-gray-200 z-40 flex"
+                   class="absolute right-0 top-0 h-full bg-white border-l border-gray-200 z-40 flex panel mobile-hidden"
                    :style="`width: ${panels.right.width}px`">
                 
                 <!-- Resize Handle -->
                 <div class="resize-handle-left absolute left-0 top-0 w-1 h-full bg-gray-300 hover:bg-blue-500 cursor-col-resize z-50"
-                     @mousedown="startResize('right', $event)"></div>
+                     @mousedown="startResize('right', $event)"
+                     @touchstart="startResize('right', $event)"></div>
                 
                 <!-- Panel Content -->
                 <div class="flex-1 p-4 overflow-y-auto">
@@ -117,7 +129,7 @@
                 x-transition:leave="transition ease-in duration-300"
                 x-transition:leave-start="translate-y-0"
                 x-transition:leave-end="translate-y-full"
-                class="bg-white border-t border-gray-200 z-40 flex fixed bottom-0 left-0 right-0"
+                class="bg-white border-t border-gray-200 z-40 flex fixed bottom-0 left-0 right-0 panel"
                 :style="`height: ${panels.bottom.height}px`">
             
             <!-- Resize Handle -->
@@ -142,7 +154,11 @@
              x-transition:leave-start="opacity-100"
              x-transition:leave-end="opacity-0"
              @click.self="closeModal()"
-             class="fixed inset-0 bg-black bg-opacity-50 z-[99999] flex items-center justify-center pointer-events-auto">
+             class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center pointer-events-auto"
+             style="z-index: var(--z-modal-backdrop);"
+             role="dialog"
+             aria-modal="true"
+             :aria-labelledby="modal.title">
             
             <div x-show="modal.visible"
                  x-transition:enter="transition ease-out duration-300"
@@ -151,13 +167,18 @@
                  x-transition:leave="transition ease-in duration-300"
                  x-transition:leave-start="opacity-100 transform scale-100"
                  x-transition:leave-end="opacity-0 transform scale-90"
-                 class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 pointer-events-auto relative z-[100000]">
+                 class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 pointer-events-auto relative modal-content"
+                 style="z-index: var(--z-modal);">
                 
                 <!-- Modal Header -->
                 <div class="flex items-center justify-between p-4 border-b border-gray-200">
-                    <h3 class="text-lg font-semibold" x-text="modal.title"></h3>
-                    <button @click="closeModal()" class="p-1 hover:bg-gray-100 rounded">
-                        <i class="mdi mdi-close text-xl"></i>
+                    <h3 class="text-lg font-semibold" 
+                        x-text="modal.title" 
+                        id="modal-title"></h3>
+                    <button @click="closeModal()" 
+                            class="p-1 hover:bg-gray-100 rounded"
+                            aria-label="Close modal">
+                        <i class="mdi mdi-close text-xl" aria-hidden="true"></i>
                     </button>
                 </div>
                 
