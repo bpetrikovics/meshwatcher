@@ -55,10 +55,29 @@
         min-width: 44px;
     }
     
-    /* Adjust header for mobile */
-    header {
-        padding: 8px !important;
+    /* Adjust header for mobile - HIGHER SPECIFICITY */
+    body header.bg-gray-800.text-white.px-4.py-2 {
+        padding: 4px 8px !important;
         flex-wrap: wrap !important;
+        min-height: 48px !important;
+        height: 48px !important;
+    }
+    
+    /* Override button padding in header */
+    body header.bg-gray-800 button.p-2 {
+        padding: 6px !important;
+    }
+    
+    /* Override title size in header */
+    body header.bg-gray-800 h1.text-xl {
+        font-size: 1rem !important;
+        margin: 0 !important;
+    }
+    
+    /* Override flex items in header */
+    body header.bg-gray-800 .flex.items-center {
+        align-items: center !important;
+        min-height: 40px !important;
     }
     
     /* Hide side panels on mobile by default */
@@ -84,6 +103,23 @@
 .resize-handle-right:hover,
 .resize-handle-top:hover {
     background-color: #3b82f6 !important;
+}
+
+/* Reduce header height for all screen sizes */
+header.bg-gray-800 {
+    padding: 8px 16px !important;
+    min-height: 56px !important;
+}
+
+/* Override button padding in header */
+header.bg-gray-800 button.p-2 {
+    padding: 6px !important;
+}
+
+/* Override title size in header */
+header.bg-gray-800 h1.text-xl {
+    font-size: 1.125rem !important;
+    margin: 0 !important;
 }
 
 /* Make bottom resize handle more visible */
