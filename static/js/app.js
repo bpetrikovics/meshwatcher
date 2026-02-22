@@ -119,12 +119,6 @@ function meshApp() {
                     maxZoom: 18
                 }).addTo(this.map);
                 
-                // Add a sample marker
-                L.marker(CONFIG.DEFAULT_MAP_CENTER)
-                    .addTo(this.map)
-                    .bindPopup('Sample Location')
-                    .openPopup();
-                    
                 console.log('Map initialized successfully');
             } catch (error) {
                 console.error('Failed to initialize map:', error);
