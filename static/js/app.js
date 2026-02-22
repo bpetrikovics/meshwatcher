@@ -88,16 +88,21 @@ function meshApp() {
         },
         
         // Initialize Leaflet map
-        initMap() {
+        initMap(retryCount = 0) {
             try {
-                console.log('Initializing map...');
+                console.log('Initializing map...', retryCount > 0 ? `(attempt ${retryCount + 1})` : '');
                 
                 // Check if map container exists
                 const mapContainer = document.getElementById('map');
                 if (!mapContainer) {
                     console.error('Map container not found - DOM may not be ready');
-                    // Don't throw error, just log and retry later
-                    setTimeout(() => this.initMap(), 100);
+                    // Retry with limit to prevent infinite loops
+                    if (retryCount < 5) {
+                        setTimeout(() => this.initMap(retryCount + 1), 100);
+                    } else {
+                        console.error('Map initialization failed after 5 attempts');
+                        this.showError('Map container not found. Please refresh the page.');
+                    }
                     return;
                 }
                 
@@ -109,7 +114,7 @@ function meshApp() {
                 
                 // Check if Leaflet is available
                 if (typeof L === 'undefined') {
-                    throw new Error('Leaflet library not loaded');
+                    throw new Error('LEAFLET_NOT_LOADED');
                 }
                 
                 this.map = L.map('map').setView(CONFIG.DEFAULT_MAP_CENTER, CONFIG.DEFAULT_ZOOM);
@@ -122,13 +127,15 @@ function meshApp() {
                 console.log('Map initialized successfully');
             } catch (error) {
                 console.error('Failed to initialize map:', error);
-                // Only show error for critical failures, not DOM timing issues
-                if (error.message.includes('Leaflet library not loaded')) {
-                    this.showError('Map initialization failed. Please check your internet connection and refresh the page.');
-                } else {
+                
+                // Handle specific error types
+                if (error.message === 'LEAFLET_NOT_LOADED') {
+                    this.showError('MAP_LOAD_FAILED');
+                } else if (retryCount < 2) {
                     console.warn('Map initialization issue, will retry...');
-                    // Retry once after a short delay
-                    setTimeout(() => this.initMap(), 500);
+                    setTimeout(() => this.initMap(retryCount + 1), 500);
+                } else {
+                    this.showError('MAP_INIT_FAILED');
                 }
             }
         },
@@ -175,12 +182,10 @@ function meshApp() {
         togglePanel(panelName) {
             this.panels[panelName].visible = !this.panels[panelName].visible;
             
-            // Resize map after panel animation
-            setTimeout(() => {
-                if (this.map) {
-                    this.map.invalidateSize();
-                }
-            }, 300);
+            // Resize map immediately since animations were removed
+            if (this.map) {
+                this.map.invalidateSize();
+            }
         },
         
         // Start resizing a panel
@@ -208,8 +213,11 @@ function meshApp() {
             this.resizing.panel = panelName;
             this.resizing.startX = touch.clientX;
             this.resizing.startY = touch.clientY;
-            this.resizing.startWidth = this.panels[panelName].width;
-            this.resizing.startHeight = this.panels[panelName].height;
+            
+            // Safely access panel dimensions with defaults
+            const panel = this.panels[panelName];
+            this.resizing.startWidth = panel.width || CONFIG.PANEL_SIZES[panelName]?.default || 300;
+            this.resizing.startHeight = panel.height || CONFIG.PANEL_SIZES[panelName]?.default || 200;
             
             // Prevent text selection during resize
             document.body.style.userSelect = 'none';
@@ -278,12 +286,18 @@ function meshApp() {
         },
         
         // Show error message
-        showError(message) {
-            console.error(message);
-            // Only show user-facing errors for critical issues
-            if (message.includes('internet connection') || message.includes('refresh the page')) {
-                // Could integrate with a toast notification system here
-                // For now, use a less intrusive approach
+        showError(errorType) {
+            const errorMessages = {
+                'MAP_LOAD_FAILED': 'Map library failed to load. Please check your internet connection and refresh the page.',
+                'MAP_INIT_FAILED': 'Map initialization failed. Please refresh the page.',
+                'MODAL_FAILED': 'Failed to open modal. Please try again.'
+            };
+            
+            const message = errorMessages[errorType] || 'An unexpected error occurred.';
+            console.error(`${errorType}: ${message}`);
+            
+            // Show user-facing error for critical issues
+            if (errorMessages[errorType]) {
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'fixed top-20 right-4 bg-red-500 text-white px-4 py-2 rounded shadow-lg z-50';
                 errorDiv.textContent = message;
@@ -312,18 +326,27 @@ function meshApp() {
                         this.closeModal();
                     }
                 }),
-                'node-details': () => ({
-                    title: `Node ${data.id || 'Unknown'}`,
-                    content: `
-                        <div class="space-y-2">
-                            <div><strong>ID:</strong> ${data.id || 'N/A'}</div>
-                            <div><strong>Name:</strong> ${data.name || 'N/A'}</div>
-                            <div><strong>Status:</strong> <span class="${data.online ? 'text-green-600' : 'text-red-600'}">${data.online ? 'Online' : 'Offline'}</span></div>
-                            <div><strong>Last Seen:</strong> ${data.lastSeen || 'N/A'}</div>
-                        </div>
-                    `,
-                    onConfirm: () => this.closeModal()
-                })
+                'node-details': () => {
+                    // Sanitize user data to prevent XSS
+                    const sanitizeHtml = (str) => {
+                        const div = document.createElement('div');
+                        div.textContent = str || 'N/A';
+                        return div.innerHTML;
+                    };
+                    
+                    return {
+                        title: `Node ${sanitizeHtml(data.id)}`,
+                        content: `
+                            <div class="space-y-2">
+                                <div><strong>ID:</strong> ${sanitizeHtml(data.id)}</div>
+                                <div><strong>Name:</strong> ${sanitizeHtml(data.name)}</div>
+                                <div><strong>Status:</strong> <span class="${data.online ? 'text-green-600' : 'text-red-600'}">${data.online ? 'Online' : 'Offline'}</span></div>
+                                <div><strong>Last Seen:</strong> ${sanitizeHtml(data.lastSeen)}</div>
+                            </div>
+                        `,
+                        onConfirm: () => this.closeModal()
+                    };
+                }
             };
             
             return configs[type]?.() || this.getDefaultModalConfig();
@@ -349,7 +372,7 @@ function meshApp() {
                 this.modal.visible = true;
             } catch (error) {
                 console.error('Failed to show modal:', error);
-                this.showError('Failed to open modal');
+                this.showError('MODAL_FAILED');
             }
         },
         
