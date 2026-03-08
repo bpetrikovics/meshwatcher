@@ -197,7 +197,8 @@
         // Configuration passed from Flask template
         window.APP_CONFIG = {
             STATUS_CURRENTLY_ACTIVE_HOURS: '{{ settings.status_currently_active_hours | tojson }}',
-            STATUS_RECENTLY_ACTIVE_HOURS: '{{ settings.status_recently_active_hours | tojson }}'
+            STATUS_RECENTLY_ACTIVE_HOURS: '{{ settings.status_recently_active_hours | tojson }}',
+            GIT_COMMIT: '{{ settings.git_commit | e }}'
         };
     </script>
     <script src="/static/js/app.js"></script>
