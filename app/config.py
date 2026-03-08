@@ -37,6 +37,10 @@ class Settings(BaseSettings):
 
     readonly_mode: bool = False # Disable write operations to the database
 
+    # Status thresholds in hours (following existing pattern)
+    status_currently_active_hours: int = 24  # Hours threshold for currently active nodes
+    status_recently_active_hours: int = 72  # Hours threshold for recently active nodes
+
     namespace_packets: str = "/packets"
 
     node_cache_ttl_seconds: int = 1800

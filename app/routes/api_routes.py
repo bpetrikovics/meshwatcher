@@ -150,9 +150,45 @@ def serialize_node(node, include_params: List[str]) -> Dict[str, Any]:
     
     # Add additional info if requested
     if "info" in include_params:
+        # Calculate status based on last update
+        status = "inactive"  # Default status
+        last_seen_hours_ago = None
+        
+        if node.updated:
+            try:
+                # Proper timezone-aware calculation
+                now = datetime.now(timezone.utc)
+                node_updated = node.updated
+                if node_updated.tzinfo is None:
+                    # Assume UTC if no timezone info
+                    node_updated = node_updated.replace(tzinfo=timezone.utc)
+                else:
+                    # Convert to UTC for consistent comparison
+                    node_updated = node_updated.astimezone(timezone.utc)
+                
+                time_diff = now - node_updated
+                last_seen_hours_ago = time_diff.total_seconds() / 3600
+                
+                # Use configurable thresholds
+                if last_seen_hours_ago < settings.status_currently_active_hours:
+                    status = "currently_active"
+                elif last_seen_hours_ago < settings.status_recently_active_hours:
+                    status = "recently_active"
+                # Else remains "inactive"
+            except Exception:
+                # If datetime calculation fails, set default status
+                status = "inactive"
+                last_seen_hours_ago = None
+        
         result["info"] = {
             "has_position": hasattr(node, 'latitude_i'),
             "last_seen": node.updated.isoformat() if node.updated else None,
+            "status": status,
+            "last_seen_hours_ago": int(last_seen_hours_ago) if last_seen_hours_ago is not None else None,
+            # Enhanced node metadata
+            "role": node.role,
+            "hw_model": node.hw_model,
+            "is_unmessagable": node.is_unmessagable,
         }
     
     return result

@@ -10,7 +10,12 @@ const CONFIG = {
         DEFAULT_FILTERS: {
             has_position: true,
             active: false
-        }
+        },
+        // Timing configuration
+        MAP_INIT_DELAY: 200, // ms delay before loading nodes
+        // Status thresholds in hours (following backend pattern)
+        STATUS_CURRENTLY_ACTIVE_HOURS: 24,   // hours
+        STATUS_RECENTLY_ACTIVE_HOURS: 72     // hours (3 days)
     },
     PANEL_SIZES: {
         left: { default: 300, min: 200, max: 500 },
@@ -141,12 +146,15 @@ function meshApp() {
                 this.networkLayer = L.layerGroup().addTo(this.map);
                 this.traceLayer = L.layerGroup().addTo(this.map);
                 
+                // Add status legend
+                this.addStatusLegend();
+                
                 console.log('Map initialized successfully');
                 
                 // Load initial nodes after map is ready
                 setTimeout(() => {
                     this.loadInitialNodes();
-                }, 200); // Increased delay to ensure map is fully ready
+                }, CONFIG.API.MAP_INIT_DELAY); // Use configurable delay
                 
             } catch (error) {
                 console.error('Failed to initialize map:', error);
@@ -472,11 +480,8 @@ function meshApp() {
                     this.addNodeToMap(node);
                 });
                 
-                // Handle pagination if there are more nodes
-                if (data.pagination.has_more) {
-                    console.log('Loading more nodes...');
-                    await this.loadMoreNodes(data.pagination.next_offset);
-                }
+                // Handle pagination iteratively to prevent stack overflow
+                await this.loadAllPages(data);
                 
                 // Fit map to show all nodes
                 if (this.nodeLayer.getLayers().length > 0 && this.map && this.map._loaded) {
@@ -493,6 +498,38 @@ function meshApp() {
                 this.showError('NODE_LOAD_FAILED');
             } finally {
                 this.loading.nodes = false;
+            }
+        },
+        
+        async loadAllPages(initialData) {
+            let offset = initialData.pagination.next_offset;
+            let hasMore = initialData.pagination.has_more;
+            let pageCount = 1;
+            const maxPages = 50; // Prevent infinite loops
+            
+            while (hasMore && pageCount < maxPages) {
+                console.log(`Loading page ${pageCount + 1}...`);
+                
+                const url = this.buildApiUrl({ offset });
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                data.nodes.forEach(node => {
+                    this.addNodeToMap(node);
+                });
+                
+                hasMore = data.pagination.has_more;
+                offset = data.pagination.next_offset;
+                pageCount++;
+                
+                // Small delay to prevent overwhelming the server
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            if (pageCount >= maxPages) {
+                console.warn('Reached maximum page limit, stopping pagination');
+            } else {
+                console.log(`Loaded ${pageCount} pages total`);
             }
         },
         
@@ -536,10 +573,16 @@ function meshApp() {
                 // Store node data
                 this.nodes[node.id] = node;
                 
+                // Determine status and styling
+                const status = node.info?.status || 'inactive';
+                const statusClass = this.getStatusClass(status);
+                const timeAgo = this.getTimeAgoText(node.info?.last_seen_hours_ago);
+                
                 // Create custom node marker
                 const icon = L.divIcon({
                     className: 'node-marker',
-                    html: `<div class="node-icon online" title="${node.long_name || node.id}">
+                    html: `<div class="node-icon ${statusClass}" 
+                             title="${node.long_name || node.id}\nStatus: ${this.getStatusLabel(status)}\nLast seen: ${timeAgo}">
                             <i class="mdi mdi-radio-tower"></i>
                            </div>`,
                     iconSize: [24, 24],
@@ -558,17 +601,21 @@ function meshApp() {
         },
         
         createNodePopup(node) {
+            const info = node.info || {};
+            const position = node.position || {};
+            
             return `
                 <div class="node-popup">
-                    <h4 class="font-semibold">${node.long_name || node.id}</h4>
-                    <div class="text-sm space-y-1">
-                        <div><strong>ID:</strong> ${node.id}</div>
-                        <div><strong>Name:</strong> ${node.short_name || 'N/A'}</div>
-                        <div><strong>Model:</strong> ${node.hw_model || 'N/A'}</div>
-                        <div><strong>Role:</strong> ${node.role || 'N/A'}</div>
-                        <div><strong>Last Seen:</strong> ${node.updated ? new Date(node.updated).toLocaleString() : 'Unknown'}</div>
-                        <div><strong>Position:</strong> ${node.position.latitude.toFixed(6)}, ${node.position.longitude.toFixed(6)}</div>
-                        ${node.position.altitude ? `<div><strong>Altitude:</strong> ${node.position.altitude}m</div>` : ''}
+                    <h4>${node.long_name || node.id}</h4>
+                    <div class="node-info">
+                        <p><strong>ID:</strong> ${node.id}</p>
+                        <p><strong>Model:</strong> ${node.hw_model || 'Unknown'}</p>
+                        ${info.role ? `<p><strong>Role:</strong> ${info.role}</p>` : ''}
+                        <p><strong>Status:</strong> <span class="status-badge ${this.getStatusClass(info.status)}">${this.getStatusLabel(info.status)}</span></p>
+                        ${info.last_seen_hours_ago !== null ? `<p><strong>Last seen:</strong> ${this.getTimeAgoText(info.last_seen_hours_ago)}</p>` : ''}
+                        ${position.latitude ? `<p><strong>Position:</strong> ${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)}</p>` : ''}
+                        ${position.altitude ? `<p><strong>Altitude:</strong> ${position.altitude}m</p>` : ''}
+                        ${info.is_unmessagable ? '<p><em>Node is unmessagable</em></p>' : ''}
                     </div>
                 </div>
             `;
@@ -593,6 +640,74 @@ function meshApp() {
                 node.marker.setPopupContent(this.createNodePopup(node));
             } catch (error) {
                 console.error('Failed to update node position:', error);
+            }
+        },
+        
+        // Status legend functions
+        addStatusLegend() {
+            const statusLegend = L.control({ position: 'bottomleft' });
+            
+            statusLegend.onAdd = (map) => {
+                const div = L.DomUtil.create('div', 'status-legend');
+                const thresholds = CONFIG.API;
+                div.innerHTML = `
+                    <div style="font-weight: bold; margin-bottom: 8px;">Node Status</div>
+                    <div class="legend-item">
+                        <div class="node-icon currently-active"></div>
+                        Currently Active (≤${thresholds.STATUS_CURRENTLY_ACTIVE_HOURS}h)
+                    </div>
+                    <div class="legend-item">
+                        <div class="node-icon recently-active"></div>
+                        Recently Active (≤${thresholds.STATUS_RECENTLY_ACTIVE_HOURS}h)
+                    </div>
+                    <div class="legend-item">
+                        <div class="node-icon inactive"></div>
+                        Inactive (>${thresholds.STATUS_RECENTLY_ACTIVE_HOURS}h)
+                    </div>
+                `;
+                return div;
+            };
+            
+            statusLegend.addTo(this.map);
+        },
+        
+        // Status helper functions
+        getStatusClass(status) {
+            switch (status) {
+                case 'currently_active':
+                    return 'currently-active';
+                case 'recently_active':
+                    return 'recently-active';
+                case 'inactive':
+                default:
+                    return 'inactive';
+            }
+        },
+        
+        getStatusLabel(status) {
+            switch (status) {
+                case 'currently_active':
+                    return 'Currently Active';
+                case 'recently_active':
+                    return 'Recently Active';
+                case 'inactive':
+                default:
+                    return 'Inactive';
+            }
+        },
+        
+        getTimeAgoText(hoursAgo) {
+            if (hoursAgo === null || hoursAgo === undefined) {
+                return 'Never seen';
+            }
+            
+            if (hoursAgo < 1) {
+                return 'Less than 1 hour ago';
+            } else if (hoursAgo < 24) {
+                return `${Math.round(hoursAgo)} hours ago`;
+            } else {
+                const days = Math.round(hoursAgo / 24);
+                return `${days} day${days === 1 ? '' : 's'} ago`;
             }
         },
         

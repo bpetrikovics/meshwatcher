@@ -204,7 +204,103 @@ footer.glass-panel {
     border-top: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-/* Node Marker Styles */
+/* Node status colors */
+.node-icon.currently-active {
+    background-color: #4CAF50;
+    color: white;
+    border: 2px solid #388E3C;
+}
+
+.node-icon.recently-active {
+    background-color: #FF9800;
+    color: white;
+    border: 2px solid #F57C00;
+}
+
+.node-icon.inactive {
+    background-color: #9E9E9E;
+    color: white;
+    border: 2px solid #616161;
+}
+
+/* Node marker animations */
+.node-icon {
+    transition: all 0.3s ease;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+}
+
+.node-icon:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+/* Status legend */
+.status-legend {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.legend-item .node-icon {
+    margin-right: 8px;
+    width: 16px;
+    height: 16px;
+    font-size: 8px;
+}
+
+/* Node popup styling */
+.node-popup {
+    min-width: 200px;
+}
+
+.node-popup h4 {
+    margin: 0 0 10px 0;
+    color: #333;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+}
+
+.node-popup p {
+    margin: 5px 0;
+    font-size: 12px;
+}
+
+.status-badge {
+    padding: 2px 6px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.status-badge.currently-active {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.status-badge.recently-active {
+    background-color: #FF9800;
+    color: white;
+}
+
+.status-badge.inactive {
+    background-color: #9E9E9E;
+    color: white;
+}
+
+/* Node markers */
 .node-marker {
     background: transparent;
     border: none;
