@@ -91,6 +91,7 @@ function meshApp() {
                     this.initMap();
                     this.setupEventListeners();
                     this.initializeCommitDisplay();
+                    this.setupPageUnloadHandlers();
                     console.log('App initialized after DOM ready');
                 });
             } else {
@@ -98,6 +99,7 @@ function meshApp() {
                 this.initMap();
                 this.setupEventListeners();
                 this.initializeCommitDisplay();
+                this.setupPageUnloadHandlers();
                 console.log('App initialized immediately');
             }
         },
@@ -202,15 +204,92 @@ function meshApp() {
         
         // Cleanup event listeners
         cleanup() {
+            console.log('Cleaning up app resources...');
+            
+            // Remove window event listeners
             if (this.resizeHandler) {
                 window.removeEventListener('resize', this.resizeHandler);
+                this.resizeHandler = null;
             }
+            
+            // Remove document event listeners
             if (this.mouseMoveHandler) {
                 document.removeEventListener('mousemove', this.mouseMoveHandler);
+                this.mouseMoveHandler = null;
             }
             if (this.mouseUpHandler) {
                 document.removeEventListener('mouseup', this.mouseUpHandler);
+                this.mouseUpHandler = null;
             }
+            
+            // Clean up map resources
+            if (this.map) {
+                // Remove all layers
+                if (this.nodeLayer) {
+                    this.nodeLayer.clearLayers();
+                    this.map.removeLayer(this.nodeLayer);
+                }
+                if (this.networkLayer) {
+                    this.networkLayer.clearLayers();
+                    this.map.removeLayer(this.networkLayer);
+                }
+                if (this.traceLayer) {
+                    this.traceLayer.clearLayers();
+                    this.map.removeLayer(this.traceLayer);
+                }
+                
+                // Remove map from container
+                this.map.remove();
+                this.map = null;
+            }
+            
+            // Clear node references
+            this.nodes = {};
+            
+            // Clear modal state
+            this.modal.visible = false;
+            this.modal.title = '';
+            this.modal.content = '';
+            this.modal.onConfirm = () => {};
+            
+            // Reset resizing state
+            this.resizing.active = false;
+            this.resizing.panel = null;
+            
+            console.log('App cleanup completed');
+        },
+        
+        // Setup page unload handlers for proper cleanup
+        setupPageUnloadHandlers() {
+            // Handle page unload
+            const handlePageUnload = () => {
+                this.cleanup();
+            };
+            
+            // Handle before unload (when user navigates away)
+            const handleBeforeUnload = () => {
+                this.cleanup();
+            };
+            
+            // Add event listeners for cleanup
+            window.addEventListener('beforeunload', handleBeforeUnload);
+            window.addEventListener('unload', handlePageUnload);
+            
+            // Also handle visibility change (tab switching)
+            const handleVisibilityChange = () => {
+                if (document.visibilityState === 'hidden') {
+                    // Optional: cleanup when tab becomes hidden
+                    // this.cleanup();
+                }
+            };
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+            
+            // Store cleanup handlers for potential manual removal
+            this._cleanupHandlers = {
+                handlePageUnload,
+                handleBeforeUnload,
+                handleVisibilityChange
+            };
         },
         
         // Toggle panel visibility
@@ -766,6 +845,22 @@ function meshApp() {
             } catch (error) {
                 console.error('Failed to remove node from map:', error);
             }
+        },
+        
+        // Manual cleanup method for testing or forced cleanup
+        forceCleanup() {
+            console.log('Force cleaning up app resources...');
+            
+            // Remove cleanup handlers first to prevent double cleanup
+            if (this._cleanupHandlers) {
+                window.removeEventListener('beforeunload', this._cleanupHandlers.handleBeforeUnload);
+                window.removeEventListener('unload', this._cleanupHandlers.handlePageUnload);
+                document.removeEventListener('visibilitychange', this._cleanupHandlers.handleVisibilityChange);
+                this._cleanupHandlers = null;
+            }
+            
+            // Perform full cleanup
+            this.cleanup();
         }
     };
 }
