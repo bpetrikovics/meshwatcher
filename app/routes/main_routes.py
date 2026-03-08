@@ -7,7 +7,7 @@ bp = Blueprint("main", __name__)
 
 @bp.route("/")
 def index():
-    return render_template("index.html", version=settings.git_commit)
+    return render_template("index.html", settings=settings)
 
 
 @bp.route(settings.namespace_packets)

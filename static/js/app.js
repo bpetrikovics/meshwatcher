@@ -13,9 +13,6 @@ const CONFIG = {
         },
         // Timing configuration
         MAP_INIT_DELAY: 200, // ms delay before loading nodes
-        // Status thresholds in hours (following backend pattern)
-        STATUS_CURRENTLY_ACTIVE_HOURS: 24,   // hours
-        STATUS_RECENTLY_ACTIVE_HOURS: 72     // hours (3 days)
     },
     PANEL_SIZES: {
         left: { default: 300, min: 200, max: 500 },
@@ -84,7 +81,7 @@ function meshApp() {
         mouseMoveHandler: null,
         mouseUpHandler: null,
         
-        // Initialize app
+        // Initialize application
         init() {
             console.log('Initializing app...');
             
@@ -93,12 +90,14 @@ function meshApp() {
                 document.addEventListener('DOMContentLoaded', () => {
                     this.initMap();
                     this.setupEventListeners();
+                    this.initializeCommitDisplay();
                     console.log('App initialized after DOM ready');
                 });
             } else {
                 // DOM is already ready
                 this.initMap();
                 this.setupEventListeners();
+                this.initializeCommitDisplay();
                 console.log('App initialized immediately');
             }
         },
@@ -106,7 +105,8 @@ function meshApp() {
         // Initialize Leaflet map
         initMap(retryCount = 0) {
             try {
-                console.log('Initializing map...', retryCount > 0 ? `(attempt ${retryCount + 1})` : '');
+                const retryText = retryCount > 0 ? ` (attempt ${retryCount + 1})` : '';
+                console.log('Initializing map...' + retryText);
                 
                 // Check if map container exists
                 const mapContainer = document.getElementById('map');
@@ -436,6 +436,43 @@ function meshApp() {
             }
         },
         
+        // Initialize commit display
+        initializeCommitDisplay() {
+            const commitElement = document.getElementById('commit-sha');
+            if (!commitElement) return;
+            
+            // Validate config structure
+            if (!window.APP_CONFIG || typeof window.APP_CONFIG.GIT_COMMIT !== 'string') {
+                commitElement.textContent = 'unknown version';
+                return;
+            }
+            
+            const gitCommit = window.APP_CONFIG.GIT_COMMIT.trim();
+            if (!gitCommit) {
+                commitElement.textContent = 'unknown version';
+                return;
+            }
+            
+            // Configuration: length of short SHA (standard git default is 7)
+            const SHORT_SHA_LENGTH = 7;
+            
+            // Check if it looks like a git SHA (hexadecimal string)
+            const isGitSha = /^[a-fA-F0-9]+$/.test(gitCommit);
+            
+            if (isGitSha) {
+                // Shorten to specified length
+                const shortCommit = gitCommit.length >= SHORT_SHA_LENGTH 
+                    ? gitCommit.substring(0, SHORT_SHA_LENGTH) 
+                    : gitCommit;
+                commitElement.textContent = shortCommit;
+                commitElement.title = `Full commit: ${gitCommit}`;
+            } else {
+                // Not a SHA, show as-is with "unknown version" fallback
+                commitElement.textContent = gitCommit === '(unknown version)' ? 'unknown version' : gitCommit;
+                commitElement.title = gitCommit;
+            }
+        },
+        
         // API utility functions
         buildApiUrl(params = {}) {
             const queryParams = new URLSearchParams();
@@ -579,12 +616,14 @@ function meshApp() {
                 const timeAgo = this.getTimeAgoText(node.info?.last_seen_hours_ago);
                 
                 // Create custom node marker
+                const iconHtml = `<div class="node-icon ${statusClass}" 
+                                     title="${node.long_name || node.id}\nStatus: ${this.getStatusLabel(status)}\nLast seen: ${timeAgo}">
+                                    <i class="mdi mdi-radio-tower"></i>
+                                   </div>`;
+                
                 const icon = L.divIcon({
                     className: 'node-marker',
-                    html: `<div class="node-icon ${statusClass}" 
-                             title="${node.long_name || node.id}\nStatus: ${this.getStatusLabel(status)}\nLast seen: ${timeAgo}">
-                            <i class="mdi mdi-radio-tower"></i>
-                           </div>`,
+                    html: iconHtml,
                     iconSize: [24, 24],
                     iconAnchor: [12, 12]
                 });
@@ -649,7 +688,10 @@ function meshApp() {
             
             statusLegend.onAdd = (map) => {
                 const div = L.DomUtil.create('div', 'status-legend');
-                const thresholds = CONFIG.API;
+                const thresholds = window.APP_CONFIG || {
+                    STATUS_CURRENTLY_ACTIVE_HOURS: 24,
+                    STATUS_RECENTLY_ACTIVE_HOURS: 72
+                };
                 div.innerHTML = `
                     <div style="font-weight: bold; margin-bottom: 8px;">Node Status</div>
                     <div class="legend-item">

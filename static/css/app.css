@@ -238,26 +238,35 @@ footer.glass-panel {
     box-shadow: 0 4px 8px rgba(0,0,0,0.3);
 }
 
-/* Status legend */
+/* Status legend styles */
 .status-legend {
-    background: rgba(255, 255, 255, 0.9);
-    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.95);
     padding: 10px;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     font-size: 12px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    min-width: 200px;
 }
 
 .legend-item {
     display: flex;
     align-items: center;
-    margin-bottom: 5px;
+    margin-bottom: 4px;
+    gap: 8px;
 }
 
 .legend-item .node-icon {
-    margin-right: 8px;
-    width: 16px;
-    height: 16px;
-    font-size: 8px;
+    margin-right: 0;
+}
+
+/* Version display */
+.commit-sha {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 11px;
+    color: #ccc;
 }
 
 /* Node popup styling */
@@ -318,14 +327,6 @@ footer.glass-panel {
     border: 2px solid #fff;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     transition: all 0.2s ease;
-}
-
-.node-icon.online {
-    background: #10b981; /* Green for online */
-}
-
-.node-icon.offline {
-    background: #ef4444; /* Red for offline */
 }
 
 .node-icon:hover {
