@@ -23,6 +23,12 @@ function meshApp() {
         // Map instance
         map: null,
         
+        // Node management
+        nodes: {},
+        nodeLayer: null,
+        networkLayer: null,
+        traceLayer: null,
+        
         // Panel configuration
         panels: {
             left: {
@@ -117,6 +123,7 @@ function meshApp() {
                     throw new Error('LEAFLET_NOT_LOADED');
                 }
                 
+                // Initialize map
                 this.map = L.map('map').setView(CONFIG.DEFAULT_MAP_CENTER, CONFIG.DEFAULT_ZOOM);
                 
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -124,7 +131,18 @@ function meshApp() {
                     maxZoom: 18
                 }).addTo(this.map);
                 
+                // Initialize layers
+                this.nodeLayer = L.layerGroup().addTo(this.map);
+                this.networkLayer = L.layerGroup().addTo(this.map);
+                this.traceLayer = L.layerGroup().addTo(this.map);
+                
                 console.log('Map initialized successfully');
+                
+                // Load initial nodes after map is ready
+                setTimeout(() => {
+                    this.loadInitialNodes();
+                }, 100); // Small delay to ensure map is fully ready
+                
             } catch (error) {
                 console.error('Failed to initialize map:', error);
                 
@@ -290,6 +308,7 @@ function meshApp() {
             const errorMessages = {
                 'MAP_LOAD_FAILED': 'Map library failed to load. Please check your internet connection and refresh the page.',
                 'MAP_INIT_FAILED': 'Map initialization failed. Please refresh the page.',
+                'NODE_LOAD_FAILED': 'Failed to load node data. Please refresh the page.',
                 'MODAL_FAILED': 'Failed to open modal. Please try again.'
             };
             
@@ -299,8 +318,11 @@ function meshApp() {
             // Show user-facing error for critical issues
             if (errorMessages[errorType]) {
                 const errorDiv = document.createElement('div');
-                errorDiv.className = 'fixed top-20 right-4 bg-red-500 text-white px-4 py-2 rounded shadow-lg z-50';
-                errorDiv.textContent = message;
+                errorDiv.className = 'error-message';
+                errorDiv.innerHTML = `
+                    ${message}
+                    <span class="close-btn" onclick="this.parentElement.remove()">×</span>
+                `;
                 document.body.appendChild(errorDiv);
                 
                 // Auto-remove after 5 seconds
@@ -389,6 +411,143 @@ function meshApp() {
             } catch (error) {
                 console.error('Failed to close modal:', error);
             }
+        },
+        
+        // Node management functions
+        async loadInitialNodes() {
+            try {
+                console.log('Loading initial nodes...');
+                const response = await fetch('/api/nodes?include=positions,info&has_position=true&limit=1000');
+                const data = await response.json();
+                
+                console.log(`Loaded ${data.nodes.length} nodes`);
+                
+                // Add nodes to map
+                data.nodes.forEach(node => {
+                    this.addNodeToMap(node);
+                });
+                
+                // Handle pagination if there are more nodes
+                if (data.pagination.has_more) {
+                    console.log('Loading more nodes...');
+                    await this.loadMoreNodes(data.pagination.next_offset);
+                }
+                
+                // Fit map to show all nodes
+                if (this.nodeLayer.getLayers().length > 0) {
+                    const group = L.featureGroup(this.nodeLayer.getLayers());
+                    this.map.fitBounds(group.getBounds().pad(0.1));
+                }
+                
+            } catch (error) {
+                console.error('Failed to load initial nodes:', error);
+                this.showError('NODE_LOAD_FAILED');
+            }
+        },
+        
+        async loadMoreNodes(offset) {
+            try {
+                const response = await fetch(`/api/nodes?include=positions,info&has_position=true&limit=1000&offset=${offset}`);
+                const data = await response.json();
+                
+                data.nodes.forEach(node => {
+                    this.addNodeToMap(node);
+                });
+                
+                // Continue pagination if needed
+                if (data.pagination.has_more) {
+                    await this.loadMoreNodes(data.pagination.next_offset);
+                }
+                
+            } catch (error) {
+                console.error('Failed to load more nodes:', error);
+            }
+        },
+        
+        addNodeToMap(node) {
+            // Check if map is ready
+            if (!this.map) {
+                console.warn('Map not initialized yet, skipping node addition');
+                return;
+            }
+            
+            if (!node.position || !this.nodeLayer) {
+                console.warn('Invalid node data or node layer not ready');
+                return;
+            }
+            
+            try {
+                // Store node data
+                this.nodes[node.id] = node;
+                
+                // Create custom node marker
+                const icon = L.divIcon({
+                    className: 'node-marker',
+                    html: `<div class="node-icon online" title="${node.long_name || node.id}">
+                            <i class="mdi mdi-radio-tower"></i>
+                           </div>`,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                });
+                
+                const marker = L.marker([node.position.latitude, node.position.longitude], { icon })
+                    .bindPopup(this.createNodePopup(node))
+                    .addTo(this.nodeLayer);
+                
+                // Store marker reference
+                node.marker = marker;
+            } catch (error) {
+                console.error('Failed to add node to map:', error);
+            }
+        },
+        
+        createNodePopup(node) {
+            return `
+                <div class="node-popup">
+                    <h4 class="font-semibold">${node.long_name || node.id}</h4>
+                    <div class="text-sm space-y-1">
+                        <div><strong>ID:</strong> ${node.id}</div>
+                        <div><strong>Name:</strong> ${node.short_name || 'N/A'}</div>
+                        <div><strong>Model:</strong> ${node.hw_model || 'N/A'}</div>
+                        <div><strong>Role:</strong> ${node.role || 'N/A'}</div>
+                        <div><strong>Last Seen:</strong> ${node.updated ? new Date(node.updated).toLocaleString() : 'Unknown'}</div>
+                        <div><strong>Position:</strong> ${node.position.latitude.toFixed(6)}, ${node.position.longitude.toFixed(6)}</div>
+                        ${node.position.altitude ? `<div><strong>Altitude:</strong> ${node.position.altitude}m</div>` : ''}
+                    </div>
+                </div>
+            `;
+        },
+        
+        updateNodePosition(nodeId, position) {
+            const node = this.nodes[nodeId];
+            if (!node || !node.marker || !this.map) {
+                console.warn('Cannot update node position: map, node, or marker not available');
+                return;
+            }
+            
+            try {
+                // Update node position data
+                node.position = position;
+                
+                // Animate marker to new position
+                const newLatLng = L.latLng(position.latitude, position.longitude);
+                node.marker.setLatLng(newLatLng);
+                
+                // Update popup
+                node.marker.setPopupContent(this.createNodePopup(node));
+            } catch (error) {
+                console.error('Failed to update node position:', error);
+            }
+        },
+        
+        removeNodeFromMap(nodeId) {
+            const node = this.nodes[nodeId];
+            if (!node || !node.marker) {
+                return;
+            }
+            
+            this.nodeLayer.removeLayer(node.marker);
+            delete this.nodes[nodeId];
         }
     };
 }

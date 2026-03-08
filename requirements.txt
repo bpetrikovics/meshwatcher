@@ -1,4 +1,4 @@
-gunicorn[eventlet]
+gunicorn
 flask
 flask-socketio
 pydantic-settings
