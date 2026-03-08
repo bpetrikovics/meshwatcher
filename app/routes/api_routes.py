@@ -148,6 +148,13 @@ def serialize_node(node, include_params: List[str]) -> Dict[str, Any]:
             "payload": node.payload,
         }
     
+    # Add additional info if requested
+    if "info" in include_params:
+        result["info"] = {
+            "has_position": hasattr(node, 'latitude_i'),
+            "last_seen": node.updated.isoformat() if node.updated else None,
+        }
+    
     return result
 
 

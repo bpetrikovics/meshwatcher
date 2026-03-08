@@ -1,7 +1,17 @@
-// Configuration object
+// Application configuration
 const CONFIG = {
     DEFAULT_MAP_CENTER: [47.5, 19.0],
     DEFAULT_ZOOM: 8,
+    // API configuration
+    API: {
+        DEFAULT_LIMIT: 1000,
+        MAX_LIMIT: 5000,
+        DEFAULT_INCLUDES: ['positions', 'info'],
+        DEFAULT_FILTERS: {
+            has_position: true,
+            active: false
+        }
+    },
     PANEL_SIZES: {
         left: { default: 300, min: 200, max: 500 },
         right: { default: 350, min: 250, max: 600 },
@@ -28,8 +38,24 @@ function meshApp() {
         nodeLayer: null,
         networkLayer: null,
         traceLayer: null,
-        
-        // Panel configuration
+        modal: {
+            visible: false,
+            title: '',
+            content: '',
+            onConfirm: () => {}
+        },
+        loading: {
+            nodes: false,
+            pagination: false
+        },
+        resizing: {
+            active: false,
+            panel: null,
+            startX: 0,
+            startY: 0,
+            startWidth: 0,
+            startHeight: 0
+        },
         panels: {
             left: {
                 visible: false,
@@ -50,27 +76,6 @@ function meshApp() {
                 maxHeight: CONFIG.PANEL_SIZES.bottom.max
             }
         },
-        
-        // Modal configuration
-        modal: {
-            visible: false,
-            title: '',
-            content: '',
-            onConfirm: () => {}
-        },
-        
-        // Resize state
-        resizing: {
-            active: false,
-            panel: null,
-            startX: 0,
-            startY: 0,
-            startWidth: 0,
-            startHeight: 0
-        },
-        
-        // Event handlers for cleanup
-        resizeHandler: null,
         mouseMoveHandler: null,
         mouseUpHandler: null,
         
@@ -141,7 +146,7 @@ function meshApp() {
                 // Load initial nodes after map is ready
                 setTimeout(() => {
                     this.loadInitialNodes();
-                }, 100); // Small delay to ensure map is fully ready
+                }, 200); // Increased delay to ensure map is fully ready
                 
             } catch (error) {
                 console.error('Failed to initialize map:', error);
@@ -162,15 +167,19 @@ function meshApp() {
         setupEventListeners() {
             // Handle window resize
             this.resizeHandler = () => {
-                if (this.map) {
-                    this.map.invalidateSize();
+                if (this.map && this.map._container && this.map._loaded) {
+                    try {
+                        this.map.invalidateSize();
+                    } catch (error) {
+                        console.warn('Map resize failed:', error);
+                    }
                 }
             };
             window.addEventListener('resize', this.resizeHandler);
             
             // Handle mouse move for resizing
             this.mouseMoveHandler = (e) => {
-                if (this.resizing.active) {
+                if (this.resizing && this.resizing.active) {
                     this.handleResize(e);
                 }
             };
@@ -249,7 +258,7 @@ function meshApp() {
         
         // Handle panel resizing
         handleResize(event) {
-            if (!this.resizing.active) return;
+            if (!this.resizing || !this.resizing.active) return;
             
             // Handle both mouse and touch events
             const touch = event.touches?.[0] || event;
@@ -270,8 +279,12 @@ function meshApp() {
             }
             
             // Resize map during resize
-            if (this.map) {
-                this.map.invalidateSize();
+            if (this.map && this.map._container && this.map._loaded) {
+                try {
+                    this.map.invalidateSize();
+                } catch (error) {
+                    console.warn('Map resize during panel resize failed:', error);
+                }
             }
             
             // Prevent default touch behavior
@@ -282,6 +295,8 @@ function meshApp() {
         
         // Stop resizing
         stopResize() {
+            if (!this.resizing) return;
+            
             this.resizing.active = false;
             this.resizing.panel = null;
             
@@ -413,11 +428,41 @@ function meshApp() {
             }
         },
         
-        // Node management functions
+        // API utility functions
+        buildApiUrl(params = {}) {
+            const queryParams = new URLSearchParams();
+            
+            // Add includes
+            const includes = params.includes || CONFIG.API.DEFAULT_INCLUDES;
+            queryParams.append('include', includes.join(','));
+            
+            // Add filters
+            const filters = { ...CONFIG.API.DEFAULT_FILTERS, ...params.filters };
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value !== null && value !== undefined) {
+                    queryParams.append(key, value.toString());
+                }
+            });
+            
+            // Add pagination
+            if (params.limit) {
+                queryParams.append('limit', Math.min(params.limit, CONFIG.API.MAX_LIMIT));
+            } else {
+                queryParams.append('limit', CONFIG.API.DEFAULT_LIMIT);
+            }
+            
+            if (params.offset) {
+                queryParams.append('offset', params.offset);
+            }
+            
+            return `/api/nodes?${queryParams.toString()}`;
+        },
         async loadInitialNodes() {
             try {
+                this.loading.nodes = true;
                 console.log('Loading initial nodes...');
-                const response = await fetch('/api/nodes?include=positions,info&has_position=true&limit=1000');
+                const url = this.buildApiUrl();
+                const response = await fetch(url);
                 const data = await response.json();
                 
                 console.log(`Loaded ${data.nodes.length} nodes`);
@@ -434,20 +479,28 @@ function meshApp() {
                 }
                 
                 // Fit map to show all nodes
-                if (this.nodeLayer.getLayers().length > 0) {
-                    const group = L.featureGroup(this.nodeLayer.getLayers());
-                    this.map.fitBounds(group.getBounds().pad(0.1));
+                if (this.nodeLayer.getLayers().length > 0 && this.map && this.map._loaded) {
+                    try {
+                        const group = L.featureGroup(this.nodeLayer.getLayers());
+                        this.map.fitBounds(group.getBounds().pad(0.1));
+                    } catch (error) {
+                        console.warn('Failed to fit map bounds:', error);
+                    }
                 }
                 
             } catch (error) {
                 console.error('Failed to load initial nodes:', error);
                 this.showError('NODE_LOAD_FAILED');
+            } finally {
+                this.loading.nodes = false;
             }
         },
         
         async loadMoreNodes(offset) {
             try {
-                const response = await fetch(`/api/nodes?include=positions,info&has_position=true&limit=1000&offset=${offset}`);
+                this.loading.pagination = true;
+                const url = this.buildApiUrl({ offset });
+                const response = await fetch(url);
                 const data = await response.json();
                 
                 data.nodes.forEach(node => {
@@ -461,13 +514,16 @@ function meshApp() {
                 
             } catch (error) {
                 console.error('Failed to load more nodes:', error);
+                this.showError('NODE_LOAD_FAILED');
+            } finally {
+                this.loading.pagination = false;
             }
         },
         
         addNodeToMap(node) {
             // Check if map is ready
-            if (!this.map) {
-                console.warn('Map not initialized yet, skipping node addition');
+            if (!this.map || !this.map._loaded) {
+                console.warn('Map not fully initialized yet, skipping node addition');
                 return;
             }
             
@@ -541,13 +597,18 @@ function meshApp() {
         },
         
         removeNodeFromMap(nodeId) {
-            const node = this.nodes[nodeId];
-            if (!node || !node.marker) {
-                return;
+            try {
+                const node = this.nodes[nodeId];
+                if (!node || !node.marker) {
+                    console.warn('Node or marker not found for removal');
+                    return;
+                }
+                
+                this.nodeLayer.removeLayer(node.marker);
+                delete this.nodes[nodeId];
+            } catch (error) {
+                console.error('Failed to remove node from map:', error);
             }
-            
-            this.nodeLayer.removeLayer(node.marker);
-            delete this.nodes[nodeId];
         }
     };
 }
