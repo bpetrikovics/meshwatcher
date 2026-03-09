@@ -183,14 +183,18 @@ class EventManager:
         self.logger.info("Initialized // version: %s", settings.git_commit)
 
     def _update_node_last_seen(self, node_id: str, db):
-        """Update node's last seen timestamp to current time."""
+        """Update node's last seen timestamp to current time. Returns the node object."""
         existing_node = db.get(NodeInfo, node_id)
         current_time = datetime.now(timezone.utc)
         if existing_node:
             existing_node.updated = current_time
+            return existing_node
         else:
             # Create placeholder node with current timestamp
-            db.add(NodeInfo(id_=node_id, updated=current_time))
+            placeholder_node = NodeInfo(id_=node_id, updated=current_time)
+            db.add(placeholder_node)
+            db.flush()  # Ensure the placeholder is in the database before returning
+            return placeholder_node
 
     @staticmethod
     def extract_payload(packet: MeshtasticPacket, class_to_extract: type) -> Any:
@@ -279,11 +283,27 @@ class EventManager:
         # TODO: recognize nodeinfo request/exchanges, directed vs broadcast
 
         with self.db_factory() as db:
-            # Update node's last seen timestamp and merge nodeinfo data
-            self._update_node_last_seen(nodeinfo.id_, db)
-            db.merge(nodeinfo)
-
-        self.presenter.upsert_node_cache(nodeinfo)
+            # Update node's last seen timestamp and get the node object
+            existing_node = self._update_node_last_seen(nodeinfo.id_, db)
+            
+            # Update the existing node with nodeinfo data
+            if nodeinfo.short_name is not None:
+                existing_node.short_name = nodeinfo.short_name
+            if nodeinfo.long_name is not None:
+                existing_node.long_name = nodeinfo.long_name
+            if nodeinfo.macaddr is not None:
+                existing_node.macaddr = nodeinfo.macaddr
+            if nodeinfo.hw_model is not None:
+                existing_node.hw_model = nodeinfo.hw_model
+            if nodeinfo.public_key is not None:
+                existing_node.public_key = nodeinfo.public_key
+            if nodeinfo.role is not None:
+                existing_node.role = nodeinfo.role
+            if nodeinfo.is_unmessagable is not None:
+                existing_node.is_unmessagable = nodeinfo.is_unmessagable
+            
+            # Use the updated existing_node for cache
+            self.presenter.upsert_node_cache(existing_node)
 
         self.logger.debug("Node %s was upserted", nodeinfo.id_)
 
