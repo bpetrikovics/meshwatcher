@@ -463,7 +463,8 @@ function meshApp() {
                         content: `
                             <div class="space-y-2">
                                 <div><strong>ID:</strong> ${sanitizeHtml(data.id)}</div>
-                                <div><strong>Name:</strong> ${sanitizeHtml(data.name)}</div>
+                                <div><strong>Long Name:</strong> ${sanitizeHtml(data.long_name || data.name || 'N/A')}</div>
+                                <div><strong>Short Name:</strong> ${sanitizeHtml(data.short_name || 'N/A')}</div>
                                 <div><strong>Status:</strong> <span class="${data.online ? 'text-green-600' : 'text-red-600'}">${data.online ? 'Online' : 'Offline'}</span></div>
                                 <div><strong>Last Seen:</strong> ${sanitizeHtml(data.lastSeen)}</div>
                             </div>
@@ -727,6 +728,7 @@ function meshApp() {
                     <h4>${node.long_name || node.id}</h4>
                     <div class="node-info">
                         <p><strong>ID:</strong> ${node.id}</p>
+                        ${node.short_name ? `<p><strong>Short Name:</strong> ${node.short_name}</p>` : ''}
                         <p><strong>Model:</strong> ${node.hw_model || 'Unknown'}</p>
                         ${info.role ? `<p><strong>Role:</strong> ${info.role}</p>` : ''}
                         <p><strong>Status:</strong> <span class="status-badge ${this.getStatusClass(info.status)}">${this.getStatusLabel(info.status)}</span></p>
