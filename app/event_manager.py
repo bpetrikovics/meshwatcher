@@ -1,6 +1,7 @@
 import json
 import logging
 
+from datetime import datetime, timezone
 from typing import Callable, Any
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
@@ -181,6 +182,16 @@ class EventManager:
         self.mqtt.loop_start()
         self.logger.info("Initialized // version: %s", settings.git_commit)
 
+    def _update_node_last_seen(self, node_id: str, db):
+        """Update node's last seen timestamp to current time."""
+        existing_node = db.get(NodeInfo, node_id)
+        current_time = datetime.now(timezone.utc)
+        if existing_node:
+            existing_node.updated = current_time
+        else:
+            # Create placeholder node with current timestamp
+            db.add(NodeInfo(id_=node_id, updated=current_time))
+
     @staticmethod
     def extract_payload(packet: MeshtasticPacket, class_to_extract: type) -> Any:
         """
@@ -233,10 +244,8 @@ class EventManager:
         self.logger.info(text_message)
 
         with self.db_factory() as db:
-            # Allow handling of messages from nodes that don't have nodeinfo yet
-            existing_node = db.get(NodeInfo, node_id)
-            if not existing_node:
-                db.add(NodeInfo(id_=node_id))
+            # Update node's last seen timestamp
+            self._update_node_last_seen(node_id, db)
             db.merge(text_message)
 
     @raw_handler.validate_packet
@@ -253,9 +262,8 @@ class EventManager:
         self.logger.info(position)
 
         with self.db_factory() as db:
-            existing_node = db.get(NodeInfo, node_id)
-            if not existing_node:
-                db.add(NodeInfo(id_=node_id))
+            # Update node's last seen timestamp
+            self._update_node_last_seen(node_id, db)
             db.merge(position)
 
     @raw_handler.validate_packet
@@ -271,6 +279,8 @@ class EventManager:
         # TODO: recognize nodeinfo request/exchanges, directed vs broadcast
 
         with self.db_factory() as db:
+            # Update node's last seen timestamp and merge nodeinfo data
+            self._update_node_last_seen(nodeinfo.id_, db)
             db.merge(nodeinfo)
 
         self.presenter.upsert_node_cache(nodeinfo)
@@ -328,10 +338,8 @@ class EventManager:
             return
 
         with self.db_factory() as db:
-            # Allow handling of telemetry before nodeinfo received for the corresponding node
-            existing_node = db.get(NodeInfo, node_id)
-            if not existing_node:
-                db.add(NodeInfo(id_=node_id))
+            # Update node's last seen timestamp
+            self._update_node_last_seen(node_id, db)
 
             telemetry_id = None
 
@@ -399,6 +407,11 @@ class EventManager:
             return
 
         self.logger.info(routing)
+
+        # Update node's last seen timestamp even though we don't store routing data
+        node_id = f"!{packet.from_:08x}"
+        with self.db_factory() as db:
+            self._update_node_last_seen(node_id, db)
 
         # For now, we're not storing routing packets in database as requested
         # The routing data is parsed and logged for analysis purposes only
