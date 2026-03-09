@@ -754,7 +754,7 @@ function meshApp() {
                 
                 // Check for movement and heading
                 const hasSpeed = node.position && node.position.ground_speed && node.position.ground_speed > 0;
-                const hasHeading = node.position && node.position.heading !== null && node.position.heading !== undefined;
+                const hasHeading = node.position && node.position.heading != null;
                 const shouldShowDirection = hasSpeed && hasHeading;
                 
                 // Create custom node marker with optional directional shape
@@ -808,7 +808,7 @@ function meshApp() {
                         ${safeShortName ? `<p><strong>Short Name:</strong> ${safeShortName}</p>` : ''}
                         <p><strong>Status:</strong> <span class="status-badge ${this.getStatusClass(info.status)}">${this.getStatusLabel(info.status)}</span></p>
                         ${position.ground_speed ? `<p><strong>Ground Speed:</strong> ${position.ground_speed} m/s</p>` : ''}
-                        ${position.heading !== null ? `<p><strong>Heading:</strong> ${position.heading.toFixed(1)}° (${this.getCompassDirection(position.heading)})</p>` : ''}
+                        ${position.heading != null ? `<p><strong>Heading:</strong> ${position.heading.toFixed(1)}° (${this.getCompassDirection(position.heading)})</p>` : ''}
                         ${info.last_seen_hours_ago !== null ? `<p><strong>Last seen:</strong> ${this.getTimeAgoText(info.last_seen_hours_ago)}</p>` : ''}
                         ${position.latitude ? `<p><strong>Position:</strong> ${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)}</p>` : ''}
                         ${position.altitude ? `<p><strong>Altitude:</strong> ${position.altitude}m</p>` : ''}

@@ -561,10 +561,10 @@ class Position(SQLModel, table=True):
 
     @computed_field
     @property
-    def heading(self) -> float:
+    def heading(self) -> Optional[float]:
         """Convert heading from integer (1e5 scale) to decimal degrees."""
         if self.ground_track is None:
-            return 0.0
+            return None
         return self.ground_track / 1e5
 
     @computed_field

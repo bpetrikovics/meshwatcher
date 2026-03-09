@@ -139,7 +139,7 @@ def test_position_computed_fields_heading_none():
 
     assert pos.latitude == 47.0
     assert pos.longitude == 19.0
-    assert pos.heading == 0.0
+    assert pos.heading is None
 
 
 def test_routing_model_validation_and_string_representation():
