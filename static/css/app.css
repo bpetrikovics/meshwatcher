@@ -246,6 +246,7 @@ footer.glass-panel {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     font-size: 12px;
     min-width: 200px;
+    max-width: 280px;
 }
 
 .legend-item {
@@ -257,6 +258,15 @@ footer.glass-panel {
 
 .legend-item .node-icon {
     margin-right: 0;
+    flex-shrink: 0;
+}
+
+.legend-section-title {
+    font-weight: bold;
+    margin: 12px 0 8px 0;
+    border-top: 1px solid #ddd;
+    padding-top: 8px;
+    color: #374151;
 }
 
 /* Version display */
@@ -346,6 +356,57 @@ footer.glass-panel {
     color: #1f2937;
     border-bottom: 1px solid #e5e7eb;
     padding-bottom: 4px;
+}
+
+.node-role-section {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.role-icon {
+    margin-right: 6px;
+    color: #666;
+    font-size: 14px;
+}
+
+.role-badge {
+    background: linear-gradient(135deg, #e5e7eb, #d1d5db);
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #374151;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: 1px solid #d1d5db;
+    /* Add pattern for colorblind accessibility */
+    background-image: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(0,0,0,0.05) 2px);
+    position: relative;
+}
+
+.role-badge::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(0,0,0,0.1) 1px);
+    border-radius: 12px;
+    pointer-events: none;
+}
+
+.hw-model {
+    background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    color: #6b7280;
+    font-weight: 500;
+    border: 1px solid #d1d5db;
 }
 
 .node-popup .space-y-1 > * {

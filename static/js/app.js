@@ -32,6 +32,14 @@ const CONFIG = {
 
 function meshApp() {
     return {
+        // HTML sanitization helper to prevent XSS attacks
+        sanitizeHtml(str) {
+            if (str === null || str === undefined) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        },
+        
         // Map instance
         map: null,
         
@@ -40,6 +48,28 @@ function meshApp() {
         nodeLayer: null,
         networkLayer: null,
         traceLayer: null,
+        
+        // Performance caching for legend
+        cachedRoles: null,
+        needsRoleUpdate: true,
+        
+        // Get cached unique roles for performance
+        getUniqueRoles() {
+            if (this.needsRoleUpdate || this.cachedRoles === null) {
+                this.cachedRoles = new Set(
+                    Object.values(this.nodes)
+                        .map(node => node.role)
+                        .filter(role => role !== null && role !== undefined && role !== '')
+                );
+                this.needsRoleUpdate = false;
+            }
+            return this.cachedRoles;
+        },
+        
+        // Invalidate role cache when nodes change
+        invalidateRoleCache() {
+            this.needsRoleUpdate = true;
+        },
         modal: {
             visible: false,
             title: '',
@@ -674,6 +704,21 @@ function meshApp() {
             }
         },
         
+        // Role-based icon mapping
+        getIconForRole(role) {
+            const roleIcons = {
+                'CLIENT': 'mdi-radio-tower',
+                'CLIENT_MUTE': 'mdi-volume-mute',
+                'CLIENT_BASE': 'mdi-home',
+                'ROUTER': 'mdi-hub',
+                'ROUTER_LATE': 'mdi-hubspot',
+                'REPEATER': 'mdi-repeat',
+                'SENSOR': 'mdi-thermometer',
+                'TRACKER': 'mdi-crosshairs-gps'
+            };
+            return roleIcons[role] || 'mdi-help-circle';
+        },
+
         addNodeToMap(node) {
             // Check if map is ready
             if (!this.map || !this.map._loaded) {
@@ -689,16 +734,21 @@ function meshApp() {
             try {
                 // Store node data
                 this.nodes[node.id] = node;
+                this.invalidateRoleCache(); // Invalidate cache when node is added
                 
                 // Determine status and styling
                 const status = node.info?.status || 'inactive';
                 const statusClass = this.getStatusClass(status);
                 const timeAgo = this.getTimeAgoText(node.info?.last_seen_hours_ago);
+                const role = this.sanitizeHtml(node.role || 'Unknown');
+                const roleIcon = this.getIconForRole(role);
+                const safeName = this.sanitizeHtml(node.long_name || node.id);
+                const safeStatusLabel = this.sanitizeHtml(this.getStatusLabel(status));
                 
-                // Create custom node marker
+                // Create custom node marker with role-based icon
                 const iconHtml = `<div class="node-icon ${statusClass}" 
-                                     title="${node.long_name || node.id}\nStatus: ${this.getStatusLabel(status)}\nLast seen: ${timeAgo}">
-                                    <i class="mdi mdi-radio-tower"></i>
+                                     title="${safeName}\nRole: ${role}\nStatus: ${safeStatusLabel}\nLast seen: ${timeAgo}">
+                                    <i class="mdi ${roleIcon}"></i>
                                    </div>`;
                 
                 const icon = L.divIcon({
@@ -722,15 +772,24 @@ function meshApp() {
         createNodePopup(node) {
             const info = node.info || {};
             const position = node.position || {};
+            const role = this.sanitizeHtml(node.role || 'Unknown');
+            const roleIcon = this.getIconForRole(role);
+            const safeName = this.sanitizeHtml(node.long_name || node.id);
+            const safeShortName = this.sanitizeHtml(node.short_name || '');
+            const safeHwModel = this.sanitizeHtml(node.hw_model || '');
+            const safeId = this.sanitizeHtml(node.id);
             
             return `
                 <div class="node-popup">
-                    <h4>${node.long_name || node.id}</h4>
+                    <h4>${safeName}</h4>
+                    <div class="node-role-section">
+                        <i class="mdi ${roleIcon} role-icon"></i>
+                        <span class="role-badge">${role}</span>
+                        ${safeHwModel ? `<span class="hw-model">${safeHwModel}</span>` : ''}
+                    </div>
                     <div class="node-info">
-                        <p><strong>ID:</strong> ${node.id}</p>
-                        ${node.short_name ? `<p><strong>Short Name:</strong> ${node.short_name}</p>` : ''}
-                        <p><strong>Model:</strong> ${node.hw_model || 'Unknown'}</p>
-                        ${info.role ? `<p><strong>Role:</strong> ${info.role}</p>` : ''}
+                        <p><strong>ID:</strong> ${safeId}</p>
+                        ${safeShortName ? `<p><strong>Short Name:</strong> ${safeShortName}</p>` : ''}
                         <p><strong>Status:</strong> <span class="status-badge ${this.getStatusClass(info.status)}">${this.getStatusLabel(info.status)}</span></p>
                         ${info.last_seen_hours_ago !== null ? `<p><strong>Last seen:</strong> ${this.getTimeAgoText(info.last_seen_hours_ago)}</p>` : ''}
                         ${position.latitude ? `<p><strong>Position:</strong> ${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)}</p>` : ''}
@@ -773,6 +832,10 @@ function meshApp() {
                     STATUS_CURRENTLY_ACTIVE_HOURS: 24,
                     STATUS_RECENTLY_ACTIVE_HOURS: 72
                 };
+                
+                // Use cached roles for better performance
+                const uniqueRoles = this.getUniqueRoles();
+                
                 div.innerHTML = `
                     <div style="font-weight: bold; margin-bottom: 8px;">Node Status</div>
                     <div class="legend-item">
@@ -787,6 +850,17 @@ function meshApp() {
                         <div class="node-icon inactive"></div>
                         Inactive (>${thresholds.STATUS_RECENTLY_ACTIVE_HOURS}h)
                     </div>
+                    ${uniqueRoles.size > 0 ? `
+                        <div class="legend-section-title">Device Roles</div>
+                        ${Array.from(uniqueRoles).sort().map(role => `
+                            <div class="legend-item">
+                                <div class="node-icon" style="background: #f9fafb; border: 2px solid #d1d5db; color: #374151;">
+                                    <i class="mdi ${this.getIconForRole(role)}" style="font-size: 12px;"></i>
+                                </div>
+                                ${this.sanitizeHtml(role)}
+                            </div>
+                        `).join('')}
+                    ` : ''}
                 `;
                 return div;
             };
