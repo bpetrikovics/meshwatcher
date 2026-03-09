@@ -322,7 +322,6 @@ footer.glass-panel {
 /* Node markers */
 .node-marker {
     background: transparent;
-    border: none;
 }
 
 .node-icon {
@@ -334,9 +333,34 @@ footer.glass-panel {
     justify-content: center;
     font-size: 14px;
     color: white;
-    border: 2px solid #fff;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    transition: all 0.2s ease;
+    border: 2px solid;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.node-icon-directional {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: white;
+    border: 2px solid;
+    position: relative;
+    transition: all 0.3s ease;
+    clip-path: polygon(50% 0%, 0% 100%, 50% 70%, 100% 100%);
+    transform-origin: center;
+}
+
+.node-icon-directional i {
+    position: relative;
+    top: -2px;
+}
+
+.node-icon i {
+    position: relative;
+    top: -1px;
 }
 
 .node-icon:hover {

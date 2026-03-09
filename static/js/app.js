@@ -66,6 +66,13 @@ function meshApp() {
             return this.cachedRoles;
         },
         
+        // Convert degrees to compass direction
+        getCompassDirection(degrees) {
+            const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+            const index = Math.round(degrees / 45) % 8;
+            return directions[index];
+        },
+        
         // Invalidate role cache when nodes change
         invalidateRoleCache() {
             this.needsRoleUpdate = true;
@@ -710,7 +717,7 @@ function meshApp() {
                 'CLIENT': 'mdi-radio-tower',
                 'CLIENT_MUTE': 'mdi-volume-mute',
                 'CLIENT_BASE': 'mdi-home',
-                'ROUTER': 'mdi-hub',
+                'ROUTER': 'mdi-hub-outline',
                 'ROUTER_LATE': 'mdi-hubspot',
                 'REPEATER': 'mdi-repeat',
                 'SENSOR': 'mdi-thermometer',
@@ -745,10 +752,19 @@ function meshApp() {
                 const safeName = this.sanitizeHtml(node.long_name || node.id);
                 const safeStatusLabel = this.sanitizeHtml(this.getStatusLabel(status));
                 
-                // Create custom node marker with role-based icon
-                const iconHtml = `<div class="node-icon ${statusClass}" 
-                                     title="${safeName}\nRole: ${role}\nStatus: ${safeStatusLabel}\nLast seen: ${timeAgo}">
-                                    <i class="mdi ${roleIcon}"></i>
+                // Check for movement and heading
+                const hasSpeed = node.position && node.position.ground_speed && node.position.ground_speed > 0;
+                const hasHeading = node.position && node.position.heading !== null && node.position.heading !== undefined;
+                const shouldShowDirection = hasSpeed && hasHeading;
+                
+                // Create custom node marker with optional directional shape
+                const containerClass = shouldShowDirection ? 'node-icon-directional' : 'node-icon';
+                const rotation = shouldShowDirection ? node.position.heading : 0;
+                
+                const iconHtml = `<div class="${containerClass} ${statusClass}" 
+                                     title="${safeName}\nRole: ${role}\nStatus: ${safeStatusLabel}\nLast seen: ${timeAgo}"
+                                     style="transform: rotate(${rotation}deg);">
+                                    <i class="mdi ${shouldShowDirection ? 'mdi-arrow-up' : roleIcon}"></i>
                                    </div>`;
                 
                 const icon = L.divIcon({
@@ -791,6 +807,8 @@ function meshApp() {
                         <p><strong>ID:</strong> ${safeId}</p>
                         ${safeShortName ? `<p><strong>Short Name:</strong> ${safeShortName}</p>` : ''}
                         <p><strong>Status:</strong> <span class="status-badge ${this.getStatusClass(info.status)}">${this.getStatusLabel(info.status)}</span></p>
+                        ${position.ground_speed ? `<p><strong>Ground Speed:</strong> ${position.ground_speed} m/s</p>` : ''}
+                        ${position.heading !== null ? `<p><strong>Heading:</strong> ${position.heading.toFixed(1)}° (${this.getCompassDirection(position.heading)})</p>` : ''}
                         ${info.last_seen_hours_ago !== null ? `<p><strong>Last seen:</strong> ${this.getTimeAgoText(info.last_seen_hours_ago)}</p>` : ''}
                         ${position.latitude ? `<p><strong>Position:</strong> ${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)}</p>` : ''}
                         ${position.altitude ? `<p><strong>Altitude:</strong> ${position.altitude}m</p>` : ''}
