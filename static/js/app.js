@@ -758,14 +758,17 @@ function meshApp() {
                 const shouldShowDirection = hasSpeed && hasHeading;
                 
                 // Create custom node marker with optional directional shape
-                const containerClass = shouldShowDirection ? 'node-icon-directional' : 'node-icon';
-                const rotation = shouldShowDirection ? node.position.heading : 0;
-                
-                const iconHtml = `<div class="${containerClass} ${statusClass}" 
-                                     title="${safeName}\nRole: ${role}\nStatus: ${safeStatusLabel}\nLast seen: ${timeAgo}"
-                                     style="transform: rotate(${rotation}deg);">
-                                    <i class="mdi ${shouldShowDirection ? 'mdi-arrow-up' : roleIcon}"></i>
-                                   </div>`;
+                const iconHtml = shouldShowDirection 
+                    ? `<div class="node-icon ${statusClass}" 
+                          title="${safeName}\nRole: ${role}\nStatus: ${safeStatusLabel}\nLast seen: ${timeAgo}">
+                         <div class="directional-indicator" style="transform: rotate(${rotation}deg);">
+                            <i class="mdi ${roleIcon}"></i>
+                         </div>
+                       </div>`
+                    : `<div class="node-icon ${statusClass}" 
+                          title="${safeName}\nRole: ${role}\nStatus: ${safeStatusLabel}\nLast seen: ${timeAgo}">
+                         <i class="mdi ${roleIcon}"></i>
+                       </div>`;
                 
                 const icon = L.divIcon({
                     className: 'node-marker',
