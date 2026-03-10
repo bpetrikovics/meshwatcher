@@ -549,15 +549,15 @@ class Position(SQLModel, table=True):
 
     @computed_field
     @property
-    def latitude(self) -> float:
+    def latitude(self) -> Optional[float]:
         """Convert latitude from integer (1e7 scale) to decimal degrees."""
-        return self.latitude_i / 1e7
+        return self.latitude_i / 1e7 if self.latitude_i is not None else None
 
     @computed_field
     @property
-    def longitude(self) -> float:
+    def longitude(self) -> Optional[float]:
         """Convert longitude from integer (1e7 scale) to decimal degrees."""
-        return self.longitude_i / 1e7
+        return self.longitude_i / 1e7 if self.longitude_i is not None else None
 
     @computed_field
     @property

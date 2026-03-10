@@ -756,6 +756,7 @@ function meshApp() {
                 const hasSpeed = node.position && node.position.ground_speed && node.position.ground_speed > 0;
                 const hasHeading = node.position && node.position.heading != null;
                 const shouldShowDirection = hasSpeed && hasHeading;
+                const rotation = shouldShowDirection ? node.position.heading : 0;
                 
                 // Create custom node marker with optional directional shape
                 const iconHtml = shouldShowDirection 
