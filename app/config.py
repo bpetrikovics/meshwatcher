@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     namespace_packets: str = "/packets"
 
     # Map clustering (pixels)
-    clustering_radius: int = 0  # 0 = spiderfying only, >0 = clustering radius
+    clustering_radius: int = 25  # 0 = spiderfying only, >0 = clustering radius
 
     # Features
     event_animations_enabled: bool = False  # Future: event-driven animations
