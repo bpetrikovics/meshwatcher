@@ -273,6 +273,18 @@ footer.glass-panel {
     box-shadow: 0 4px 8px rgba(0,0,0,0.3);
 }
 
+/* Overlapping nodes connection lines */
+.leaflet-overlay-pane svg path.leaflet-interactive {
+    stroke-dasharray: 3, 6;
+    animation: dash-animation 20s linear infinite;
+}
+
+@keyframes dash-animation {
+    to {
+        stroke-dashoffset: -100;
+    }
+}
+
 /* Status legend styles */
 .status-legend {
     background: rgba(255, 255, 255, 0.95);

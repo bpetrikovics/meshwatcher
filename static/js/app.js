@@ -52,6 +52,10 @@ function meshApp() {
         networkLayer: null,
         traceLayer: null,
         
+        // Clustering state tracking
+        _lastReclusterZoom: undefined,
+        _wasClustering: false,
+        
         // Performance caching for legend
         cachedRoles: null,
         needsRoleUpdate: true,
@@ -299,11 +303,11 @@ function meshApp() {
                     const wasClustering = this._wasClustering;
                     const zoomedInOrSame = currentZoom >= this._lastReclusterZoom;
                     if (zoomedInOrSame && wasClustering === shouldClusterNow) {
-                        this._lastReclusterZoom = currentZoom;
-                        this._wasClustering = shouldClusterNow;
-                        return;
+                        return; // Early return without state update
                     }
                 }
+                
+                // Update state after boundary detection passes
                 this._lastReclusterZoom = currentZoom;
                 this._wasClustering = shouldClusterNow;
 
@@ -326,6 +330,11 @@ function meshApp() {
                                 // Do not touch transform here; Leaflet uses transform for marker positioning
                                 m._icon.style.transition = '';
                                 m._icon.title = '';
+                            }
+                            // Clean up connection lines
+                            if (m._connectionLine && this.map) {
+                                this.map.removeLayer(m._connectionLine);
+                                m._connectionLine = null;
                             }
                         }
                     });
@@ -360,6 +369,22 @@ function meshApp() {
                     this.nodeLayer.addLayers(markers);
                 } else {
                     markers.forEach(m => this.nodeLayer.addLayer(m));
+                    
+                    // If clustering is disabled (unclustered state), immediately handle overlapping nodes
+                    const config = window.APP_CONFIG || {};
+                    const currentZoom = this.map.getZoom();
+                    const handleOverlapping = config.CLUSTERING_HANDLE_OVERLAPPING !== false;
+                    
+                    // Check if clustering is actually disabled at this zoom level
+                    const clusteringRadius = this.calculateClusterRadiusForZoom(currentZoom);
+                    const isClusteringDisabled = clusteringRadius === 0;
+                    
+                    if (isClusteringDisabled && handleOverlapping) {
+                        console.log('Unclustered state detected, checking for overlapping nodes...');
+                        setTimeout(() => {
+                            this.handleOverlappingNodes();
+                        }, 50); // Small delay to ensure markers are rendered
+                    }
                 }
             } finally {
                 this._isReclustering = false;
@@ -373,9 +398,11 @@ function meshApp() {
             const maxZoom = (config.CLUSTERING_MAX_ZOOM !== undefined) ? config.CLUSTERING_MAX_ZOOM : 12;
             const maxDistanceMeters = (config.CLUSTERING_MAX_DISTANCE_METERS !== undefined) ? config.CLUSTERING_MAX_DISTANCE_METERS : 300;
             const adaptiveDensity = config.CLUSTERING_ADAPTIVE_DENSITY !== false;
-            const minRadiusPixels = (config.CLUSTERING_MIN_RADIUS_PIXELS !== undefined) ? config.CLUSTERING_MIN_RADIUS_PIXELS : 10;
-            const maxRadiusPixels = (config.CLUSTERING_MAX_RADIUS_PIXELS !== undefined) ? config.CLUSTERING_MAX_RADIUS_PIXELS : 100;
-            const densityScale = (config.CLUSTERING_DENSITY_SCALE !== undefined) ? config.CLUSTERING_DENSITY_SCALE : 0.5;
+            
+            // Validate and bound configuration values
+            const minRadiusPixels = Math.max(1, config.CLUSTERING_MIN_RADIUS_PIXELS || 10);
+            const maxRadiusPixels = Math.max(minRadiusPixels, config.CLUSTERING_MAX_RADIUS_PIXELS || 100);
+            const densityScale = Math.max(0, Math.min(1, config.CLUSTERING_DENSITY_SCALE || 0.5));
 
             if (zoom < minZoom || zoom >= maxZoom) {
                 return 0;
@@ -387,7 +414,9 @@ function meshApp() {
 
             if (adaptiveDensity && this.map) {
                 const density = this.getNodeDensity();
-                radiusInPixels *= (1 + (density * densityScale));
+                // Add bounds to density scaling to prevent extreme values
+                const densityMultiplier = Math.min(1 + (density * densityScale), 3.0);
+                radiusInPixels *= densityMultiplier;
             }
 
             return Math.max(minRadiusPixels, Math.min(radiusInPixels, maxRadiusPixels));
@@ -464,19 +493,33 @@ function meshApp() {
             const currentZoom = this.map.getZoom();
             const handleOverlapping = config.CLUSTERING_HANDLE_OVERLAPPING !== false;
             
+            console.log(`handleOverlappingNodes: zoom=${currentZoom}, maxZoom=${maxZoom}, enabled=${handleOverlapping}`);
+            
+            // Check if clustering is actually disabled at this zoom level
+            const clusteringRadius = this.calculateClusterRadiusForZoom(currentZoom);
+            const isClusteringDisabled = clusteringRadius === 0;
+            
             // Only handle overlapping nodes when clustering has stopped and feature is enabled
-            if (currentZoom < maxZoom || !handleOverlapping) return;
+            if (!isClusteringDisabled || !handleOverlapping) {
+                console.log(`Skipping overlap handling: clustering enabled (radius=${clusteringRadius}) or feature disabled`);
+                return;
+            }
             
             if (typeof this.nodeLayer.getLayers !== 'function') return;
             
             const layers = this.nodeLayer.getLayers();
             const positionMap = new Map();
             
-            // Group nodes by position (with small tolerance for floating point precision)
+            console.log(`Checking ${layers.length} layers for overlapping nodes (clustering disabled at zoom ${currentZoom})`);
+            
+            // Group nodes by position (with larger tolerance for floating point precision)
             layers.forEach(layer => {
                 if (layer.getLatLng) {
                     const latlng = layer.getLatLng();
-                    const key = `${latlng.lat.toFixed(6)},${latlng.lng.toFixed(6)}`;
+                    // Use 4 decimal places for more aggressive overlap detection (roughly 11m precision)
+                    const key = `${latlng.lat.toFixed(4)},${latlng.lng.toFixed(4)}`;
+                    
+                    console.log(`Node at position: ${key}`);
                     
                     if (!positionMap.has(key)) {
                         positionMap.set(key, []);
@@ -485,12 +528,25 @@ function meshApp() {
                 }
             });
             
+            console.log(`Position map created with ${positionMap.size} unique positions`);
+            
+            let overlappingGroups = 0;
             positionMap.forEach((nodesAtPosition, positionKey) => {
+                console.log(`Position ${positionKey}: ${nodesAtPosition.length} nodes`);
                 if (nodesAtPosition.length > 1) {
+                    overlappingGroups++;
                     console.log(`Found ${nodesAtPosition.length} overlapping nodes at ${positionKey}, spreading...`);
                     this.manuallySpreadNodes(nodesAtPosition);
                 }
             });
+            
+            console.log(`Found ${overlappingGroups} overlapping groups`);
+        },
+        
+        // Temporary method for testing overlap detection
+        forceCheckOverlaps() {
+            console.log('Manually triggering overlap detection...');
+            this.handleOverlappingNodes();
         },
         
         // Manual fallback to spread overlapping nodes
@@ -501,22 +557,43 @@ function meshApp() {
             const centerLng = nodes[0].getLatLng().lng;
             
             // Calculate spread radius based on number of overlapping nodes
-            const spreadRadius = Math.max(0.0002, 0.0001 * Math.sqrt(nodes.length)); // Dynamic radius
+            // Use much larger minimum radius for visible separation
+            const minRadius = 0.002; // Increased from 0.0005 (about 200m vs 50m)
+            const scaleFactor = 0.001; // Increased from 0.0002
+            const spreadRadius = Math.max(minRadius, scaleFactor * Math.sqrt(nodes.length));
+            
+            console.log(`Spreading ${nodes.length} nodes with radius ${spreadRadius.toFixed(6)} degrees (about ${(spreadRadius * 111000).toFixed(0)}m)`);
+            
+            // Use spiral arrangement for better separation with many nodes
+            const useSpiral = nodes.length > 4;
             
             nodes.forEach((node, index) => {
                 if (index === 0) {
-                    // Keep first node at original position but add indicator
+                    // Keep first node at original position with no visual frame
                     if (node._icon) {
-                        node._icon.style.border = '2px solid #2196F3';
                         node._icon.title = `Primary position - ${nodes.length} nodes here`;
                     }
                     return;
                 }
                 
-                // Arrange nodes in a circle around the center point
-                const angle = (index * 2 * Math.PI) / (nodes.length - 1);
-                const newLat = centerLat + spreadRadius * Math.cos(angle);
-                const newLng = centerLng + spreadRadius * Math.sin(angle);
+                let newLat, newLng;
+                
+                if (useSpiral) {
+                    // Spiral arrangement for better separation with many nodes
+                    const spiralIndex = index - 1;
+                    const angle = spiralIndex * 0.8; // Angle step for spiral
+                    const radius = spreadRadius * (1 + spiralIndex * 0.3); // Increasing radius
+                    
+                    newLat = centerLat + radius * Math.cos(angle);
+                    newLng = centerLng + radius * Math.sin(angle);
+                } else {
+                    // Circle arrangement for smaller groups
+                    const angle = (index * 2 * Math.PI) / (nodes.length - 1);
+                    newLat = centerLat + spreadRadius * Math.cos(angle);
+                    newLng = centerLng + spreadRadius * Math.sin(angle);
+                }
+                
+                console.log(`Node ${index}: original (${centerLat.toFixed(6)},${centerLng.toFixed(6)}) -> new (${newLat.toFixed(6)},${newLng.toFixed(6)})`);
                 
                 // Move the node to the new position
                 if (node.setLatLng) {
@@ -526,10 +603,25 @@ function meshApp() {
                     }
                     node.setLatLng([newLat, newLng]);
                     
-                    // Add visual indicator that this node was moved
+                    // Add connection line from moved node to original position
+                    if (this.map && node.__originalLatLng) {
+                        console.log(`Adding connection line from ${node.__originalLatLng.lat.toFixed(6)},${node.__originalLatLng.lng.toFixed(6)} to ${newLat.toFixed(6)},${newLng.toFixed(6)}`);
+                        const connectionLine = L.polyline([node.__originalLatLng, [newLat, newLng]], {
+                            color: 'rgba(255, 152, 0, 0.8)',  // Increased opacity for visibility
+                            weight: 2,  // Increased weight for visibility
+                            dashArray: '5, 10',  // Larger dashes for visibility
+                            opacity: 0.8  // Increased opacity
+                        }).addTo(this.map);
+                        
+                        // Store reference for cleanup
+                        node._connectionLine = connectionLine;
+                        console.log(`Connection line added successfully`);
+                    } else {
+                        console.log(`Cannot add connection line: map=${!!this.map}, originalLatLng=${!!node.__originalLatLng}`);
+                    }
+                    
+                    // Add tooltip for moved node (no visual frame)
                     if (node._icon) {
-                        node._icon.style.border = '2px solid #ff9800';
-                        node._icon.style.boxShadow = '0 0 8px rgba(255, 152, 0, 0.6)';
                         node._icon.title = `Overlapping node (moved) - Original: ${centerLat.toFixed(6)}, ${centerLng.toFixed(6)}`;
                         // IMPORTANT: Do not set `transform` on marker icons.
                         // Leaflet positions markers using transform: translate3d(...);
@@ -538,7 +630,7 @@ function meshApp() {
                 }
             });
             
-            console.log(`Spread ${nodes.length} overlapping nodes with radius ${spreadRadius.toFixed(6)} degrees`);
+            console.log(`Spread ${nodes.length} overlapping nodes with radius ${spreadRadius.toFixed(6)} degrees (arrangement: ${useSpiral ? 'spiral' : 'circle'})`);
         },
         
         // Setup global event listeners
@@ -1107,19 +1199,35 @@ function meshApp() {
                         try {
                             // Prevent popup during zoom animations
                             if (this.isZooming || !this.map || !this.map._loaded) {
-                                return '<div class="node-popup"><p>Loading...</p></div>';
+                                return '';
                             }
                             return this.createNodePopup(node);
                         } catch (error) {
-                            // Catch the Popup.js error and provide fallback
-                            console.warn('Popup error caught:', error);
-                            return '<div class="node-popup"><p>Node information temporarily unavailable</p></div>';
+                            console.error('Error creating popup:', error);
+                            return '';
                         }
                     })
                     .addTo(this.nodeLayer);
                 
                 // Store marker reference
                 node.marker = marker;
+                
+                // Check for overlapping nodes if clustering is disabled and we're at high zoom
+                const config = window.APP_CONFIG || {};
+                const currentZoom = this.map.getZoom();
+                const handleOverlapping = config.CLUSTERING_HANDLE_OVERLAPPING !== false;
+                const clusteringEnabled = config.CLUSTERING_ENABLED && typeof L.markerClusterGroup !== 'undefined';
+                
+                // Check if clustering is actually disabled at this zoom level
+                const clusteringRadius = this.calculateClusterRadiusForZoom(currentZoom);
+                const isClusteringDisabled = clusteringRadius === 0;
+                
+                // Only check for overlaps if clustering is disabled at this zoom level
+                if (isClusteringDisabled && handleOverlapping) {
+                    setTimeout(() => {
+                        this.handleOverlappingNodes();
+                    }, 100); // Small delay to ensure marker is rendered
+                }
             } catch (error) {
                 console.error('Failed to add node to map:', error);
             }
