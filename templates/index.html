@@ -214,7 +214,12 @@
             CLUSTERING_ADAPTIVE_DENSITY: {{ settings.clustering_adaptive_density | tojson }},
             CLUSTERING_CHUNKED_LOADING: {{ settings.clustering_chunked_loading | tojson }},
             CLUSTERING_SPIDERFY_ON_MAX_ZOOM: {{ settings.clustering_spiderfy_on_max_zoom | tojson }},
-            CLUSTERING_HANDLE_OVERLAPPING: {{ settings.clustering_handle_overlapping | tojson }}
+            CLUSTERING_HANDLE_OVERLAPPING: {{ settings.clustering_handle_overlapping | tojson }},
+            CLUSTERING_MIN_RADIUS_PIXELS: {{ settings.clustering_min_radius_pixels }},
+            CLUSTERING_MAX_RADIUS_PIXELS: {{ settings.clustering_max_radius_pixels }},
+            CLUSTERING_DENSITY_SCALE: {{ settings.clustering_density_scale }},
+            CLUSTERING_BOUNDARY_DELAY_MS: {{ settings.clustering_boundary_delay_ms }},
+            CLUSTERING_BOUNDARY_DETECTION: {{ settings.clustering_boundary_detection | tojson }}
         };
     </script>
     <script src="/static/js/app.js"></script>

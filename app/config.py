@@ -56,6 +56,12 @@ class Settings(BaseSettings):
     clustering_spiderfy_on_max_zoom: bool = True  # Auto-expand at max zoom
     clustering_handle_overlapping: bool = True  # Auto-spread overlapping nodes when clustering stops
 
+    clustering_min_radius_pixels: int = 10
+    clustering_max_radius_pixels: int = 100
+    clustering_density_scale: float = 0.5
+    clustering_boundary_delay_ms: int = 100
+    clustering_boundary_detection: bool = True
+
     model_config = ConfigDict(
         env_file=".env",  # Optional: loads environment variables from a .env file
         extra="ignore",   # Ignore env variables we're unaware of

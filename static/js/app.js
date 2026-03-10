@@ -214,13 +214,15 @@ function meshApp() {
                 });
                 
                 this.map.on('zoomend', () => {
+                    const config = window.APP_CONFIG || {};
+                    const delayMs = (config.CLUSTERING_BOUNDARY_DELAY_MS !== undefined) ? config.CLUSTERING_BOUNDARY_DELAY_MS : 100;
                     setTimeout(() => {
                         this.isZooming = false;
                         // Force reclustering when zoom changes
                         this.reclusterNodes();
                         // Handle overlapping nodes when clustering stops
                         this.handleOverlappingNodes();
-                    }, 100); // Delay to ensure zoom animation completes
+                    }, delayMs); // Delay to ensure zoom animation completes
                 });
                 
                 // Add status legend
@@ -288,7 +290,22 @@ function meshApp() {
 
             try {
                 const currentZoom = this.map.getZoom();
-                const maxZoom = config.CLUSTERING_MAX_ZOOM || 12;
+                const maxZoom = (config.CLUSTERING_MAX_ZOOM !== undefined) ? config.CLUSTERING_MAX_ZOOM : 12;
+                const minZoom = (config.CLUSTERING_MIN_ZOOM !== undefined) ? config.CLUSTERING_MIN_ZOOM : 0;
+
+                const boundaryDetectionEnabled = config.CLUSTERING_BOUNDARY_DETECTION !== false;
+                const shouldClusterNow = currentZoom >= minZoom && currentZoom < maxZoom;
+                if (boundaryDetectionEnabled && this._lastReclusterZoom !== undefined) {
+                    const wasClustering = this._wasClustering;
+                    const zoomedInOrSame = currentZoom >= this._lastReclusterZoom;
+                    if (zoomedInOrSame && wasClustering === shouldClusterNow) {
+                        this._lastReclusterZoom = currentZoom;
+                        this._wasClustering = shouldClusterNow;
+                        return;
+                    }
+                }
+                this._lastReclusterZoom = currentZoom;
+                this._wasClustering = shouldClusterNow;
 
                 // Rebuild from authoritative marker set (this.nodes[*].marker)
                 const markers = Object.values(this.nodes)
@@ -298,7 +315,7 @@ function meshApp() {
                 if (markers.length === 0) return;
 
                 // If clustering is active again, restore any markers that were moved to avoid overlap
-                if (currentZoom < maxZoom) {
+                if (shouldClusterNow) {
                     markers.forEach(m => {
                         if (m.__originalLatLng && typeof m.setLatLng === 'function') {
                             m.setLatLng(m.__originalLatLng);
@@ -352,10 +369,13 @@ function meshApp() {
         // Separate method for cluster radius calculation to ensure proper binding
         calculateClusterRadiusForZoom(zoom) {
             const config = window.APP_CONFIG || {};
-            const minZoom = config.CLUSTERING_MIN_ZOOM || 8;
-            const maxZoom = config.CLUSTERING_MAX_ZOOM || 12;
-            const maxDistanceMeters = config.CLUSTERING_MAX_DISTANCE_METERS || 100;
+            const minZoom = (config.CLUSTERING_MIN_ZOOM !== undefined) ? config.CLUSTERING_MIN_ZOOM : 0;
+            const maxZoom = (config.CLUSTERING_MAX_ZOOM !== undefined) ? config.CLUSTERING_MAX_ZOOM : 12;
+            const maxDistanceMeters = (config.CLUSTERING_MAX_DISTANCE_METERS !== undefined) ? config.CLUSTERING_MAX_DISTANCE_METERS : 300;
             const adaptiveDensity = config.CLUSTERING_ADAPTIVE_DENSITY !== false;
+            const minRadiusPixels = (config.CLUSTERING_MIN_RADIUS_PIXELS !== undefined) ? config.CLUSTERING_MIN_RADIUS_PIXELS : 10;
+            const maxRadiusPixels = (config.CLUSTERING_MAX_RADIUS_PIXELS !== undefined) ? config.CLUSTERING_MAX_RADIUS_PIXELS : 100;
+            const densityScale = (config.CLUSTERING_DENSITY_SCALE !== undefined) ? config.CLUSTERING_DENSITY_SCALE : 0.5;
 
             if (zoom < minZoom || zoom >= maxZoom) {
                 return 0;
@@ -367,14 +387,10 @@ function meshApp() {
 
             if (adaptiveDensity && this.map) {
                 const density = this.getNodeDensity();
-                // Previously we disabled clustering entirely for sparse views. That makes it look like
-                // clustering is "off" when zoomed out. Instead, scale the radius down but keep a
-                // small minimum multiplier so nearby nodes can still cluster.
-                const densityMultiplier = Math.min(Math.max(density * 2, 0.35), 1.5);
-                radiusInPixels *= densityMultiplier;
+                radiusInPixels *= (1 + (density * densityScale));
             }
 
-            return Math.max(10, Math.min(radiusInPixels, 80));
+            return Math.max(minRadiusPixels, Math.min(radiusInPixels, maxRadiusPixels));
         },
 
         // Separate method for cluster icon creation
