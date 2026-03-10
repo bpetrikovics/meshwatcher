@@ -12,6 +12,10 @@
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
+    <!-- Leaflet.markercluster CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    
     <!-- Material Design Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/MaterialDesign-Webfont/7.4.47/css/materialdesignicons.min.css">
     
@@ -186,6 +190,9 @@
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
+    <!-- Leaflet.markercluster JS -->
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    
     <!-- Socket.IO JS (for future use) -->
     <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"></script>
     
@@ -196,9 +203,18 @@
     <script>
         // Configuration passed from Flask template
         window.APP_CONFIG = {
-            STATUS_CURRENTLY_ACTIVE_HOURS: '{{ settings.status_currently_active_hours | tojson }}',
-            STATUS_RECENTLY_ACTIVE_HOURS: '{{ settings.status_recently_active_hours | tojson }}',
-            GIT_COMMIT: '{{ settings.git_commit | e }}'
+            STATUS_CURRENTLY_ACTIVE_HOURS: {{ settings.status_currently_active_hours | tojson }},
+            STATUS_RECENTLY_ACTIVE_HOURS: {{ settings.status_recently_active_hours | tojson }},
+            GIT_COMMIT: {{ settings.git_commit | tojson }},
+            CLUSTERING_ENABLED: {{ settings.clustering_enabled | tojson }},
+            CLUSTERING_MAX_ZOOM: {{ settings.clustering_max_zoom }},
+            CLUSTERING_MIN_ZOOM: {{ settings.clustering_min_zoom }},
+            CLUSTERING_MAX_DISTANCE_METERS: {{ settings.clustering_max_distance_meters }},
+            CLUSTERING_MIN_CLUSTER_SIZE: {{ settings.clustering_min_cluster_size }},
+            CLUSTERING_ADAPTIVE_DENSITY: {{ settings.clustering_adaptive_density | tojson }},
+            CLUSTERING_CHUNKED_LOADING: {{ settings.clustering_chunked_loading | tojson }},
+            CLUSTERING_SPIDERFY_ON_MAX_ZOOM: {{ settings.clustering_spiderfy_on_max_zoom | tojson }},
+            CLUSTERING_HANDLE_OVERLAPPING: {{ settings.clustering_handle_overlapping | tojson }}
         };
     </script>
     <script src="/static/js/app.js"></script>

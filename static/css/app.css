@@ -223,6 +223,41 @@ footer.glass-panel {
     border: 2px solid #616161;
 }
 
+/* Cluster marker styles */
+.cluster-marker {
+    background: transparent;
+}
+
+.cluster-icon {
+    background: #2196F3; /* Blue color as requested */
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    border: 2px solid #1976D2;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.cluster-icon:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+}
+
+.cluster-icon i {
+    font-size: 16px;
+    margin-right: 2px;
+}
+
+.cluster-count {
+    font-weight: bold;
+    font-size: 12px;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
 /* Node marker animations */
 .node-icon {
     transition: all 0.3s ease;

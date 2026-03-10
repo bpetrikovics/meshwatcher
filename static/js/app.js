@@ -201,8 +201,8 @@ function meshApp() {
                     maxZoom: 18
                 }).addTo(this.map);
                 
-                // Initialize layers
-                this.nodeLayer = L.layerGroup().addTo(this.map);
+                // Initialize layers with clustering support
+                this.initializeNodeLayer();
                 this.networkLayer = L.layerGroup().addTo(this.map);
                 this.traceLayer = L.layerGroup().addTo(this.map);
                 
@@ -216,6 +216,10 @@ function meshApp() {
                 this.map.on('zoomend', () => {
                     setTimeout(() => {
                         this.isZooming = false;
+                        // Force reclustering when zoom changes
+                        this.reclusterNodes();
+                        // Handle overlapping nodes when clustering stops
+                        this.handleOverlappingNodes();
                     }, 100); // Delay to ensure zoom animation completes
                 });
                 
@@ -240,6 +244,285 @@ function meshApp() {
                     this.showError('MAP_LOAD_FAILED');
                 }
             }
+        },
+        
+        // Initialize node layer with clustering support
+        initializeNodeLayer() {
+            const config = window.APP_CONFIG || {};
+            
+            if (config.CLUSTERING_ENABLED && typeof L.markerClusterGroup !== 'undefined') {
+                console.log('Initializing node layer with hybrid clustering');
+                
+                // Initialize clustering layer with hybrid approach
+                this.nodeLayer = L.markerClusterGroup({
+                    chunkedLoading: config.CLUSTERING_CHUNKED_LOADING || false,
+                    maxClusterRadius: (zoom) => this.calculateClusterRadiusForZoom(zoom),
+                    spiderfyOnMaxZoom: config.CLUSTERING_SPIDERFY_ON_MAX_ZOOM !== false,
+                    showCoverageOnHover: false,
+                    zoomToBoundsOnClick: true,
+                    disableClusteringAtZoom: config.CLUSTERING_MAX_ZOOM || 12,
+                    iconCreateFunction: this.createClusterIcon.bind(this),
+                    // Custom handling for overlapping nodes when clustering stops
+                    spiderfyDistanceMultiplier: 1.5,
+                    maxSpiderfySizeMultiplier: 2
+                });
+                
+                console.log(`Hybrid clustering enabled - Active: zoom ${config.CLUSTERING_MIN_ZOOM}-${config.CLUSTERING_MAX_ZOOM}, Max distance: ${config.CLUSTERING_MAX_DISTANCE_METERS}m`);
+            } else {
+                console.log('Initializing node layer without clustering');
+                this.nodeLayer = L.layerGroup();
+            }
+            
+            this.nodeLayer.addTo(this.map);
+        },
+        
+        // Force reclustering of nodes when zoom changes
+        reclusterNodes() {
+            if (!this.nodeLayer || !this.map || !this.map._loaded) return;
+
+            const config = window.APP_CONFIG || {};
+            if (!config.CLUSTERING_ENABLED || typeof L.markerClusterGroup === 'undefined') return;
+
+            if (this._isReclustering) return;
+            this._isReclustering = true;
+
+            try {
+                const currentZoom = this.map.getZoom();
+                const maxZoom = config.CLUSTERING_MAX_ZOOM || 12;
+
+                // Rebuild from authoritative marker set (this.nodes[*].marker)
+                const markers = Object.values(this.nodes)
+                    .map(n => n && n.marker)
+                    .filter(m => m && typeof m.getLatLng === 'function');
+
+                if (markers.length === 0) return;
+
+                // If clustering is active again, restore any markers that were moved to avoid overlap
+                if (currentZoom < maxZoom) {
+                    markers.forEach(m => {
+                        if (m.__originalLatLng && typeof m.setLatLng === 'function') {
+                            m.setLatLng(m.__originalLatLng);
+                            m.__originalLatLng = null;
+                            if (m._icon) {
+                                m._icon.style.border = '';
+                                m._icon.style.boxShadow = '';
+                                // Do not touch transform here; Leaflet uses transform for marker positioning
+                                m._icon.style.transition = '';
+                                m._icon.title = '';
+                            }
+                        }
+                    });
+                }
+
+                // Recreate the MarkerClusterGroup so clustering state re-evaluates correctly
+                const oldLayer = this.nodeLayer;
+                if (this.map.hasLayer(oldLayer)) {
+                    this.map.removeLayer(oldLayer);
+                }
+
+                // Important: clear the old layer BEFORE adding markers to the new cluster group.
+                // Markers can only belong to one parent at a time; clearing after re-adding would remove them again.
+                if (oldLayer && typeof oldLayer.clearLayers === 'function') {
+                    oldLayer.clearLayers();
+                }
+
+                this.nodeLayer = L.markerClusterGroup({
+                    chunkedLoading: config.CLUSTERING_CHUNKED_LOADING || false,
+                    maxClusterRadius: (zoom) => this.calculateClusterRadiusForZoom(zoom),
+                    spiderfyOnMaxZoom: config.CLUSTERING_SPIDERFY_ON_MAX_ZOOM !== false,
+                    showCoverageOnHover: false,
+                    zoomToBoundsOnClick: true,
+                    disableClusteringAtZoom: maxZoom,
+                    iconCreateFunction: this.createClusterIcon.bind(this),
+                    spiderfyDistanceMultiplier: 1.5,
+                    maxSpiderfySizeMultiplier: 2
+                });
+
+                this.nodeLayer.addTo(this.map);
+                if (typeof this.nodeLayer.addLayers === 'function') {
+                    this.nodeLayer.addLayers(markers);
+                } else {
+                    markers.forEach(m => this.nodeLayer.addLayer(m));
+                }
+            } finally {
+                this._isReclustering = false;
+            }
+        },
+
+        // Separate method for cluster radius calculation to ensure proper binding
+        calculateClusterRadiusForZoom(zoom) {
+            const config = window.APP_CONFIG || {};
+            const minZoom = config.CLUSTERING_MIN_ZOOM || 8;
+            const maxZoom = config.CLUSTERING_MAX_ZOOM || 12;
+            const maxDistanceMeters = config.CLUSTERING_MAX_DISTANCE_METERS || 100;
+            const adaptiveDensity = config.CLUSTERING_ADAPTIVE_DENSITY !== false;
+
+            if (zoom < minZoom || zoom >= maxZoom) {
+                return 0;
+            }
+
+            const centerLat = this.map ? this.map.getCenter().lat : 47.5;
+            const metersPerPixel = 156543.03392 * Math.cos(centerLat * Math.PI / 180) / Math.pow(2, zoom);
+            let radiusInPixels = maxDistanceMeters / metersPerPixel;
+
+            if (adaptiveDensity && this.map) {
+                const density = this.getNodeDensity();
+                // Previously we disabled clustering entirely for sparse views. That makes it look like
+                // clustering is "off" when zoomed out. Instead, scale the radius down but keep a
+                // small minimum multiplier so nearby nodes can still cluster.
+                const densityMultiplier = Math.min(Math.max(density * 2, 0.35), 1.5);
+                radiusInPixels *= densityMultiplier;
+            }
+
+            return Math.max(10, Math.min(radiusInPixels, 80));
+        },
+
+        // Separate method for cluster icon creation
+        createClusterIcon(cluster) {
+            const config = window.APP_CONFIG || {};
+            const count = cluster.getChildCount();
+            const minClusterSize = config.CLUSTERING_MIN_CLUSTER_SIZE || 2;
+
+            if (count < minClusterSize) {
+                const markers = cluster.getAllChildMarkers();
+                if (markers.length > 0) {
+                    return markers[0].getIcon();
+                }
+            }
+
+            const size = Math.min(30 + Math.min(count * 2, 20), 50);
+            return L.divIcon({
+                html: `<div class="cluster-icon" style="width: ${size}px; height: ${size}px;">
+                        <i class="mdi mdi-map-marker-multiple"></i>
+                        <span class="cluster-count">${count}</span>
+                       </div>`,
+                className: 'cluster-marker',
+                iconSize: [size, size],
+                iconAnchor: [size/2, size/2]
+            });
+        },
+
+        // Calculate node density in current viewport
+        getNodeDensity() {
+            if (!this.map || !this.map._loaded) return 0.5; // Default density
+            
+            try {
+                const bounds = this.map.getBounds();
+                const nodeCount = Object.keys(this.nodes).length;
+                
+                // Calculate viewport area in square kilometers
+                const northEast = bounds.getNorthEast();
+                const southWest = bounds.getSouthWest();
+                
+                // Approximate area calculation (simplified)
+                const latDiff = northEast.lat - southWest.lat;
+                const lngDiff = northEast.lng - southWest.lng;
+                const centerLat = bounds.getCenter().lat;
+                
+                // Convert degrees to approximate kilometers
+                const latKm = latDiff * 111.32; // 1 degree latitude ≈ 111.32 km
+                const lngKm = lngDiff * 111.32 * Math.cos(centerLat * Math.PI / 180);
+                const areaKm2 = Math.abs(latKm * lngKm);
+                
+                if (areaKm2 === 0) return nodeCount > 0 ? 1.0 : 0;
+                
+                // Calculate density as nodes per square kilometer
+                const density = nodeCount / areaKm2;
+                
+                // Normalize to 0-1 range for clustering decisions
+                // 0 = very sparse (< 0.1 nodes/km²), 1 = very dense (> 10 nodes/km²)
+                return Math.min(Math.max(density / 10, 0), 1);
+                
+            } catch (error) {
+                console.warn('Failed to calculate node density:', error);
+                return 0.5; // Default density on error
+            }
+        },
+        
+        // Handle overlapping nodes when clustering stops
+        handleOverlappingNodes() {
+            if (!this.nodeLayer || !this.map || !this.map._loaded) return;
+            
+            const config = window.APP_CONFIG || {};
+            const maxZoom = config.CLUSTERING_MAX_ZOOM || 12;
+            const currentZoom = this.map.getZoom();
+            const handleOverlapping = config.CLUSTERING_HANDLE_OVERLAPPING !== false;
+            
+            // Only handle overlapping nodes when clustering has stopped and feature is enabled
+            if (currentZoom < maxZoom || !handleOverlapping) return;
+            
+            if (typeof this.nodeLayer.getLayers !== 'function') return;
+            
+            const layers = this.nodeLayer.getLayers();
+            const positionMap = new Map();
+            
+            // Group nodes by position (with small tolerance for floating point precision)
+            layers.forEach(layer => {
+                if (layer.getLatLng) {
+                    const latlng = layer.getLatLng();
+                    const key = `${latlng.lat.toFixed(6)},${latlng.lng.toFixed(6)}`;
+                    
+                    if (!positionMap.has(key)) {
+                        positionMap.set(key, []);
+                    }
+                    positionMap.get(key).push(layer);
+                }
+            });
+            
+            positionMap.forEach((nodesAtPosition, positionKey) => {
+                if (nodesAtPosition.length > 1) {
+                    console.log(`Found ${nodesAtPosition.length} overlapping nodes at ${positionKey}, spreading...`);
+                    this.manuallySpreadNodes(nodesAtPosition);
+                }
+            });
+        },
+        
+        // Manual fallback to spread overlapping nodes
+        manuallySpreadNodes(nodes) {
+            if (!nodes || nodes.length <= 1) return;
+            
+            const centerLat = nodes[0].getLatLng().lat;
+            const centerLng = nodes[0].getLatLng().lng;
+            
+            // Calculate spread radius based on number of overlapping nodes
+            const spreadRadius = Math.max(0.0002, 0.0001 * Math.sqrt(nodes.length)); // Dynamic radius
+            
+            nodes.forEach((node, index) => {
+                if (index === 0) {
+                    // Keep first node at original position but add indicator
+                    if (node._icon) {
+                        node._icon.style.border = '2px solid #2196F3';
+                        node._icon.title = `Primary position - ${nodes.length} nodes here`;
+                    }
+                    return;
+                }
+                
+                // Arrange nodes in a circle around the center point
+                const angle = (index * 2 * Math.PI) / (nodes.length - 1);
+                const newLat = centerLat + spreadRadius * Math.cos(angle);
+                const newLng = centerLng + spreadRadius * Math.sin(angle);
+                
+                // Move the node to the new position
+                if (node.setLatLng) {
+                    // Store original position so we can restore when zooming back out and clustering re-enables
+                    if (!node.__originalLatLng && typeof node.getLatLng === 'function') {
+                        node.__originalLatLng = node.getLatLng();
+                    }
+                    node.setLatLng([newLat, newLng]);
+                    
+                    // Add visual indicator that this node was moved
+                    if (node._icon) {
+                        node._icon.style.border = '2px solid #ff9800';
+                        node._icon.style.boxShadow = '0 0 8px rgba(255, 152, 0, 0.6)';
+                        node._icon.title = `Overlapping node (moved) - Original: ${centerLat.toFixed(6)}, ${centerLng.toFixed(6)}`;
+                        // IMPORTANT: Do not set `transform` on marker icons.
+                        // Leaflet positions markers using transform: translate3d(...);
+                        // overriding it causes markers to jump to seemingly random locations.
+                    }
+                }
+            });
+            
+            console.log(`Spread ${nodes.length} overlapping nodes with radius ${spreadRadius.toFixed(6)} degrees`);
         },
         
         // Setup global event listeners

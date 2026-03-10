@@ -45,6 +45,17 @@ class Settings(BaseSettings):
 
     node_cache_ttl_seconds: int = 1800
 
+    # Clustering configuration
+    clustering_enabled: bool = True  # Enable/disable node clustering
+    clustering_max_zoom: int = 12  # Zoom level where clustering stops (earlier than before)
+    clustering_min_zoom: int = 0  # Zoom level where clustering starts
+    clustering_max_distance_meters: int = 300  # Max distance in meters for clustering
+    clustering_min_cluster_size: int = 2  # Minimum nodes to form a cluster
+    clustering_adaptive_density: bool = True  # Adjust clustering based on node density
+    clustering_chunked_loading: bool = False  # Load all nodes at once for simplicity
+    clustering_spiderfy_on_max_zoom: bool = True  # Auto-expand at max zoom
+    clustering_handle_overlapping: bool = True  # Auto-spread overlapping nodes when clustering stops
+
     model_config = ConfigDict(
         env_file=".env",  # Optional: loads environment variables from a .env file
         extra="ignore",   # Ignore env variables we're unaware of
