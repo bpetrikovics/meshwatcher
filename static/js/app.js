@@ -566,22 +566,15 @@ function meshApp() {
                     }
                 }),
                 'node-details': () => {
-                    // Sanitize user data to prevent XSS
-                    const sanitizeHtml = (str) => {
-                        const div = document.createElement('div');
-                        div.textContent = str || 'N/A';
-                        return div.innerHTML;
-                    };
-                    
                     return {
-                        title: `Node ${sanitizeHtml(data.id)}`,
+                        title: `Node ${this.sanitizeHtml(data.id)}`,
                         content: `
                             <div class="space-y-2">
-                                <div><strong>ID:</strong> ${sanitizeHtml(data.id)}</div>
-                                <div><strong>Long Name:</strong> ${sanitizeHtml(data.long_name || data.name || 'N/A')}</div>
-                                <div><strong>Short Name:</strong> ${sanitizeHtml(data.short_name || 'N/A')}</div>
+                                <div><strong>ID:</strong> ${this.sanitizeHtml(data.id)}</div>
+                                <div><strong>Long Name:</strong> ${this.sanitizeHtml(data.long_name || data.name || 'N/A')}</div>
+                                <div><strong>Short Name:</strong> ${this.sanitizeHtml(data.short_name || 'N/A')}</div>
                                 <div><strong>Status:</strong> <span class="${data.online ? 'text-green-600' : 'text-red-600'}">${data.online ? 'Online' : 'Offline'}</span></div>
-                                <div><strong>Last Seen:</strong> ${sanitizeHtml(data.lastSeen)}</div>
+                                <div><strong>Last Seen:</strong> ${this.sanitizeHtml(data.lastSeen)}</div>
                             </div>
                         `,
                         onConfirm: () => this.closeModal()
