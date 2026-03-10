@@ -324,16 +324,8 @@ footer.glass-panel {
     background: transparent;
 }
 
-.node-icon.directional-parent {
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    transition: all 0.3s ease;
-    background: transparent;
-    border: none;
+.node-icon.moving {
+    border: 3px solid rgba(255, 0, 0, 0.8) !important;
 }
 
 .node-icon {
@@ -363,43 +355,6 @@ footer.glass-panel {
     transition: all 0.3s ease;
     clip-path: polygon(50% 0%, 0% 100%, 50% 70%, 100% 100%);
     transform-origin: center;
-}
-
-.directional-indicator {
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    transform-origin: center;
-    clip-path: polygon(50% 0%, 0% 100%, 50% 70%, 100% 100%);
-    transition: all 0.3s ease;
-}
-
-.directional-indicator.currently-active {
-    background-color: #4CAF50;
-    color: white;
-    border: 3px solid rgba(255, 0, 0, 0.8);
-}
-
-.directional-indicator.recently-active {
-    background-color: #FF9800;
-    color: white;
-    border: 3px solid rgba(255, 0, 0, 0.8);
-}
-
-.directional-indicator.inactive {
-    background-color: #9E9E9E;
-    color: white;
-    border: 3px solid rgba(255, 0, 0, 0.8);
-}
-
-.directional-indicator i {
-    position: relative;
-    z-index: 1;
-    font-size: 16px;
-    color: white;
 }
 
 .node-icon i {

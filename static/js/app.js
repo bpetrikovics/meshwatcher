@@ -788,26 +788,19 @@ function meshApp() {
                 const hasSpeed = node.position && node.position.ground_speed && node.position.ground_speed > 0;
                 const hasHeading = node.position && node.position.heading != null;
                 const shouldShowDirection = hasSpeed && hasHeading;
-                const rotation = shouldShowDirection ? node.position.heading : 0;
                 
-                // Create custom node marker with optional directional shape
-                const iconHtml = shouldShowDirection 
-                    ? `<div class="node-icon directional-parent" 
-                          title="${safeName}\nRole: ${role}\nStatus: ${safeStatusLabel}\nLast seen: ${timeAgo}">
-                         <div class="directional-indicator ${statusClass}" style="transform: rotate(${rotation}deg);">
-                            <i class="mdi ${roleIcon}"></i>
-                         </div>
-                       </div>`
-                    : `<div class="node-icon ${statusClass}" 
-                          title="${safeName}\nRole: ${role}\nStatus: ${safeStatusLabel}\nLast seen: ${timeAgo}">
-                         <i class="mdi ${roleIcon}"></i>
-                       </div>`;
+                // Create custom node marker with optional red border for movement
+                const movingClass = shouldShowDirection ? 'moving' : '';
+                const iconHtml = `<div class="node-icon ${statusClass} ${movingClass}" 
+                                     title="${safeName}\nRole: ${role}\nStatus: ${safeStatusLabel}\nLast seen: ${timeAgo}">
+                                    <i class="mdi ${roleIcon}"></i>
+                                   </div>`;
                 
                 const icon = L.divIcon({
                     className: 'node-marker',
                     html: iconHtml,
-                    iconSize: shouldShowDirection ? [30, 30] : [24, 24],
-                    iconAnchor: shouldShowDirection ? [15, 15] : [12, 12]
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
                 });
                 
                 const marker = L.marker([node.position.latitude, node.position.longitude], { icon })
