@@ -34,8 +34,8 @@ def build_nodes_query(include_params: List[str], filters: Dict[str, Any], sessio
     if "positions" in include_params:
         # Apply base filter to position subquery to reduce scope
         pos_subquery = session.query(Position.node_id, Position.latitude_i, Position.longitude_i,
-                                   Position.altitude, Position.time, Position.ground_speed, 
-                                   Position.ground_track, Position.precision_bits).filter(Position.time.isnot(None))
+                                   Position.altitude, Position.time, Position.created_at, Position.ground_speed, 
+                                   Position.ground_track, Position.precision_bits)
         if base_filter:
             pos_subquery = pos_subquery.filter(Position.node_id == filters["node_id"])
         
@@ -43,7 +43,7 @@ def build_nodes_query(include_params: List[str], filters: Dict[str, Any], sessio
             pos_subquery.add_columns(
                 func.row_number().over(
                     partition_by=Position.node_id,
-                    order_by=desc(Position.time)
+                    order_by=desc(Position.created_at)
                 ).label('rn')
             ).subquery().alias('latest_pos')
         )
@@ -54,7 +54,7 @@ def build_nodes_query(include_params: List[str], filters: Dict[str, Any], sessio
             and_(NodeInfo.id_ == latest_pos.c.node_id, latest_pos.c.rn == 1)
         ).add_columns(
             latest_pos.c.latitude_i, latest_pos.c.longitude_i, latest_pos.c.altitude,
-            latest_pos.c.time, latest_pos.c.ground_speed, latest_pos.c.ground_track,
+            latest_pos.c.time, latest_pos.c.created_at, latest_pos.c.ground_speed, latest_pos.c.ground_track,
             latest_pos.c.precision_bits
         )
     
@@ -90,7 +90,7 @@ def build_nodes_query(include_params: List[str], filters: Dict[str, Any], sessio
             # Use EXISTS for better performance than JOIN+DISTINCT
             query = query.filter(
                 session.query(Position).filter(
-                    and_(Position.node_id == NodeInfo.id_, Position.time.isnot(None))
+                    Position.node_id == NodeInfo.id_
                 ).exists()
             )
     
@@ -123,6 +123,7 @@ def serialize_node(node, include_params: List[str]) -> Dict[str, Any]:
             longitude_i=node.longitude_i,
             altitude=node.altitude,
             time=node.time,
+            created_at=node.created_at,
             ground_speed=node.ground_speed,
             ground_track=node.ground_track,
             precision_bits=node.precision_bits
@@ -133,6 +134,7 @@ def serialize_node(node, include_params: List[str]) -> Dict[str, Any]:
             "longitude": position.longitude,
             "altitude": position.altitude,
             "time": position.time,
+            "created_at": position.created_at.isoformat() if position.created_at else None,
             "ground_speed": position.ground_speed,
             "ground_track": position.ground_track,
             "precision_bits": position.precision_bits,

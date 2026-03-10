@@ -43,6 +43,9 @@ function meshApp() {
         // Map instance
         map: null,
         
+        // Map state tracking
+        isZooming: false,
+        
         // Node management
         nodes: {},
         nodeLayer: null,
@@ -173,7 +176,25 @@ function meshApp() {
                 }
                 
                 // Initialize map
-                this.map = L.map('map').setView(CONFIG.DEFAULT_MAP_CENTER, CONFIG.DEFAULT_ZOOM);
+                this.map = L.map('map', {
+                    center: CONFIG.DEFAULT_MAP_CENTER,
+                    zoom: CONFIG.DEFAULT_ZOOM,
+                    scrollWheelZoom: true  // Re-enable scroll wheel zoom
+                });
+                
+                // Set map as loaded immediately after creation
+                this.map._loaded = true;
+                
+                // Patch the problematic Popup method to prevent null map access
+                const originalPopupInit = L.Popup.prototype._animateZoom;
+                if (originalPopupInit) {
+                    L.Popup.prototype._animateZoom = function() {
+                        if (!this._map) {
+                            return; // Prevent null map access
+                        }
+                        return originalPopupInit.call(this);
+                    };
+                }
                 
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '© OpenStreetMap contributors',
@@ -184,6 +205,19 @@ function meshApp() {
                 this.nodeLayer = L.layerGroup().addTo(this.map);
                 this.networkLayer = L.layerGroup().addTo(this.map);
                 this.traceLayer = L.layerGroup().addTo(this.map);
+                
+                // Add zoom event handlers to prevent popup issues
+                this.map.on('zoomstart', () => {
+                    this.isZooming = true;
+                    // Close all open popups before zoom to prevent errors
+                    this.map.closePopup();
+                });
+                
+                this.map.on('zoomend', () => {
+                    setTimeout(() => {
+                        this.isZooming = false;
+                    }, 100); // Delay to ensure zoom animation completes
+                });
                 
                 // Add status legend
                 this.addStatusLegend();
@@ -199,13 +233,11 @@ function meshApp() {
                 console.error('Failed to initialize map:', error);
                 
                 // Handle specific error types
-                if (error.message === 'LEAFLET_NOT_LOADED') {
-                    this.showError('MAP_LOAD_FAILED');
-                } else if (retryCount < 2) {
-                    console.warn('Map initialization issue, will retry...');
+                if (error.message === 'LEAFLET_NOT_LOADED' && retryCount < 2) {
+                    console.warn('Leaflet not loaded, will retry...');
                     setTimeout(() => this.initMap(retryCount + 1), 500);
                 } else {
-                    this.showError('MAP_INIT_FAILED');
+                    this.showError('MAP_LOAD_FAILED');
                 }
             }
         },
@@ -760,9 +792,9 @@ function meshApp() {
                 
                 // Create custom node marker with optional directional shape
                 const iconHtml = shouldShowDirection 
-                    ? `<div class="node-icon ${statusClass}" 
+                    ? `<div class="node-icon directional-parent" 
                           title="${safeName}\nRole: ${role}\nStatus: ${safeStatusLabel}\nLast seen: ${timeAgo}">
-                         <div class="directional-indicator" style="transform: rotate(${rotation}deg);">
+                         <div class="directional-indicator ${statusClass}" style="transform: rotate(${rotation}deg);">
                             <i class="mdi ${roleIcon}"></i>
                          </div>
                        </div>`
@@ -774,12 +806,24 @@ function meshApp() {
                 const icon = L.divIcon({
                     className: 'node-marker',
                     html: iconHtml,
-                    iconSize: [24, 24],
-                    iconAnchor: [12, 12]
+                    iconSize: shouldShowDirection ? [30, 30] : [24, 24],
+                    iconAnchor: shouldShowDirection ? [15, 15] : [12, 12]
                 });
                 
                 const marker = L.marker([node.position.latitude, node.position.longitude], { icon })
-                    .bindPopup(this.createNodePopup(node))
+                    .bindPopup(() => {
+                        try {
+                            // Prevent popup during zoom animations
+                            if (this.isZooming || !this.map || !this.map._loaded) {
+                                return '<div class="node-popup"><p>Loading...</p></div>';
+                            }
+                            return this.createNodePopup(node);
+                        } catch (error) {
+                            // Catch the Popup.js error and provide fallback
+                            console.warn('Popup error caught:', error);
+                            return '<div class="node-popup"><p>Node information temporarily unavailable</p></div>';
+                        }
+                    })
                     .addTo(this.nodeLayer);
                 
                 // Store marker reference
@@ -824,7 +868,7 @@ function meshApp() {
         
         updateNodePosition(nodeId, position) {
             const node = this.nodes[nodeId];
-            if (!node || !node.marker || !this.map) {
+            if (!node || !node.marker || !this.map || !this.map._loaded) {
                 console.warn('Cannot update node position: map, node, or marker not available');
                 return;
             }

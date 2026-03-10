@@ -577,7 +577,8 @@ class Position(SQLModel, table=True):
 
     def __str__(self) -> str:
         node = self.node_id if self.node_id is not None else "<unset>"
-        return f"Position {node} @ {self.time}: lat={self.latitude}, lon={self.longitude}, heading={self.heading}, ground speed={self.ground_speed}, alt={self.altitude}, radius={self.radius:.2f}"
+        timestamp = self.created_at.isoformat() if self.created_at else "unknown"
+        return f"Position {node} @ {timestamp}: lat={self.latitude}, lon={self.longitude}, heading={self.heading}, ground speed={self.ground_speed}, alt={self.altitude}, radius={self.radius:.2f}"
 
 
 class Routing(SQLModel, table=False):
