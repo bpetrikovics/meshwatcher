@@ -2,7 +2,6 @@
 const CONFIG = {
     DEFAULT_MAP_CENTER: [47.5, 19.0],
     DEFAULT_ZOOM: 8,
-    // API configuration
     API: {
         DEFAULT_LIMIT: 1000,
         MAX_LIMIT: 5000,
@@ -11,8 +10,7 @@ const CONFIG = {
             has_position: true,
             active: false
         },
-        // Timing configuration
-        MAP_INIT_DELAY: 200, // ms delay before loading nodes
+        MAP_INIT_DELAY: 200,  // ms delay before loading nodes
     },
     PANEL_SIZES: {
         left: { default: 300, min: 200, max: 500 },
@@ -32,7 +30,7 @@ const CONFIG = {
 
 function meshApp() {
     return {
-        // HTML sanitization helper to prevent XSS attacks
+        // HTML sanitization to prevent XSS
         sanitizeHtml(str) {
             if (str === null || str === undefined) return '';
             const div = document.createElement('div');
@@ -43,7 +41,7 @@ function meshApp() {
         // Map instance
         map: null,
         
-        // Map state tracking
+        // Map state
         isZooming: false,
         
         // Node management
@@ -52,15 +50,11 @@ function meshApp() {
         networkLayer: null,
         traceLayer: null,
         
-        // Clustering state tracking
-        _lastReclusterZoom: undefined,
-        _wasClustering: false,
-        
-        // Performance caching for legend
+        // Performance caching
         cachedRoles: null,
         needsRoleUpdate: true,
         
-        // Get cached unique roles for performance
+        // Get cached unique roles
         getUniqueRoles() {
             if (this.needsRoleUpdate || this.cachedRoles === null) {
                 this.cachedRoles = new Set(
@@ -129,7 +123,6 @@ function meshApp() {
         init() {
             console.log('Initializing app...');
             
-            // Ensure DOM is ready before initializing map
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', () => {
                     this.initMap();
@@ -139,7 +132,6 @@ function meshApp() {
                     console.log('App initialized after DOM ready');
                 });
             } else {
-                // DOM is already ready
                 this.initMap();
                 this.setupEventListeners();
                 this.initializeCommitDisplay();
@@ -154,11 +146,9 @@ function meshApp() {
                 const retryText = retryCount > 0 ? ` (attempt ${retryCount + 1})` : '';
                 console.log('Initializing map...' + retryText);
                 
-                // Check if map container exists
                 const mapContainer = document.getElementById('map');
                 if (!mapContainer) {
                     console.error('Map container not found - DOM may not be ready');
-                    // Retry with limit to prevent infinite loops
                     if (retryCount < 5) {
                         setTimeout(() => this.initMap(retryCount + 1), 100);
                     } else {
@@ -168,34 +158,30 @@ function meshApp() {
                     return;
                 }
                 
-                // Check if map is already initialized
                 if (this.map) {
                     console.log('Map already initialized, skipping...');
                     return;
                 }
                 
-                // Check if Leaflet is available
                 if (typeof L === 'undefined') {
                     throw new Error('LEAFLET_NOT_LOADED');
                 }
                 
-                // Initialize map
                 this.map = L.map('map', {
                     center: CONFIG.DEFAULT_MAP_CENTER,
                     zoom: CONFIG.DEFAULT_ZOOM,
-                    scrollWheelZoom: true  // Re-enable scroll wheel zoom
+                    scrollWheelZoom: true
                 });
                 
-                // Set map as loaded immediately after creation
                 this.map._loaded = true;
                 
-                // Patch the problematic Popup method to prevent null map access
+                // Leaflet Popup has a bug where _animateZoom can be called after popup is removed
+                // This causes "Cannot read properties of null (reading '_map')" errors during zoom
+                // Patching prevents crashes when popups are closed during zoom animations
                 const originalPopupInit = L.Popup.prototype._animateZoom;
                 if (originalPopupInit) {
                     L.Popup.prototype._animateZoom = function() {
-                        if (!this._map) {
-                            return; // Prevent null map access
-                        }
+                        if (!this._map) return;
                         return originalPopupInit.call(this);
                     };
                 }
@@ -205,44 +191,38 @@ function meshApp() {
                     maxZoom: 18
                 }).addTo(this.map);
                 
-                // Initialize layers with clustering support
+                // Initialize layers
                 this.initializeNodeLayer();
                 this.networkLayer = L.layerGroup().addTo(this.map);
                 this.traceLayer = L.layerGroup().addTo(this.map);
                 
-                // Add zoom event handlers to prevent popup issues
+                // Add zoom event handlers
                 this.map.on('zoomstart', () => {
                     this.isZooming = true;
-                    // Close all open popups before zoom to prevent errors
+                    // Close popups during zoom to prevent "Cannot read properties of null" errors
+                    // Leaflet popups can crash if they try to update while the map is zooming
                     this.map.closePopup();
                 });
                 
                 this.map.on('zoomend', () => {
-                    const config = window.APP_CONFIG || {};
-                    const delayMs = (config.CLUSTERING_BOUNDARY_DELAY_MS !== undefined) ? config.CLUSTERING_BOUNDARY_DELAY_MS : 100;
-                    setTimeout(() => {
-                        this.isZooming = false;
-                        // Force reclustering when zoom changes
-                        this.reclusterNodes();
-                        // Handle overlapping nodes when clustering stops
-                        this.handleOverlappingNodes();
-                    }, delayMs); // Delay to ensure zoom animation completes
+                    this.isZooming = false;
+                    // Prevent popup creation during zoom animations
+                    // Popups created during zoom can have incorrect positioning
                 });
                 
-                // Add status legend
                 this.addStatusLegend();
                 
                 console.log('Map initialized successfully');
                 
-                // Load initial nodes after map is ready
                 setTimeout(() => {
                     this.loadInitialNodes();
-                }, CONFIG.API.MAP_INIT_DELAY); // Use configurable delay
+                }, CONFIG.API.MAP_INIT_DELAY);
+                // Delay node loading to ensure map is fully rendered
+                // Loading nodes too early can cause positioning issues and performance problems
                 
             } catch (error) {
                 console.error('Failed to initialize map:', error);
                 
-                // Handle specific error types
                 if (error.message === 'LEAFLET_NOT_LOADED' && retryCount < 2) {
                     console.warn('Leaflet not loaded, will retry...');
                     setTimeout(() => this.initMap(retryCount + 1), 500);
@@ -252,34 +232,55 @@ function meshApp() {
             }
         },
         
-        // Initialize node layer with clustering support
+        // Initialize node layer with clustering
         initializeNodeLayer() {
-            const config = window.APP_CONFIG || {};
+            console.log('Initializing node layer with clustering approach');
             
-            if (config.CLUSTERING_ENABLED && typeof L.markerClusterGroup !== 'undefined') {
-                console.log('Initializing node layer with hybrid clustering');
-                
-                // Initialize clustering layer with hybrid approach
-                this.nodeLayer = L.markerClusterGroup({
-                    chunkedLoading: config.CLUSTERING_CHUNKED_LOADING || false,
-                    maxClusterRadius: (zoom) => this.calculateClusterRadiusForZoom(zoom),
-                    spiderfyOnMaxZoom: config.CLUSTERING_SPIDERFY_ON_MAX_ZOOM !== false,
-                    showCoverageOnHover: false,
-                    zoomToBoundsOnClick: true,
-                    disableClusteringAtZoom: config.CLUSTERING_MAX_ZOOM || 12,
-                    iconCreateFunction: this.createClusterIcon.bind(this),
-                    // Custom handling for overlapping nodes when clustering stops
-                    spiderfyDistanceMultiplier: 1.5,
-                    maxSpiderfySizeMultiplier: 2
-                });
-                
-                console.log(`Hybrid clustering enabled - Active: zoom ${config.CLUSTERING_MIN_ZOOM}-${config.CLUSTERING_MAX_ZOOM}, Max distance: ${config.CLUSTERING_MAX_DISTANCE_METERS}m`);
-            } else {
-                console.log('Initializing node layer without clustering');
-                this.nodeLayer = L.layerGroup();
-            }
+            const config = window.APP_CONFIG || {};
+            const clusteringRadius = config.CLUSTERING_RADIUS || 0;
+            
+            console.log(`Clustering radius: ${clusteringRadius}px (${clusteringRadius === 0 ? 'spiderfying only' : 'clustering enabled'})`);
+            
+            this.nodeLayer = L.markerClusterGroup({ 
+                maxClusterRadius: clusteringRadius,  // 0 = spiderfying only, >0 = clustering
+                spiderfyOnMaxZoom: true,
+                zoomToBoundsOnClick: true,
+                iconCreateFunction: this.createClusterIcon.bind(this),
+                spiderfyDistanceMultiplier: 1.2,
+                maxSpiderfySizeMultiplier: 1.5
+            });
             
             this.nodeLayer.addTo(this.map);
+        },
+
+        // Create custom cluster icons
+        createClusterIcon(cluster) {
+            const count = cluster.getChildCount();
+            const size = Math.min(30 + Math.min(count * 3, 30), 60);
+            
+            return L.divIcon({
+                html: `
+                    <div class="cluster-icon" style="
+                        width: ${size}px; 
+                        height: ${size}px; 
+                        background: linear-gradient(135deg, #2196F3, #1976D2);
+                        border: 3px solid white;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                        font-weight: bold;
+                        color: white;
+                        font-size: ${Math.max(12, size/4)}px;
+                    ">
+                        ${count}
+                    </div>
+                `,
+                className: 'custom-cluster-marker',
+                iconSize: [size, size],
+                iconAnchor: [size/2, size/2]
+            });
         },
         
         // Force reclustering of nodes when zoom changes
@@ -597,7 +598,8 @@ function meshApp() {
                 
                 // Move the node to the new position
                 if (node.setLatLng) {
-                    // Store original position so we can restore when zooming back out and clustering re-enables
+                    // Store original position to restore when clustering re-enables
+                    // When zooming out, markers need to return to their original overlapping positions
                     if (!node.__originalLatLng && typeof node.getLatLng === 'function') {
                         node.__originalLatLng = node.getLatLng();
                     }
@@ -613,7 +615,8 @@ function meshApp() {
                             opacity: 0.8  // Increased opacity
                         }).addTo(this.map);
                         
-                        // Store reference for cleanup
+                        // Store reference for cleanup when reclustering
+                        // Connection lines must be removed when markers return to clusters
                         node._connectionLine = connectionLine;
                         console.log(`Connection line added successfully`);
                     } else {
@@ -623,9 +626,9 @@ function meshApp() {
                     // Add tooltip for moved node (no visual frame)
                     if (node._icon) {
                         node._icon.title = `Overlapping node (moved) - Original: ${centerLat.toFixed(6)}, ${centerLng.toFixed(6)}`;
-                        // IMPORTANT: Do not set `transform` on marker icons.
-                        // Leaflet positions markers using transform: translate3d(...);
-                        // overriding it causes markers to jump to seemingly random locations.
+                        // Never override Leaflet's transform property
+                        // Leaflet uses transform: translate3d() internally for marker positioning
+                        // Overriding it causes markers to jump to random locations on zoom/pan
                     }
                 }
             });
@@ -635,7 +638,8 @@ function meshApp() {
         
         // Setup global event listeners
         setupEventListeners() {
-            // Handle window resize
+            // Handle window resize to keep map properly sized
+            // Map container can change size when browser window is resized
             this.resizeHandler = () => {
                 if (this.map && this.map._container && this.map._loaded) {
                     try {
@@ -647,7 +651,8 @@ function meshApp() {
             };
             window.addEventListener('resize', this.resizeHandler);
             
-            // Handle mouse move for resizing
+            // Track mouse movement for panel resizing functionality
+            // Mouse move events update panel dimensions during resize operations
             this.mouseMoveHandler = (e) => {
                 if (this.resizing && this.resizing.active) {
                     this.handleResize(e);
@@ -655,7 +660,8 @@ function meshApp() {
             };
             document.addEventListener('mousemove', this.mouseMoveHandler);
             
-            // Handle mouse up for resizing
+            // Handle mouse up to end resize operations
+            // Mouse up can occur anywhere on document, not just on resize handle
             this.mouseUpHandler = () => {
                 this.stopResize();
             };
@@ -834,7 +840,8 @@ function meshApp() {
                 }
             }
             
-            // Prevent default touch behavior
+            // Prevent default touch behavior during resize
+            // Touch devices can have conflicting scroll/resize gestures
             if (event.preventDefault) {
                 event.preventDefault();
             }
@@ -847,7 +854,8 @@ function meshApp() {
             this.resizing.active = false;
             this.resizing.panel = null;
             
-            // Restore cursor and selection
+            // Restore normal cursor and text selection after resize
+            // Resize operation disables these for better UX, must restore when done
             document.body.style.userSelect = '';
             document.body.style.cursor = '';
         },
@@ -1212,22 +1220,7 @@ function meshApp() {
                 // Store marker reference
                 node.marker = marker;
                 
-                // Check for overlapping nodes if clustering is disabled and we're at high zoom
-                const config = window.APP_CONFIG || {};
-                const currentZoom = this.map.getZoom();
-                const handleOverlapping = config.CLUSTERING_HANDLE_OVERLAPPING !== false;
-                const clusteringEnabled = config.CLUSTERING_ENABLED && typeof L.markerClusterGroup !== 'undefined';
-                
-                // Check if clustering is actually disabled at this zoom level
-                const clusteringRadius = this.calculateClusterRadiusForZoom(currentZoom);
-                const isClusteringDisabled = clusteringRadius === 0;
-                
-                // Only check for overlaps if clustering is disabled at this zoom level
-                if (isClusteringDisabled && handleOverlapping) {
-                    setTimeout(() => {
-                        this.handleOverlappingNodes();
-                    }, 100); // Small delay to ensure marker is rendered
-                }
+                // No overlap detection needed - built-in spiderfying handles it
             } catch (error) {
                 console.error('Failed to add node to map:', error);
             }
@@ -1403,6 +1396,18 @@ function meshApp() {
             
             // Perform full cleanup
             this.cleanup();
+        },
+        
+        // Placeholder for future event-driven animations
+        animateNodeEvent(nodeId, eventType, data) {
+            // Future: blinking markers, communication lines, etc.
+            console.log(`Event animation placeholder: ${eventType} for node ${nodeId}`);
+        },
+
+        // Placeholder for event animation system
+        initializeEventAnimations() {
+            // Future: socket.io integration, event listeners
+            console.log('Event animations placeholder - to be implemented');
         }
     };
 }

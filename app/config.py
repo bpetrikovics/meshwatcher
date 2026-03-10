@@ -3,17 +3,19 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
 
+    # Application
     url_base: str = "/"
-
     git_commit: str = "(unknown version)"
     flask_secret_key: str = "meshtastic!"
 
+    # Database
     mysql_user: str = "meshwatcher"
     mysql_password: str = "put your password here"
     mysql_host: str = "127.0.0.1"
     mysql_port: int = 3306
     mysql_db: str = "meshwatcher"
 
+    # MQTT
     mqtt_server: str = "mqtt.creativo.hu"
     mqtt_port: int = 1883
     mqtt_username: str = "meshdev"
@@ -21,6 +23,7 @@ class Settings(BaseSettings):
     mqtt_root_topic: str = "msh/EU_868/HU/2/e/"
     mqtt_channels: dict = {'MediumFast': {'key': 'AQ=='}}
 
+    # Data retention (days)
     node_retention_days: int = 14
     packet_retention_days: int = 7
     metrics_retention_days: int = 7
@@ -28,43 +31,35 @@ class Settings(BaseSettings):
     telemetry_retention_days: int = 7
     db_cleanup_period_minutes: int = 30
 
-    cache_cleanup_interval: int = 60 # Clean up cache every N minutes
-    duplicate_detection_window: int = 30 # Detect duplicate packets within N seconds
+    # Performance
+    cache_cleanup_interval: int = 60  # Cache cleanup interval (minutes)
+    duplicate_detection_window: int = 30  # Duplicate packet detection (seconds)
+    node_cache_ttl_seconds: int = 1800  # Node cache TTL
 
-    packet_json_log: bool  = False # Log packets to stdout in JSON format
-    packet_sql_log: bool = False # Log raw packets to database (e.g. not just processed data)
-    raw_telemetry_log: bool = False # Log raw telemetry packets to database (e.g. not just extracted metrics)
+    # Logging
+    packet_json_log: bool = False  # Log packets to stdout as JSON
+    packet_sql_log: bool = False  # Store raw packets in database
+    raw_telemetry_log: bool = False  # Store raw telemetry packets
 
-    readonly_mode: bool = False # Disable write operations to the database
+    # Operations
+    readonly_mode: bool = False  # Disable database writes
 
-    # Status thresholds in hours (following existing pattern)
-    status_currently_active_hours: int = 24  # Hours threshold for currently active nodes
-    status_recently_active_hours: int = 72  # Hours threshold for recently active nodes
+    # UI status thresholds (hours)
+    status_currently_active_hours: int = 24
+    status_recently_active_hours: int = 72
 
+    # WebSocket
     namespace_packets: str = "/packets"
 
-    node_cache_ttl_seconds: int = 1800
+    # Map clustering (pixels)
+    clustering_radius: int = 0  # 0 = spiderfying only, >0 = clustering radius
 
-    # Clustering configuration
-    clustering_enabled: bool = True  # Enable/disable node clustering
-    clustering_max_zoom: int = 12  # Zoom level where clustering stops (earlier than before)
-    clustering_min_zoom: int = 0  # Zoom level where clustering starts
-    clustering_max_distance_meters: int = 300  # Max distance in meters for clustering
-    clustering_min_cluster_size: int = 2  # Minimum nodes to form a cluster
-    clustering_adaptive_density: bool = True  # Adjust clustering based on node density
-    clustering_chunked_loading: bool = False  # Load all nodes at once for simplicity
-    clustering_spiderfy_on_max_zoom: bool = True  # Auto-expand at max zoom
-    clustering_handle_overlapping: bool = True  # Auto-spread overlapping nodes when clustering stops
-
-    clustering_min_radius_pixels: int = 10
-    clustering_max_radius_pixels: int = 100
-    clustering_density_scale: float = 0.5
-    clustering_boundary_delay_ms: int = 100
-    clustering_boundary_detection: bool = True
+    # Features
+    event_animations_enabled: bool = False  # Future: event-driven animations
 
     model_config = ConfigDict(
-        env_file=".env",  # Optional: loads environment variables from a .env file
-        extra="ignore",   # Ignore env variables we're unaware of
+        env_file=".env",
+        extra="ignore",
     )
 
 # Create a single instance of settings to be used application-wide

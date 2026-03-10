@@ -206,20 +206,8 @@
             STATUS_CURRENTLY_ACTIVE_HOURS: {{ settings.status_currently_active_hours | tojson }},
             STATUS_RECENTLY_ACTIVE_HOURS: {{ settings.status_recently_active_hours | tojson }},
             GIT_COMMIT: {{ settings.git_commit | tojson }},
-            CLUSTERING_ENABLED: {{ settings.clustering_enabled | tojson }},
-            CLUSTERING_MAX_ZOOM: {{ settings.clustering_max_zoom | tojson }},
-            CLUSTERING_MIN_ZOOM: {{ settings.clustering_min_zoom | tojson }},
-            CLUSTERING_MAX_DISTANCE_METERS: {{ settings.clustering_max_distance_meters | tojson }},
-            CLUSTERING_MIN_CLUSTER_SIZE: {{ settings.clustering_min_cluster_size | tojson }},
-            CLUSTERING_ADAPTIVE_DENSITY: {{ settings.clustering_adaptive_density | tojson }},
-            CLUSTERING_CHUNKED_LOADING: {{ settings.clustering_chunked_loading | tojson }},
-            CLUSTERING_SPIDERFY_ON_MAX_ZOOM: {{ settings.clustering_spiderfy_on_max_zoom | tojson }},
-            CLUSTERING_HANDLE_OVERLAPPING: {{ settings.clustering_handle_overlapping | tojson }},
-            CLUSTERING_MIN_RADIUS_PIXELS: {{ settings.clustering_min_radius_pixels | tojson }},
-            CLUSTERING_MAX_RADIUS_PIXELS: {{ settings.clustering_max_radius_pixels | tojson }},
-            CLUSTERING_DENSITY_SCALE: {{ settings.clustering_density_scale | tojson }},
-            CLUSTERING_BOUNDARY_DELAY_MS: {{ settings.clustering_boundary_delay_ms | tojson }},
-            CLUSTERING_BOUNDARY_DETECTION: {{ settings.clustering_boundary_detection | tojson }}
+            EVENT_ANIMATIONS_ENABLED: {{ settings.event_animations_enabled | tojson }},
+            CLUSTERING_RADIUS: {{ settings.clustering_radius | tojson }}
         };
     </script>
     <script src="/static/js/app.js"></script>

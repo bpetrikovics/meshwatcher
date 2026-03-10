@@ -273,16 +273,19 @@ footer.glass-panel {
     box-shadow: 0 4px 8px rgba(0,0,0,0.3);
 }
 
-/* Overlapping nodes connection lines */
-.leaflet-overlay-pane svg path.leaflet-interactive {
-    stroke-dasharray: 3, 6;
-    animation: dash-animation 20s linear infinite;
+/* Custom cluster styling */
+.custom-cluster-marker {
+    background: transparent !important;
+    border: none !important;
 }
 
-@keyframes dash-animation {
-    to {
-        stroke-dashoffset: -100;
-    }
+.cluster-icon {
+    transition: all 0.3s ease;
+}
+
+.cluster-icon:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
 }
 
 /* Status legend styles */
