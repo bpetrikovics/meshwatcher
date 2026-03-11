@@ -828,11 +828,6 @@ function meshApp() {
                 const hasHeading = node.position && node.position.heading !== null && node.position.heading !== undefined;
                 const shouldShowDirection = hasSpeed && hasHeading;
                 
-                // Debug logging for movement detection
-                if (node.position && node.position.ground_speed_ms !== undefined) {
-                    console.log(`Node ${node.id} - Speed: ${node.position.ground_speed_ms} m/s, Heading: ${node.position.heading}, Moving: ${shouldShowDirection}`);
-                }
-                
                 // Create custom node marker with optional red border for movement
                 const movingClass = shouldShowDirection ? 'moving' : '';
                 const iconHtml = `<div class="node-icon ${statusClass} ${movingClass}" 
@@ -1001,14 +996,56 @@ function meshApp() {
             if (hoursAgo === null || hoursAgo === undefined) {
                 return 'Never seen';
             }
+
+            if (typeof hoursAgo !== 'number' || Number.isNaN(hoursAgo) || !Number.isFinite(hoursAgo)) {
+                return 'Never seen';
+            }
+
+            if (hoursAgo < 0) {
+                hoursAgo = 0;
+            }
             
             if (hoursAgo < 1) {
-                return 'Less than 1 hour ago';
+                const minutes = Math.round(hoursAgo * 60);
+                if (minutes < 1) {
+                    return 'Less than 1 minute ago';
+                } else if (minutes === 1) {
+                    return '1 minute ago';
+                } else {
+                    return `${minutes} minutes ago`;
+                }
             } else if (hoursAgo < 24) {
-                return `${Math.round(hoursAgo)} hours ago`;
+                let wholeHours = Math.floor(hoursAgo);
+                let remainingMinutes = Math.round((hoursAgo - wholeHours) * 60);
+
+                if (remainingMinutes === 60) {
+                    wholeHours += 1;
+                    remainingMinutes = 0;
+                }
+
+                if (wholeHours >= 24) {
+                    return '1 day ago';
+                }
+                
+                if (remainingMinutes === 0) {
+                    return `${wholeHours} hour${wholeHours === 1 ? '' : 's'} ago`;
+                } else {
+                    return `${wholeHours} hour${wholeHours === 1 ? '' : 's'} ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'} ago`;
+                }
             } else {
-                const days = Math.round(hoursAgo / 24);
-                return `${days} day${days === 1 ? '' : 's'} ago`;
+                let days = Math.floor(hoursAgo / 24);
+                let remainingHours = Math.round((hoursAgo % 24));
+
+                if (remainingHours === 24) {
+                    days += 1;
+                    remainingHours = 0;
+                }
+                
+                if (remainingHours === 0) {
+                    return `${days} day${days === 1 ? '' : 's'} ago`;
+                } else {
+                    return `${days} day${days === 1 ? '' : 's'} ${remainingHours} hour${remainingHours === 1 ? '' : 's'} ago`;
+                }
             }
         },
         

@@ -190,8 +190,8 @@ class EventManager:
             existing_node.updated = current_time
             return existing_node
         else:
-            # Create placeholder node with current timestamp
-            placeholder_node = NodeInfo(id_=node_id, updated=current_time)
+            # Create placeholder node with current timestamp and default role
+            placeholder_node = NodeInfo(id_=node_id, updated=current_time, role="CLIENT")
             db.add(placeholder_node)
             db.flush()  # Ensure the placeholder is in the database before returning
             return placeholder_node
@@ -299,6 +299,9 @@ class EventManager:
                 existing_node.public_key = nodeinfo.public_key
             if nodeinfo.role is not None:
                 existing_node.role = nodeinfo.role
+            else:
+                # Default to CLIENT if role is not specified
+                existing_node.role = "CLIENT"
             if nodeinfo.is_unmessagable is not None:
                 existing_node.is_unmessagable = nodeinfo.is_unmessagable
             

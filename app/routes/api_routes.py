@@ -102,7 +102,7 @@ def build_nodes_query(include_params: List[str], filters: Dict[str, Any], sessio
     return query
 
 
-def serialize_node(node, include_params: List[str]) -> Dict[str, Any]:
+def serialize_node(node, include_params: List[str], session=None) -> Dict[str, Any]:
     """Serialize node data based on include parameters."""
     result = {
         "id": node.id_,
@@ -110,13 +110,18 @@ def serialize_node(node, include_params: List[str]) -> Dict[str, Any]:
         "long_name": node.long_name,
         "macaddr": node.macaddr,
         "hw_model": node.hw_model,
-        "role": node.role,
+        "role": node.role or "CLIENT",
         "is_unmessagable": node.is_unmessagable,
         "updated": node.updated.isoformat() if node.updated else None,
     }
     
     # Add position data if requested and available (from joined query)
-    if "positions" in include_params and hasattr(node, 'latitude_i'):
+    if (
+        "positions" in include_params
+        and hasattr(node, 'latitude_i')
+        and node.latitude_i is not None
+        and node.longitude_i is not None
+    ):
         # Create a Position object to use its computed properties
         position = Position(
             latitude_i=node.latitude_i,
@@ -170,6 +175,9 @@ def serialize_node(node, include_params: List[str]) -> Dict[str, Any]:
                 
                 time_diff = now - node_updated
                 last_seen_hours_ago = time_diff.total_seconds() / 3600
+                if last_seen_hours_ago < 0:
+                    last_seen_hours_ago = 0.0
+                last_seen_hours_ago = round(last_seen_hours_ago, 4)
                 
                 # Use configurable thresholds
                 if last_seen_hours_ago < settings.status_currently_active_hours:
@@ -177,18 +185,18 @@ def serialize_node(node, include_params: List[str]) -> Dict[str, Any]:
                 elif last_seen_hours_ago < settings.status_recently_active_hours:
                     status = "recently_active"
                 # Else remains "inactive"
-            except Exception:
+            except (OverflowError, TypeError, ValueError):
                 # If datetime calculation fails, set default status
                 status = "inactive"
                 last_seen_hours_ago = None
         
         result["info"] = {
-            "has_position": hasattr(node, 'latitude_i'),
+            "has_position": bool(hasattr(node, 'latitude_i') and node.latitude_i is not None and node.longitude_i is not None),
             "last_seen": node.updated.isoformat() if node.updated else None,
             "status": status,
-            "last_seen_hours_ago": int(last_seen_hours_ago) if last_seen_hours_ago is not None else None,
+            "last_seen_hours_ago": last_seen_hours_ago,
             # Enhanced node metadata
-            "role": node.role,
+            "role": node.role or "CLIENT",
             "hw_model": node.hw_model,
             "is_unmessagable": node.is_unmessagable,
         }
