@@ -480,6 +480,7 @@ footer.glass-panel {
     color: #6b7280;
     font-weight: 500;
     border: 1px solid #d1d5db;
+    margin-left: 6px;
 }
 
 .node-popup .space-y-1 > * {
