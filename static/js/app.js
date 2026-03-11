@@ -824,9 +824,14 @@ function meshApp() {
                 const safeStatusLabel = this.sanitizeHtml(this.getStatusLabel(status));
                 
                 // Check for movement and heading
-                const hasSpeed = node.position && node.position.ground_speed_ms && node.position.ground_speed_ms > 0;
-                const hasHeading = node.position && node.position.heading != null;
+                const hasSpeed = node.position && node.position.ground_speed_ms !== undefined && node.position.ground_speed_ms !== null && node.position.ground_speed_ms > 0;
+                const hasHeading = node.position && node.position.heading !== null && node.position.heading !== undefined;
                 const shouldShowDirection = hasSpeed && hasHeading;
+                
+                // Debug logging for movement detection
+                if (node.position && node.position.ground_speed_ms !== undefined) {
+                    console.log(`Node ${node.id} - Speed: ${node.position.ground_speed_ms} m/s, Heading: ${node.position.heading}, Moving: ${shouldShowDirection}`);
+                }
                 
                 // Create custom node marker with optional red border for movement
                 const movingClass = shouldShowDirection ? 'moving' : '';
@@ -888,8 +893,8 @@ function meshApp() {
                         <p><strong>ID:</strong> ${safeId}</p>
                         ${safeShortName ? `<p><strong>Short Name:</strong> ${safeShortName}</p>` : ''}
                         <p><strong>Status:</strong> <span class="status-badge ${this.getStatusClass(info.status)}">${this.getStatusLabel(info.status)}</span></p>
-                        ${position.ground_speed_ms && position.ground_speed_ms > 0 ? `<p><strong>Ground Speed:</strong> ${position.ground_speed_ms.toFixed(1)} m/s (${(position.ground_speed_ms * 3.6).toFixed(1)} km/h)</p>` : ''}
-                        ${position.heading != null && position.ground_speed_ms && position.ground_speed_ms > 0 ? `<p><strong>Heading:</strong> ${position.heading.toFixed(1)}° (${this.getCompassDirection(position.heading)})</p>` : ''}
+                        ${position.ground_speed_ms !== undefined && position.ground_speed_ms !== null && position.ground_speed_ms > 0 ? `<p><strong>Ground Speed:</strong> ${position.ground_speed_ms.toFixed(1)} m/s (${(position.ground_speed_ms * 3.6).toFixed(1)} km/h)</p>` : ''}
+                        ${position.heading !== null && position.heading !== undefined && position.ground_speed_ms !== undefined && position.ground_speed_ms !== null && position.ground_speed_ms > 0 ? `<p><strong>Heading:</strong> ${position.heading.toFixed(1)}° (${this.getCompassDirection(position.heading)})</p>` : ''}
                         ${info.last_seen_hours_ago !== null ? `<p><strong>Last seen:</strong> ${this.getTimeAgoText(info.last_seen_hours_ago)}</p>` : ''}
                         ${position.latitude ? `<p><strong>Position:</strong> ${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)}</p>` : ''}
                         ${position.altitude ? `<p><strong>Altitude:</strong> ${position.altitude}m</p>` : ''}
