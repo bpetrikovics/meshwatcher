@@ -569,6 +569,12 @@ class Position(SQLModel, table=True):
 
     @computed_field
     @property
+    def ground_speed_ms(self) -> Optional[float]:
+        """Convert ground speed from km/h to m/s."""
+        return self.ground_speed / 3.6 if self.ground_speed is not None else None
+
+    @computed_field
+    @property
     def radius(self) -> float:
         """Calculate precision radius from precision bits."""
         if self.precision_bits is None:
@@ -578,7 +584,7 @@ class Position(SQLModel, table=True):
     def __str__(self) -> str:
         node = self.node_id if self.node_id is not None else "<unset>"
         timestamp = self.created_at.isoformat() if self.created_at else "unknown"
-        return f"Position {node} @ {timestamp}: lat={self.latitude}, lon={self.longitude}, heading={self.heading}, ground speed={self.ground_speed}, alt={self.altitude}, radius={self.radius:.2f}"
+        return f"Position {node} @ {timestamp}: lat={self.latitude}, lon={self.longitude}, heading={self.heading}, ground speed={self.ground_speed_ms}, alt={self.altitude}, radius={self.radius:.2f}"
 
 
 class Routing(SQLModel, table=False):

@@ -135,7 +135,7 @@ def serialize_node(node, include_params: List[str]) -> Dict[str, Any]:
             "altitude": position.altitude,
             "time": position.time,
             "created_at": position.created_at.isoformat() if position.created_at else None,
-            "ground_speed": position.ground_speed,
+            "ground_speed": position.ground_speed_ms,
             "ground_track": position.ground_track,
             "precision_bits": position.precision_bits,
             "heading": position.heading,
