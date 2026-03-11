@@ -110,7 +110,7 @@ class TestUpdateNodeLastSeen:
         assert result.short_name is None
         assert result.long_name is None
         assert result.hw_model is None
-        assert result.role is None
+        assert result.role == "CLIENT"
 
     @patch('app.event_manager.datetime')
     def test_timestamp_precision(self, mock_datetime):
