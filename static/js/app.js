@@ -574,7 +574,7 @@ function meshApp() {
                                 <div><strong>Long Name:</strong> ${this.sanitizeHtml(data.long_name || data.name || 'N/A')}</div>
                                 <div><strong>Short Name:</strong> ${this.sanitizeHtml(data.short_name || 'N/A')}</div>
                                 <div><strong>Status:</strong> <span class="${data.online ? 'text-green-600' : 'text-red-600'}">${data.online ? 'Online' : 'Offline'}</span></div>
-                                <div><strong>Last Seen:</strong> ${this.sanitizeHtml(data.lastSeen)}</div>
+                                <div><strong>Last packet:</strong> ${this.sanitizeHtml(data.lastSeen)}</div>
                             </div>
                         `,
                         onConfirm: () => this.closeModal()
@@ -832,7 +832,7 @@ function meshApp() {
                 // Create custom node marker with optional red border for movement
                 const movingClass = shouldShowDirection ? 'moving' : '';
                 const iconHtml = `<div class="node-icon ${statusClass} ${movingClass}" 
-                                     title="${safeName}\nRole: ${role}\nStatus: ${safeStatusLabel}\nLast seen: ${timeAgo}">
+                                     title="${safeName}Role: ${role}\nStatus: ${safeStatusLabel}\nLast packet: ${timeAgo}">
                                     <i class="mdi ${roleIcon}"></i>
                                    </div>`;
                 
@@ -889,11 +889,12 @@ function meshApp() {
                         <p><strong>ID:</strong> ${safeId}</p>
                         ${safeShortName ? `<p><strong>Short Name:</strong> ${safeShortName}</p>` : ''}
                         <p><strong>Status:</strong> <span class="status-badge ${this.getStatusClass(info.status)}">${this.getStatusLabel(info.status)}</span></p>
+                        ${info.last_seen_hours_ago !== null ? `<p><strong>Last packet:</strong> ${this.getTimeAgoText(info.last_seen_hours_ago)}</p>` : ''}
+                        ${position.latitude ? `<p><strong>Position:</strong> ${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)}</p>` : ''}
+                        ${position.position_age_hours_ago !== null ? `<p><strong>Last position:</strong> ${this.getTimeAgoText(position.position_age_hours_ago)}</p>` : (position.latitude ? '<p><strong>Position age:</strong> Unknown</p>' : '')}
+                        ${position.altitude ? `<p><strong>Altitude:</strong> ${position.altitude}m</p>` : ''}
                         ${position.ground_speed_ms !== undefined && position.ground_speed_ms !== null && position.ground_speed_ms > 0 ? `<p><strong>Ground Speed:</strong> ${position.ground_speed_ms.toFixed(1)} m/s (${(position.ground_speed_ms * 3.6).toFixed(1)} km/h)</p>` : ''}
                         ${position.heading !== null && position.heading !== undefined && position.ground_speed_ms !== undefined && position.ground_speed_ms !== null && position.ground_speed_ms > 0 ? `<p><strong>Heading:</strong> ${position.heading.toFixed(1)}° (${this.getCompassDirection(position.heading)})</p>` : ''}
-                        ${info.last_seen_hours_ago !== null ? `<p><strong>Last seen:</strong> ${this.getTimeAgoText(info.last_seen_hours_ago)}</p>` : ''}
-                        ${position.latitude ? `<p><strong>Position:</strong> ${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)}</p>` : ''}
-                        ${position.altitude ? `<p><strong>Altitude:</strong> ${position.altitude}m</p>` : ''}
                         ${info.is_unmessagable ? '<p><em>Node is unmessagable</em></p>' : ''}
                     </div>
                 </div>
