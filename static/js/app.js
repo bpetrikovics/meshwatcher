@@ -210,7 +210,8 @@ function meshApp() {
                     // Popups created during zoom can have incorrect positioning
                 });
                 
-                this.addStatusLegend();
+                // disable legend for now
+                // this.addStatusLegend();
                 
                 console.log('Map initialized successfully');
                 
