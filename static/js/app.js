@@ -554,17 +554,6 @@ function meshApp() {
         // Get modal configuration
         getModalConfig(type, data) {
             const configs = {
-                test: () => ({
-                    title: 'Test Modal',
-                    content: `
-                        <p>This is a test modal to demonstrate the modal system.</p>
-                        <p class="mt-2">You can put any content here, including forms, tables, or other interactive elements.</p>
-                    `,
-                    onConfirm: () => {
-                        console.log('Modal confirmed');
-                        this.closeModal();
-                    }
-                }),
                 'node-details': () => {
                     return {
                         title: `Node ${this.sanitizeHtml(data.id)}`,
