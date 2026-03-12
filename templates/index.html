@@ -40,11 +40,6 @@
             </div>
             
             <div class="flex items-center space-x-2">
-                <button @click="showModal('test')" 
-                        class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-                        aria-label="Open test modal">
-                    Test Modal (Header)
-                </button>
                 <button @click="togglePanel('right')" 
                         class="p-2 hover:bg-gray-700 rounded transition-colors"
                         :class="panels.right.visible ? 'bg-gray-700' : ''"
@@ -86,14 +81,6 @@
             <div class="flex-1 relative map-container">
                 <div id="map" class="w-full h-full"></div>
                 
-                <!-- Map Controls Overlay -->
-                <div class="absolute top-4 left-4 bg-white rounded shadow-lg p-2" style="z-index: var(--z-sticky);">
-                    <button @click="showModal('test')" 
-                            class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
-                            aria-label="Open test modal">
-                        Test Modal
-                    </button>
-                </div>
             </div>
 
             <!-- Right Sidebar -->
@@ -187,21 +174,11 @@
         </div>
     </div>
 
-    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
-    <!-- Leaflet.markercluster JS -->
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-    
-    <!-- Socket.IO JS (for future use) -->
     <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"></script>
-    
-    <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    
-    <!-- App JavaScript -->
     <script>
-        // Configuration passed from Flask template
         window.APP_CONFIG = {
             STATUS_CURRENTLY_ACTIVE_HOURS: {{ settings.status_currently_active_hours | tojson }},
             STATUS_RECENTLY_ACTIVE_HOURS: {{ settings.status_recently_active_hours | tojson }},
