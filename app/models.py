@@ -538,7 +538,7 @@ class Position(SQLModel, table=True):
 
     created_at: Optional[datetime] = Field(
         default_factory=lambda: datetime.now(timezone.utc),
-        sa_column=Column("createdAt", DateTime, nullable=True),
+        sa_column=Column("createdAt", DateTime(timezone=True), nullable=True),
         exclude=True,
     )
 

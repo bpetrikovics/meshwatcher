@@ -17,27 +17,15 @@ def parse_include_params(include_str: Optional[str]) -> List[str]:
     return [item.strip() for item in include_str.split(",") if item.strip()]
 
 
-def calculate_position_age(position_created_at: Optional[datetime], position_time: Optional[int] = None) -> Optional[float]:
-    """Calculate position age in hours ago from created_at or position_time timestamp."""
-    # Try created_at first, then fall back to position.time
-    timestamp_to_use = None
-    
-    if position_created_at:
-        timestamp_to_use = position_created_at
-    elif position_time:
-        # Convert Unix timestamp to datetime
-        try:
-            timestamp_to_use = datetime.fromtimestamp(position_time, timezone.utc)
-        except (ValueError, OverflowError, OSError):
-            timestamp_to_use = None
-    
-    if not timestamp_to_use:
+def calculate_position_age(position_created_at: Optional[datetime]) -> Optional[float]:
+    """Calculate position age in hours ago from created_at timestamp."""
+    if not position_created_at:
         return None
     
     try:
         # Proper timezone-aware calculation
         now = datetime.now(timezone.utc)
-        pos_created = timestamp_to_use
+        pos_created = position_created_at
         if pos_created.tzinfo is None:
             # Assume UTC if no timezone info
             pos_created = pos_created.replace(tzinfo=timezone.utc)
@@ -185,7 +173,7 @@ def serialize_node(node, include_params: List[str], session=None) -> Dict[str, A
             "precision_bits": position.precision_bits,
             "heading": position.heading,
             "radius": position.radius,
-            "position_age_hours_ago": calculate_position_age(position.created_at, position.time),
+            "position_age_hours_ago": calculate_position_age(position.created_at),
         }
     
     # Add telemetry data if requested and available (from joined query)
