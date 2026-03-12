@@ -793,7 +793,8 @@ function meshApp() {
                 'REPEATER': 'mdi-repeat',
                 'SENSOR': 'mdi-thermometer',
                 'TRACKER': 'mdi-crosshairs-gps',
-                'TAK': 'mdi-radar'
+                'TAK': 'mdi-radar',
+                'TAK_TRACKER': 'mdi-radar'
             };
             return roleIcons[role] || 'mdi-help-circle';
         },
