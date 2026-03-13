@@ -16,7 +16,8 @@ MeshWatcher uses a MySQL database to store Meshtastic packet data, node informat
 Stores raw Meshtastic packet data received via MQTT.
 
 **Columns:**
-- `id` (BigInteger, Primary Key) - Packet ID from Meshtastic
+- `db_id` (Integer, Primary Key, Auto-increment) - Internal record ID
+- `id` (BigInteger) - Packet ID from Meshtastic
 - `from` (BigInteger) - Sender node ID
 - `to` (BigInteger) - Recipient node ID (0xffffffff for broadcast)
 - `channel` (Integer) - Channel number
@@ -24,19 +25,19 @@ Stores raw Meshtastic packet data received via MQTT.
 - `decoded` (JSON) - Decoded packet contents
 - `uplink` (String(9)) - Uplink node ID
 - `rxTime` (Integer) - Receive timestamp
-- `hopLimit` (Integer) - Hop limit
-- `hopStart` (Integer) - Starting hop count
-- `priority` (String(32)) - Packet priority
-- `relayNode` (Integer) - Relay node ID
-- `nextHop` (Integer) - Next hop node ID
-- `rxSnr` (Numeric) - Signal-to-noise ratio
-- `rxRssi` (Integer) - Received signal strength
-- `transportMechanism` (String(32)) - Transport mechanism
-- `wantAck` (Boolean) - Acknowledgment required
-- `createdAt` (DateTime) - Record creation timestamp
+- `hopLimit` (Integer, Nullable) - Hop limit
+- `hopStart` (Integer, Nullable) - Starting hop count
+- `priority` (String(32), Nullable) - Packet priority
+- `relayNode` (Integer, Nullable) - Relay node ID
+- `nextHop` (Integer, Nullable) - Next hop node ID
+- `rxSnr` (Numeric, Nullable) - Signal-to-noise ratio
+- `rxRssi` (Integer, Nullable) - Received signal strength
+- `transportMechanism` (String(32), Nullable) - Transport mechanism
+- `wantAck` (Boolean, Nullable) - Acknowledgment required
+- `createdAt` (DateTime, Nullable) - Record creation timestamp
 
 **Indexes:**
-- Primary key on `id`
+- Primary key on `db_id`
 
 **Retention:** 7 days (configurable via `packet_retention_days`)
 
@@ -47,19 +48,19 @@ Stores node information and metadata.
 
 **Columns:**
 - `id` (String(9), Primary Key) - Node ID in format `!xxxxxxxx`
-- `shortName` (String(4)) - Short node name
-- `longName` (String(40)) - Long node name
-- `macaddr` (String(8)) - MAC address
-- `hwModel` (String(32)) - Hardware model
-- `publicKey` (String(64)) - Public key
-- `role` (String(16)) - Node role
-- `isUnmessagable` (Boolean) - Whether node can receive messages
-- `updated` (DateTime) - Last update timestamp
+- `shortName` (String(4), Nullable) - Short node name
+- `longName` (String(40), Nullable) - Long node name
+- `macaddr` (String(8), Nullable) - MAC address
+- `hwModel` (String(32), Nullable) - Hardware model
+- `publicKey` (String(64), Nullable) - Public key
+- `role` (String(16), Nullable) - Node role
+- `isUnmessagable` (Boolean, Nullable) - Whether node can receive messages
+- `updated` (DateTime, Nullable) - Last update timestamp
 
 **Indexes:**
 - Primary key on `id`
 
-**Retention:** 30 days (configurable via `node_retention_days`)
+**Retention:** 14 days (configurable via `node_retention_days`)
 
 ---
 
@@ -78,7 +79,7 @@ Stores text messages sent between nodes.
 - `emoji` (Integer, Nullable) - Emoji flag
 - `bitfield` (Integer, Nullable) - Message bitfield
 - `timestamp` (Integer) - Message timestamp
-- `createdAt` (DateTime) - Record creation timestamp
+- `createdAt` (DateTime, Nullable) - Record creation timestamp
 
 **Foreign Keys:**
 - `nodeId` → `nodes.id` (No CASCADE)
@@ -92,7 +93,7 @@ Stores text messages sent between nodes.
 - `packetId` is required and stores the Meshtastic packet ID that carried this message.
 - `replyId`, when present, references the `packetId` of the original message being replied to (not the internal `db_id`).
 
-**Retention:** 30 days (configurable via `message_retention_days`)
+**Retention:** 7 days (configurable via `message_retention_days`)
 
 ---
 
@@ -106,11 +107,18 @@ Stores GPS position data from nodes.
 - `longitudeI` (Integer) - Longitude in integer format (1e7 scale)
 - `altitude` (Integer, Nullable) - Altitude in meters
 - `time` (Integer, Nullable) - Position timestamp
-- `locationSource` (String(32)) - Source of location data
-- `groundSpeed` (Integer, Nullable) - Ground speed
+- `locationSource` (String(32), Nullable) - Source of location data
+- `groundSpeed` (Integer, Nullable) - Ground speed in km/h
 - `groundTrack` (Integer, Nullable) - Ground track/heading
-- `precisionBits` (Integer) - Position precision
-- `createdAt` (DateTime) - Record creation timestamp
+- `precisionBits` (Integer, Nullable) - Position precision
+- `createdAt` (DateTime(timezone=True), Nullable) - Record creation timestamp
+
+**Computed Fields:**
+- `latitude` (Float, Nullable) - Latitude in decimal degrees (converted from integer)
+- `longitude` (Float, Nullable) - Longitude in decimal degrees (converted from integer)
+- `heading` (Float, Nullable) - Heading in degrees (converted from ground_track, returns None if ground_track is None)
+- `ground_speed_ms` (Float, Nullable) - Ground speed in m/s (converted from km/h)
+- `radius` (Float) - Precision radius in meters (calculated from precision_bits)
 
 **Foreign Keys:**
 - `nodeId` → `nodes.id` (**CASCADE DELETE**)
@@ -119,7 +127,7 @@ Stores GPS position data from nodes.
 - `ix_positions_node_time` on (`nodeId`, `time`)
 - `ix_positions_time` on `time`
 
-**Retention:** 30 days (follows node retention via CASCADE DELETE)
+**Retention:** 14 days (follows node retention via CASCADE DELETE)
 
 ---
 
@@ -132,7 +140,7 @@ Stores telemetry data from nodes.
 - `metricType` (String(32)) - Type of metric (e.g., "deviceMetrics", "environmentMetrics")
 - `ts` (Integer) - Telemetry timestamp
 - `payload` (JSON) - Telemetry data payload
-- `createdAt` (DateTime) - Record creation timestamp
+- `createdAt` (DateTime, Nullable) - Record creation timestamp
 
 **Foreign Keys:**
 - `nodeId` → `nodes.id` (No CASCADE)
@@ -140,9 +148,9 @@ Stores telemetry data from nodes.
 **Indexes:**
 - `ix_telemetry_node_type_ts` on (`nodeId`, `metricType`, `ts`)
 - `ix_telemetry_node_ts` on (`nodeId`, `ts`)
-- Unique constraint on (`nodeId`, `metricType`, `ts`)
+- Unique constraint on (`nodeId`, `metricType`, `ts`) named `uq_telemetry_node_type_ts`
 
-**Retention:** 90 days (configurable via `telemetry_retention_days`)
+**Retention:** 7 days (configurable via `telemetry_retention_days`)
 
 ---
 
@@ -151,13 +159,13 @@ Stores individual metrics extracted from telemetry data.
 
 **Columns:**
 - `db_id` (Integer, Primary Key, Auto-increment) - Internal record ID
-- `telemetryId` (Integer, Foreign Key → telemetry.db_id) - Parent telemetry record
+- `telemetryId` (Integer, Foreign Key → telemetry.db_id, Nullable) - Parent telemetry record
 - `nodeId` (String(9)) - Node ID
 - `metricType` (String(32)) - Metric type
 - `metric` (String(64)) - Metric name
 - `ts` (Integer) - Metric timestamp
-- `value` (Numeric) - Metric value
-- `createdAt` (DateTime) - Record creation timestamp
+- `value` (Numeric(18,6)) - Metric value
+- `createdAt` (DateTime, Nullable) - Record creation timestamp
 
 **Foreign Keys:**
 - `telemetryId` → `telemetry.db_id` (**CASCADE DELETE**)
@@ -167,7 +175,7 @@ Stores individual metrics extracted from telemetry data.
 - `ix_metrics_latest` on (`nodeId`, `metricType`, `metric`, `ts` DESC)
 - `ix_metrics_telemetry_id` on `telemetryId`
 
-**Retention:** 90 days (configurable via `metrics_retention_days` - automatically cleaned via CASCADE)
+**Retention:** 7 days (configurable via `metrics_retention_days` - automatically cleaned via CASCADE)
 
 ---
 
@@ -219,11 +227,11 @@ To maintain foreign key integrity, tables are cleaned in the following order:
 | Table | Default Retention | Config Setting | Rationale |
 |-------|------------------|----------------|-----------|
 | `packets` | 7 days | `packet_retention_days` | High volume, short-term analytical value |
-| `nodes` | 30 days | `node_retention_days` | Moderate retention for node metadata |
-| `messages` | 30 days | `message_retention_days` | Similar to nodes, conversation history |
-| `positions` | 30 days | **follows nodes** | Location tracking, cleaned with nodes |
-| `telemetry` | 90 days | `telemetry_retention_days` | Valuable historical data |
-| `metrics` | 90 days | `metrics_retention_days` | Same as telemetry (via CASCADE) |
+| `nodes` | 14 days | `node_retention_days` | Moderate retention for node metadata |
+| `messages` | 7 days | `message_retention_days` | Conversation history |
+| `positions` | 14 days | **follows nodes** | Location tracking, cleaned with nodes |
+| `telemetry` | 7 days | `telemetry_retention_days` | Device and environmental metrics |
+| `metrics` | 7 days | `metrics_retention_days` | Same as telemetry (via CASCADE) |
 
 ### Configuration
 
@@ -232,10 +240,10 @@ All retention periods are configurable via environment variables or the `.env` f
 ```bash
 # Retention periods (in days)
 PACKET_RETENTION_DAYS=7
-NODE_RETENTION_DAYS=30
-MESSAGE_RETENTION_DAYS=30
-TELEMETRY_RETENTION_DAYS=90
-METRICS_RETENTION_DAYS=90
+NODE_RETENTION_DAYS=14
+MESSAGE_RETENTION_DAYS=7
+TELEMETRY_RETENTION_DAYS=7
+METRICS_RETENTION_DAYS=7
 
 # Cleanup interval (in minutes)
 DB_CLEANUP_PERIOD_MINUTES=30
