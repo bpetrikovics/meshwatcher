@@ -247,8 +247,6 @@ function meshApp() {
             const config = window.APP_CONFIG || {};
             const clusteringRadius = config.CLUSTERING_RADIUS || 0;
             
-            console.log(`Clustering radius: ${clusteringRadius}px (${clusteringRadius === 0 ? 'spiderfying only' : 'clustering enabled'})`);
-            
             this.nodeLayer = L.markerClusterGroup({ 
                 maxClusterRadius: clusteringRadius,  // 0 = spiderfying only, >0 = clustering
                 spiderfyOnMaxZoom: true,
@@ -270,8 +268,17 @@ function meshApp() {
             
             // Debounce updates to avoid excessive recreation during dragging
             this.clusteringUpdateTimeout = setTimeout(() => {
-                console.log(`Updating clustering radius to: ${this.clusteringRadius}px`);
                 this.recreateNodeLayer();
+                
+                // On mobile, invalidate map size to ensure proper rendering
+                const isMobile = window.innerWidth <= 768;
+                if (isMobile) {
+                    setTimeout(() => {
+                        if (this.map) {
+                            this.map.invalidateSize();
+                        }
+                    }, 50);
+                }
             }, 100);
         },
 
