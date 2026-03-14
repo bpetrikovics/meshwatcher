@@ -23,7 +23,7 @@
     <link rel="stylesheet" href="/static/css/app.css">
 </head>
 <body>
-    <div x-data="meshApp()" x-init="init()" class="h-screen flex flex-col overflow-hidden">
+    <div x-data="meshApp" x-init="init()" class="h-screen flex flex-col overflow-hidden">
         
         <!-- Top Menu Bar -->
         <header class="bg-gray-800 text-white px-4 py-2 flex items-center justify-between" style="z-index: var(--z-fixed);">
@@ -208,6 +208,8 @@
             STATUS_RECENTLY_ACTIVE_HOURS: {{ settings.status_recently_active_hours | tojson }},
             GIT_COMMIT: {{ settings.git_commit | tojson }},
             EVENT_ANIMATIONS_ENABLED: {{ settings.event_animations_enabled | tojson }},
+            SOCKET_NAMESPACE_EVENTS: {{ settings.namespace_events | tojson }},
+            EVENT_FLASH_MS: {{ settings.event_flash_ms | tojson }},
             CLUSTERING_RADIUS: {{ settings.clustering_radius | tojson }}
         };
     </script>

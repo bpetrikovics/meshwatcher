@@ -53,6 +53,10 @@ function meshApp() {
         // Performance caching
         cachedRoles: null,
         needsRoleUpdate: true,
+
+        // Socket.IO events
+        eventsSocket: null,
+        markerFlashTimers: {},
         
         // Get cached unique roles
         getUniqueRoles() {
@@ -124,11 +128,18 @@ function meshApp() {
         
         // Initialize application
         init() {
+            if (this.initialized) {
+                console.log('App already initialized, skipping...');
+                return;
+            }
+            this.initialized = true;
             console.log('Initializing app...');
             
             // Initialize clustering radius from config
             const config = window.APP_CONFIG || {};
             this.clusteringRadius = config.CLUSTERING_RADIUS || 5;
+
+            this.initializeEventsSocket();
             
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', () => {
@@ -145,6 +156,145 @@ function meshApp() {
                 this.setupPageUnloadHandlers();
                 console.log('App initialized immediately');
             }
+        },
+
+        initializeEventsSocket() {
+            const config = window.APP_CONFIG || {};
+            const namespace = config.SOCKET_NAMESPACE_EVENTS || '/events';
+            if (this.eventsSocket && this.eventsSocket.connected) {
+                console.log('Events socket already connected');
+                return; // Already connected
+            }
+            try {
+                if (typeof io === 'undefined') {
+                    console.warn('Socket.IO client not loaded; realtime events disabled');
+                    return;
+                }
+                this.eventsSocket = io(namespace);
+                this.eventsSocket.on('connect', () => {
+                    console.log('Connected to events socket', namespace);
+                });
+                this.eventsSocket.on('disconnect', () => {
+                    console.log('Disconnected from events socket');
+                });
+                this.eventsSocket.on('event', (evt) => {
+                    this.handleRealtimeEvent(evt);
+                });
+            } catch (error) {
+                console.error('Failed to initialize events socket:', error);
+            }
+        },
+
+        handleRealtimeEvent(evt) {
+            if (!evt || typeof evt !== 'object') return;
+            const nodeId = evt.id;
+            if (!nodeId) return;
+
+            const type = evt.type;
+            try {
+                if (type === 'position') {
+                    const position = evt.payload?.position;
+                    if (!position || position.latitude == null || position.longitude == null) return;
+
+                    if (!this.nodes[nodeId] || !this.nodes[nodeId].marker) {
+                        const placeholderNode = {
+                            id: nodeId,
+                            position: position,
+                            info: { status: 'inactive', last_seen_hours_ago: 0 },
+                            role: 'CLIENT'
+                        };
+                        this.addNodeToMap(placeholderNode);
+                    } else {
+                        this.updateNodePosition(nodeId, position);
+                    }
+
+                    this.flashNodeMarker(nodeId);
+                    return;
+                }
+
+                if (type === 'nodeinfo') {
+                    const nodeinfo = evt.payload?.nodeinfo;
+                    if (!nodeinfo || typeof nodeinfo !== 'object') return;
+
+                    if (!this.nodes[nodeId]) {
+                        this.nodes[nodeId] = { id: nodeId, role: 'CLIENT' };
+                    }
+
+                    const node = this.nodes[nodeId];
+                    if (nodeinfo.short_name !== undefined) node.short_name = nodeinfo.short_name;
+                    if (nodeinfo.long_name !== undefined) node.long_name = nodeinfo.long_name;
+                    if (nodeinfo.hw_model !== undefined) node.hw_model = nodeinfo.hw_model;
+                    if (nodeinfo.role !== undefined && nodeinfo.role !== null) node.role = nodeinfo.role;
+                    if (nodeinfo.is_unmessagable !== undefined) node.info = { ...(node.info || {}), is_unmessagable: nodeinfo.is_unmessagable };
+
+                    this.invalidateRoleCache();
+                    if (node.marker) {
+                        this.refreshNodeMarker(nodeId);
+                        this.flashNodeMarker(nodeId);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to handle realtime event:', error);
+            }
+        },
+
+        refreshNodeMarker(nodeId) {
+            const node = this.nodes[nodeId];
+            if (!node || !node.marker) return;
+
+            const status = node.info?.status || 'inactive';
+            const statusClass = this.getStatusClass(status);
+            const timeAgo = this.getTimeAgoText(node.info?.last_seen_hours_ago);
+            const role = this.sanitizeHtml(node.role || 'Unknown');
+            const roleIcon = this.getIconForRole(role);
+            const safeName = this.sanitizeHtml(node.long_name || node.id);
+            const safeStatusLabel = this.sanitizeHtml(this.getStatusLabel(status));
+
+            const hasSpeed = node.position && node.position.ground_speed_ms !== undefined && node.position.ground_speed_ms !== null && node.position.ground_speed_ms > 0;
+            const hasHeading = node.position && node.position.heading !== null && node.position.heading !== undefined;
+            const shouldShowDirection = hasSpeed && hasHeading;
+            const movingClass = shouldShowDirection ? 'moving' : '';
+
+            const iconHtml = `<div class="node-icon ${statusClass} ${movingClass}" 
+                                     title="${safeName}\nRole: ${role}\nStatus: ${safeStatusLabel}\nLast packet: ${timeAgo}">
+                                    <i class="mdi ${roleIcon}"></i>
+                                   </div>`;
+
+            const icon = L.divIcon({
+                className: 'node-marker',
+                html: iconHtml,
+                iconSize: [24, 24],
+                iconAnchor: [12, 12]
+            });
+
+            node.marker.setIcon(icon);
+            try {
+                node.marker.setPopupContent(this.createNodePopup(node));
+            } catch (error) {
+            }
+        },
+
+        flashNodeMarker(nodeId) {
+            const config = window.APP_CONFIG || {};
+            const flashMs = config.EVENT_FLASH_MS || 2000;
+            const node = this.nodes[nodeId];
+            if (!node || !node.marker) return;
+
+            const iconEl = node.marker.getElement?.();
+            const wrapper = iconEl ? iconEl.querySelector('.node-icon') : null;
+            if (!wrapper) return;
+
+            wrapper.classList.add('flash');
+            if (this.markerFlashTimers[nodeId]) {
+                clearTimeout(this.markerFlashTimers[nodeId]);
+            }
+            this.markerFlashTimers[nodeId] = setTimeout(() => {
+                try {
+                    wrapper.classList.remove('flash');
+                } catch (e) {
+                }
+                delete this.markerFlashTimers[nodeId];
+            }, flashMs);
         },
         
         // Initialize Leaflet map
@@ -437,6 +587,19 @@ function meshApp() {
                 this.map.remove();
                 this.map = null;
             }
+
+            if (this.eventsSocket) {
+                try {
+                    this.eventsSocket.disconnect();
+                } catch (error) {
+                }
+                this.eventsSocket = null;
+            }
+
+            Object.values(this.markerFlashTimers).forEach((t) => {
+                try { clearTimeout(t); } catch (e) {}
+            });
+            this.markerFlashTimers = {};
             
             // Clear node references
             this.nodes = {};

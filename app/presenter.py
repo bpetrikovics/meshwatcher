@@ -7,7 +7,7 @@ from sqlmodel import select
 from typing import Callable, Dict, Any, Optional, Tuple
 
 from app.config import settings
-from .models import MeshtasticPacket, NodeInfo
+from .models import MeshtasticPacket, NodeInfo, Position
 
 class Presenter:
     """
@@ -111,3 +111,49 @@ class Presenter:
         self.socketio.emit(
             "packets", payload, namespace=settings.namespace_packets
         )
+
+
+    def emit_position_event(self, *, node_id: str, position: Position, ts: int, packet_id: Optional[int] = None) -> None:
+        payload: Dict[str, Any] = {
+            "type": "position",
+            "id": node_id,
+            "ts": int(ts),
+            "payload": {
+                "position": {
+                    "latitude": position.latitude,
+                    "longitude": position.longitude,
+                    "altitude": position.altitude,
+                    "ground_speed_ms": position.ground_speed_ms,
+                    "heading": position.heading,
+                }
+            },
+            "meta": {},
+        }
+
+        if packet_id is not None:
+            payload["meta"]["packet_id"] = int(packet_id)
+
+        self.socketio.emit("event", payload, namespace=settings.namespace_events)
+
+
+    def emit_nodeinfo_event(self, *, nodeinfo: NodeInfo, ts: int, packet_id: Optional[int] = None) -> None:
+        payload: Dict[str, Any] = {
+            "type": "nodeinfo",
+            "id": nodeinfo.id_,
+            "ts": int(ts),
+            "payload": {
+                "nodeinfo": {
+                    "short_name": nodeinfo.short_name,
+                    "long_name": nodeinfo.long_name,
+                    "hw_model": nodeinfo.hw_model,
+                    "role": nodeinfo.role,
+                    "is_unmessagable": nodeinfo.is_unmessagable,
+                }
+            },
+            "meta": {},
+        }
+
+        if packet_id is not None:
+            payload["meta"]["packet_id"] = int(packet_id)
+
+        self.socketio.emit("event", payload, namespace=settings.namespace_events)

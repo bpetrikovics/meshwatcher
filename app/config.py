@@ -50,6 +50,8 @@ class Settings(BaseSettings):
 
     # WebSocket
     namespace_packets: str = "/packets"
+    namespace_events: str = "/events"
+    event_flash_ms: int = 3000
 
     # Map clustering (pixels)
     clustering_radius: int = 5  # 0 = spiderfying only, >0 = clustering radius

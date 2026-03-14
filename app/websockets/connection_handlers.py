@@ -30,6 +30,18 @@ def _handle_disconnect_packets() -> None:
     logger.info("Disconnection from sid %s", sid)
 
 
+def _handle_connect_events() -> None:
+    """Handle events namespace connection."""
+    sid = request.sid
+    logger.info("Client connected to events with sid %s", sid)
+
+
+def _handle_disconnect_events() -> None:
+    """Handle events namespace disconnection."""
+    sid = request.sid
+    logger.info("Events disconnection from sid %s", sid)
+
+
 def register_connection_handlers() -> None:
     """Register connection and disconnection handlers for all namespaces."""
     socketio.on_event("connect", _handle_connect_default)
@@ -37,3 +49,6 @@ def register_connection_handlers() -> None:
 
     socketio.on_event("connect", _handle_connect_packets, namespace=settings.namespace_packets)
     socketio.on_event("disconnect", _handle_disconnect_packets, namespace=settings.namespace_packets)
+
+    socketio.on_event("connect", _handle_connect_events, namespace=settings.namespace_events)
+    socketio.on_event("disconnect", _handle_disconnect_events, namespace=settings.namespace_events)

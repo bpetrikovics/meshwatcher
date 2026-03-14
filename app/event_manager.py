@@ -2,6 +2,7 @@ import json
 import logging
 
 from datetime import datetime, timezone
+import time
 from typing import Callable, Any
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
@@ -272,6 +273,16 @@ class EventManager:
 
         self.logger.info(position)
 
+        try:
+            self.presenter.emit_position_event(
+                node_id=node_id,
+                position=position,
+                ts=int(time.time()),
+                packet_id=packet.id_,
+            )
+        except Exception as exc:
+            self.logger.exception(exc)
+
         with self.db_factory() as db:
             # Update node's last seen timestamp
             self._update_node_last_seen(node_id, db)
@@ -314,6 +325,15 @@ class EventManager:
             
             # Use the updated existing_node for cache
             self.presenter.upsert_node_cache(existing_node)
+
+            try:
+                self.presenter.emit_nodeinfo_event(
+                    nodeinfo=existing_node,
+                    ts=int(time.time()),
+                    packet_id=packet.id_,
+                )
+            except Exception as exc:
+                self.logger.exception(exc)
 
         self.logger.debug("Node %s was upserted", nodeinfo.id_)
 
