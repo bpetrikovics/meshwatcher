@@ -116,12 +116,19 @@ function meshApp() {
                 maxHeight: CONFIG.PANEL_SIZES.bottom.max
             }
         },
+        // Clustering control
+        clusteringRadius: 5, // Default value, will be updated from config
+        clusteringUpdateTimeout: null,
         mouseMoveHandler: null,
         mouseUpHandler: null,
         
         // Initialize application
         init() {
             console.log('Initializing app...');
+            
+            // Initialize clustering radius from config
+            const config = window.APP_CONFIG || {};
+            this.clusteringRadius = config.CLUSTERING_RADIUS || 5;
             
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', () => {
@@ -251,6 +258,52 @@ function meshApp() {
                 maxSpiderfySizeMultiplier: 1.5
             });
             
+            this.nodeLayer.addTo(this.map);
+        },
+
+        // Update clustering radius from slider
+        updateClusteringRadius() {
+            // Clear any pending update
+            if (this.clusteringUpdateTimeout) {
+                clearTimeout(this.clusteringUpdateTimeout);
+            }
+            
+            // Debounce updates to avoid excessive recreation during dragging
+            this.clusteringUpdateTimeout = setTimeout(() => {
+                console.log(`Updating clustering radius to: ${this.clusteringRadius}px`);
+                this.recreateNodeLayer();
+            }, 100);
+        },
+
+        // Recreate node layer with new clustering radius
+        recreateNodeLayer() {
+            if (!this.map || !this.nodeLayer) return;
+            
+            // Store current markers
+            const currentMarkers = [];
+            this.nodeLayer.eachLayer((layer) => {
+                currentMarkers.push(layer);
+            });
+            
+            // Remove old layer
+            this.map.removeLayer(this.nodeLayer);
+            
+            // Create new layer with updated radius
+            this.nodeLayer = L.markerClusterGroup({ 
+                maxClusterRadius: parseInt(this.clusteringRadius),
+                spiderfyOnMaxZoom: true,
+                zoomToBoundsOnClick: true,
+                iconCreateFunction: this.createClusterIcon.bind(this),
+                spiderfyDistanceMultiplier: 1.2,
+                maxSpiderfySizeMultiplier: 1.5
+            });
+            
+            // Add markers back to new layer
+            currentMarkers.forEach(marker => {
+                this.nodeLayer.addLayer(marker);
+            });
+            
+            // Add new layer to map
             this.nodeLayer.addTo(this.map);
         },
 

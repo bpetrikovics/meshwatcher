@@ -35,11 +35,30 @@
                         aria-label="Toggle left panel">
                     <i class="mdi mdi-menu text-xl" aria-hidden="true"></i>
                 </button>
+                
                 <h1 class="text-xl font-semibold">Mesh Watcher</h1>
                 <span id="commit-sha" class="commit-sha"></span>
             </div>
             
             <div class="flex items-center space-x-2">
+                <!-- Clustering Radius Slider -->
+                <div class="flex items-center space-x-2 clustering-slider" style="background: rgba(0, 0, 0, 0.3); padding: 4px 8px; border-radius: 4px;">
+                    <label for="clustering-radius" class="text-sm text-gray-300 whitespace-nowrap">
+                        Map clustering
+                    </label>
+                    <div class="flex items-center space-x-1">
+                        <input type="range" 
+                               id="clustering-radius" 
+                               min="0" 
+                               max="50" 
+                               step="1"
+                               x-model="clusteringRadius"
+                               @input="updateClusteringRadius"
+                               class="w-20 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer slider">
+                        <span class="text-xs text-gray-400 font-mono" style="background: rgba(0, 0, 0, 0.3); padding: 2px 4px; border-radius: 3px;" x-text="clusteringRadius + 'px'"></span>
+                    </div>
+                </div>
+                
                 <button @click="togglePanel('right')" 
                         class="p-2 hover:bg-gray-700 rounded transition-colors"
                         :class="panels.right.visible ? 'bg-gray-700' : ''"
