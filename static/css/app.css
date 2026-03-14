@@ -231,23 +231,29 @@ header.bg-gray-800 h1 {
     .panel {
         width: 100% !important;
         max-width: 100% !important;
-        height: auto !important;
-        position: relative !important;
+        position: fixed !important;
         transform: none !important;
     }
-    
+
     /* Reset margins on mobile - map should fill available space */
     .map-container {
         margin: 0 !important;
-        flex: 1 !important; /* Take up remaining space in flex container */
-        min-height: 300px !important;
-        height: auto !important; /* Remove fixed 50vh constraint */
+        flex: 1 !important;
+        min-height: 0 !important;
+        height: calc(100vh - 52px) !important;
+        height: calc(100dvh - 52px) !important;
     }
-    
+
     /* Ensure map element fills container on mobile */
     #map {
-        height: 100%;
-        min-height: 300px;
+        height: 100% !important;
+        min-height: 0 !important;
+    }
+
+    aside.panel {
+        top: 52px !important;
+        height: calc(100vh - 52px) !important;
+        height: calc(100dvh - 52px) !important;
     }
     
     /* Larger touch targets */
@@ -262,6 +268,8 @@ header.bg-gray-800 h1 {
         width: 12px !important;
         background: linear-gradient(to right, #374151, #6b7280) !important;
     }
+    
+
     
     /* Mobile-friendly buttons */
     button {

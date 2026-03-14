@@ -192,6 +192,14 @@ function meshApp() {
                         return originalPopupInit.call(this);
                     };
                 }
+
+                const originalMarkerAnimateZoom = L.Marker.prototype._animateZoom;
+                if (originalMarkerAnimateZoom) {
+                    L.Marker.prototype._animateZoom = function(opt) {
+                        if (!this._map) return;
+                        return originalMarkerAnimateZoom.call(this, opt);
+                    };
+                }
                 
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '© OpenStreetMap contributors',
@@ -242,8 +250,6 @@ function meshApp() {
         
         // Initialize node layer with clustering
         initializeNodeLayer() {
-            console.log('Initializing node layer with clustering approach');
-            
             const config = window.APP_CONFIG || {};
             const clusteringRadius = config.CLUSTERING_RADIUS || 0;
             
@@ -269,16 +275,6 @@ function meshApp() {
             // Debounce updates to avoid excessive recreation during dragging
             this.clusteringUpdateTimeout = setTimeout(() => {
                 this.recreateNodeLayer();
-                
-                // On mobile, invalidate map size to ensure proper rendering
-                const isMobile = window.innerWidth <= 768;
-                if (isMobile) {
-                    setTimeout(() => {
-                        if (this.map) {
-                            this.map.invalidateSize();
-                        }
-                    }, 50);
-                }
             }, 100);
         },
 
@@ -286,17 +282,14 @@ function meshApp() {
         recreateNodeLayer() {
             if (!this.map || !this.nodeLayer) return;
             
-            // Store current markers
+            const oldLayer = this.nodeLayer;
+
             const currentMarkers = [];
-            this.nodeLayer.eachLayer((layer) => {
+            oldLayer.eachLayer((layer) => {
                 currentMarkers.push(layer);
             });
-            
-            // Remove old layer
-            this.map.removeLayer(this.nodeLayer);
-            
-            // Create new layer with updated radius
-            this.nodeLayer = L.markerClusterGroup({ 
+
+            const newLayer = L.markerClusterGroup({ 
                 maxClusterRadius: parseInt(this.clusteringRadius),
                 spiderfyOnMaxZoom: true,
                 zoomToBoundsOnClick: true,
@@ -304,14 +297,42 @@ function meshApp() {
                 spiderfyDistanceMultiplier: 1.2,
                 maxSpiderfySizeMultiplier: 1.5
             });
-            
-            // Add markers back to new layer
-            currentMarkers.forEach(marker => {
-                this.nodeLayer.addLayer(marker);
+
+            currentMarkers.forEach((marker) => {
+                try {
+                    oldLayer.removeLayer(marker);
+                } catch (error) {
+                }
+                newLayer.addLayer(marker);
             });
-            
-            // Add new layer to map
-            this.nodeLayer.addTo(this.map);
+
+            this.map.addLayer(newLayer);
+            this.map.removeLayer(oldLayer);
+            this.nodeLayer = newLayer;
+
+            try {
+                if (typeof this.nodeLayer.refreshClusters === 'function') {
+                    this.nodeLayer.refreshClusters();
+                }
+            } catch (error) {
+                console.warn('Cluster refresh failed:', error);
+            }
+
+            try {
+                this.map.invalidateSize();
+            } catch (error) {
+                console.warn('Map invalidateSize failed:', error);
+            }
+
+            try {
+                requestAnimationFrame(() => {
+                    if (this.map) {
+                        this.map.invalidateSize();
+                    }
+                });
+            } catch (error) {
+                console.warn('Deferred map invalidateSize failed:', error);
+            }
         },
 
         // Create custom cluster icons
