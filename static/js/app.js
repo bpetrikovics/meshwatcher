@@ -758,27 +758,18 @@ function meshApp() {
                         
                         // On mobile, ensure map is properly sized before fitting bounds
                         const isMobile = window.innerWidth <= 768;
-                        console.log(`Device detected: ${isMobile ? 'Mobile' : 'Desktop'} (width: ${window.innerWidth}px)`);
-                        console.log(`Node layers count: ${this.nodeLayer.getLayers().length}`);
                         
                         const fitBoundsWithFallback = (retryCount = 0) => {
                             try {
                                 if (this.map && this.map._loaded && this.nodeLayer.getLayers().length > 0) {
                                     const currentGroup = L.featureGroup(this.nodeLayer.getLayers());
                                     const bounds = currentGroup.getBounds();
-                                    console.log(`Fitting bounds (attempt ${retryCount + 1}):`, bounds);
                                     this.map.fitBounds(bounds.pad(0.1));
-                                    console.log('Map bounds fitted successfully');
-                                } else {
-                                    console.warn('Cannot fit bounds: map not ready or no nodes');
                                 }
                             } catch (error) {
-                                console.warn(`Failed to fit map bounds (attempt ${retryCount + 1}):`, error);
-                                
                                 // Retry on mobile up to 3 times with increasing delays
                                 if (isMobile && retryCount < 3) {
                                     const delay = 200 * (retryCount + 1); // 200ms, 400ms, 600ms
-                                    console.log(`Retrying bounds fitting in ${delay}ms`);
                                     setTimeout(() => fitBoundsWithFallback(retryCount + 1), delay);
                                 }
                             }
@@ -786,22 +777,18 @@ function meshApp() {
                         
                         if (isMobile) {
                             // Invalidate map size to recalculate container dimensions
-                            console.log('Mobile: Invalidating map size before fitting bounds');
                             this.map.invalidateSize();
                             
                             // Start fitting bounds with fallback
                             setTimeout(() => fitBoundsWithFallback(), 100);
                         } else {
                             // Desktop - fit bounds immediately
-                            console.log('Desktop: Fitting bounds immediately');
                             fitBoundsWithFallback();
                         }
                         
                     } catch (error) {
                         console.warn('Failed to setup map bounds fitting:', error);
                     }
-                } else {
-                    console.log('Skipping bounds fitting - no nodes or map not ready');
                 }
                 
             } catch (error) {
