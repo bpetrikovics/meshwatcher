@@ -417,9 +417,20 @@ body.modal-open #map {
 }
 
 
-/* Map controls styling */
+/* Map controls styling - moved to top-left with padding */
 .leaflet-control-container .leaflet-top.leaflet-left {
-    top: 60px; /* Account for header */
+    top: 10px !important;
+    left: 10px !important;
+}
+
+/* Ensure zoom controls are properly positioned */
+.leaflet-control-zoom {
+    margin: 0 !important;
+}
+
+/* Add some spacing between zoom controls and other potential top-left elements */
+.leaflet-control-container .leaflet-top.leaflet-left .leaflet-control {
+    margin: 5px 5px 0 0 !important;
 }
 
 /* Glass Panel Styling */
