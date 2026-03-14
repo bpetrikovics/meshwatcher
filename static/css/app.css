@@ -12,6 +12,12 @@
     --panel-opacity: 0.65;
 }
 
+/* Ensure full viewport height on mobile */
+html, body {
+    height: 100%;
+    min-height: 100vh;
+}
+
 /* CSS Custom styles for resize handles */
 .resize-handle-left,
 .resize-handle-right,
@@ -230,11 +236,18 @@ header.bg-gray-800 h1 {
         transform: none !important;
     }
     
-    /* Reset margins on mobile */
+    /* Reset margins on mobile - map should fill available space */
     .map-container {
         margin: 0 !important;
-        height: 50vh !important; /* Half screen height */
+        flex: 1 !important; /* Take up remaining space in flex container */
         min-height: 300px !important;
+        height: auto !important; /* Remove fixed 50vh constraint */
+    }
+    
+    /* Ensure map element fills container on mobile */
+    #map {
+        height: 100%;
+        min-height: 300px;
     }
     
     /* Larger touch targets */
@@ -340,6 +353,7 @@ header.bg-gray-800 h1 {
 
 /* Ensure map container fills available space */
 #map {
+    height: 100%;
     min-height: 400px;
     z-index: 1;
 }
