@@ -4,7 +4,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 
 from app.database import db_session
-from app.models import NodeInfo, Position, Telemetry, Metric
+from app.models import NodeInfo, Position, Telemetry
 from app.config import settings
 
 bp = Blueprint("api", __name__, url_prefix="/api")

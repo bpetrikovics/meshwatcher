@@ -5,12 +5,19 @@ from datetime import datetime, timezone
 from typing import Callable, Any
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import select
 
 from meshtastic_mqtt_json import MeshtasticMQTT
 
 from .packet_handling import raw_handler
-from .models import MeshtasticPacket, NodeInfo, Telemetry, Metric, Position, TextMessage, Routing
+from .models import (
+    MeshtasticPacket,
+    NodeInfo,
+    Telemetry,
+    Metric,
+    Position,
+    TextMessage,
+    Routing,
+)
 from .presenter import Presenter
 from .config import settings
 
