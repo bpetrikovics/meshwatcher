@@ -1246,9 +1246,45 @@ function meshApp() {
                 // Update node position data
                 node.position = position;
                 
+                // Check for movement and heading
+                const hasSpeed = position.ground_speed_ms !== undefined && position.ground_speed_ms !== null && position.ground_speed_ms > 0;
+                const hasHeading = position.heading !== null && position.heading !== undefined;
+                const shouldShowDirection = hasSpeed && hasHeading;
+                
+                // Check if movement status changed
+                const currentlyMoving = node.marker._icon && node.marker._icon.querySelector('.node-icon').classList.contains('moving');
+                const movementChanged = currentlyMoving !== shouldShowDirection;
+                
                 // Animate marker to new position
                 const newLatLng = L.latLng(position.latitude, position.longitude);
                 node.marker.setLatLng(newLatLng);
+                
+                // Update marker icon if movement status changed
+                if (movementChanged) {
+                    const status = node.info?.status || 'inactive';
+                    const statusClass = this.getStatusClass(status);
+                    const timeAgo = this.getTimeAgoText(node.info?.last_seen_hours_ago);
+                    const role = this.sanitizeHtml(node.role || 'Unknown');
+                    const roleIcon = this.getIconForRole(role);
+                    const safeName = this.sanitizeHtml(node.long_name || node.id);
+                    const safeStatusLabel = this.sanitizeHtml(this.getStatusLabel(status));
+                    
+                    // Create updated icon with current movement status
+                    const movingClass = shouldShowDirection ? 'moving' : '';
+                    const iconHtml = `<div class="node-icon ${statusClass} ${movingClass}" 
+                                         title="${safeName}\nRole: ${role}\nStatus: ${safeStatusLabel}\nLast packet: ${timeAgo}">
+                                        <i class="mdi ${roleIcon}"></i>
+                                       </div>`;
+                    
+                    const icon = L.divIcon({
+                        className: 'node-marker',
+                        html: iconHtml,
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    });
+                    
+                    node.marker.setIcon(icon);
+                }
                 
                 // Update popup
                 node.marker.setPopupContent(this.createNodePopup(node));
