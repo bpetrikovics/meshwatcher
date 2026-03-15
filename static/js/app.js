@@ -275,14 +275,40 @@ function meshApp() {
             }
         },
 
-        flashNodeMarker(nodeId) {
+        // Find the cluster marker that contains a specific node using official MarkerCluster API
+        findClusterForNode(nodeId) {
+            const nodeMarker = this.nodes[nodeId]?.marker;
+            if (!nodeMarker || !this.nodeLayer) return null;
+            
+            // Check if the node marker is currently visible (not clustered)
+            if (nodeMarker.getElement()) return null;
+            
+            // Use official MarkerCluster API to find the containing cluster
+            try {
+                // Method 1: getVisibleParent() - finds the visible parent cluster
+                if (typeof this.nodeLayer.getVisibleParent === 'function') {
+                    const parentCluster = this.nodeLayer.getVisibleParent(nodeMarker);
+                    if (parentCluster) return parentCluster;
+                }
+
+                // Method 2: _groupOrZoom() - internal method to find grouping
+                if (typeof this.nodeLayer._groupOrZoom === 'function') {
+                    const result = this.nodeLayer._groupOrZoom(nodeMarker);
+                    if (result && result._childCount) return result;
+                }
+                
+            } catch (error) {
+                console.warn('Error finding cluster:', error);
+            }
+            
+            return null;
+        },
+
+        flashIndividualMarker(iconEl, nodeId) {
             const config = window.APP_CONFIG || {};
             const flashMs = config.EVENT_FLASH_MS || 2000;
-            const node = this.nodes[nodeId];
-            if (!node || !node.marker) return;
-
-            const iconEl = node.marker.getElement?.();
-            const wrapper = iconEl ? iconEl.querySelector('.node-icon') : null;
+            
+            const wrapper = iconEl.querySelector('.node-icon');
             if (!wrapper) return;
 
             wrapper.classList.add('flash');
@@ -297,7 +323,49 @@ function meshApp() {
                 delete this.markerFlashTimers[nodeId];
             }, flashMs);
         },
-        
+
+        flashClusterMarker(cluster, nodeId) {
+            const config = window.APP_CONFIG || {};
+            const flashMs = config.EVENT_FLASH_MS || 2000;
+            
+            const iconEl = cluster.getElement?.();
+            if (!iconEl) return;
+            
+            // Try different selectors to find the cluster icon
+            const wrapper = iconEl.querySelector('.cluster-icon') || iconEl;
+
+            wrapper.classList.add('cluster-flash');
+            
+            if (this.markerFlashTimers[nodeId]) {
+                clearTimeout(this.markerFlashTimers[nodeId]);
+            }
+            this.markerFlashTimers[nodeId] = setTimeout(() => {
+                try {
+                    wrapper.classList.remove('cluster-flash');
+                } catch (e) {
+                }
+                delete this.markerFlashTimers[nodeId];
+            }, flashMs);
+        },
+
+        flashNodeMarker(nodeId) {
+            const node = this.nodes[nodeId];
+            if (!node || !node.marker) return;
+
+            // Try individual marker flash first
+            const iconEl = node.marker.getElement?.();
+            if (iconEl) {
+                this.flashIndividualMarker(iconEl, nodeId);
+                return;
+            }
+            
+            // Node is clustered - find and flash cluster
+            const cluster = this.findClusterForNode(nodeId);
+            if (cluster) {
+                this.flashClusterMarker(cluster, nodeId);
+            }
+        },
+
         // Initialize Leaflet map
         initMap(retryCount = 0) {
             try {

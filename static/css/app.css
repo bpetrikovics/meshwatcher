@@ -532,6 +532,38 @@ footer.glass-panel {
     animation: node-flash-pulse 0.8s ease-in-out infinite;
 }
 
+@keyframes cluster-flash-pulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        background: #2196F3;
+    }
+    25% {
+        transform: scale(1.15);
+        box-shadow: 0 4px 12px rgba(255, 152, 0, 0.6);
+        background: #FF9800;
+    }
+    50% {
+        transform: scale(1.2);
+        box-shadow: 0 6px 16px rgba(255, 152, 0, 0.8);
+        background: #FF9800;
+    }
+    75% {
+        transform: scale(1.15);
+        box-shadow: 0 4px 12px rgba(255, 152, 0, 0.6);
+        background: #FF9800;
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        background: #2196F3;
+    }
+}
+
+.cluster-icon.cluster-flash {
+    animation: cluster-flash-pulse 0.6s ease-in-out 2;
+}
+
 .node-icon:hover {
     transform: scale(1.1);
     box-shadow: 0 4px 8px rgba(0,0,0,0.3);
