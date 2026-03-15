@@ -125,6 +125,7 @@ class Presenter:
                     "altitude": position.altitude,
                     "ground_speed_ms": position.ground_speed_ms,
                     "heading": position.heading,
+                    "position_age_hours_ago": 0,  # Real-time events are always current
                 }
             },
             "meta": {},

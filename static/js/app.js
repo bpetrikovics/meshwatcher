@@ -196,6 +196,7 @@ function meshApp() {
                     const position = evt.payload?.position;
                     if (!position || position.latitude == null || position.longitude == null) return;
 
+                    console.log('Position updated for node:', nodeId);
                     if (!this.nodes[nodeId] || !this.nodes[nodeId].marker) {
                         const placeholderNode = {
                             id: nodeId,
@@ -1156,7 +1157,7 @@ function meshApp() {
                         <p><strong>Status:</strong> <span class="status-badge ${this.getStatusClass(info.status)}">${this.getStatusLabel(info.status)}</span></p>
                         ${info.last_seen_hours_ago !== null ? `<p><strong>Last packet:</strong> ${this.getTimeAgoText(info.last_seen_hours_ago)}</p>` : ''}
                         ${position.latitude ? `<p><strong>Position:</strong> ${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)}</p>` : ''}
-                        ${position.position_age_hours_ago != null ? `<p><strong>Last position:</strong> ${this.getTimeAgoText(position.position_age_hours_ago)}</p>` : (position.latitude ? '<p><strong>Position age:</strong> Unknown</p>' : '')}
+                        ${position.position_age_hours_ago != null ? `<p><strong>Last position:</strong> ${this.getTimeAgoText(position.position_age_hours_ago)}</p>` : (position.latitude ? '<p><strong>Last position:</strong> Unknown</p>' : '')}
                         ${position.altitude ? `<p><strong>Altitude:</strong> ${position.altitude}m</p>` : ''}
                         ${position.ground_speed_ms !== undefined && position.ground_speed_ms !== null && position.ground_speed_ms > 0 ? `<p><strong>Ground Speed:</strong> ${position.ground_speed_ms.toFixed(1)} m/s (${(position.ground_speed_ms * 3.6).toFixed(1)} km/h)</p>` : ''}
                         ${position.heading !== null && position.heading !== undefined && position.ground_speed_ms !== undefined && position.ground_speed_ms !== null && position.ground_speed_ms > 0 ? `<p><strong>Heading:</strong> ${position.heading.toFixed(1)}° (${this.getCompassDirection(position.heading)})</p>` : ''}
