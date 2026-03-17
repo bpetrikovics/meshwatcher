@@ -1131,35 +1131,12 @@ function meshApp() {
                 this.nodes[node.id] = node;
                 this.invalidateRoleCache(); // Invalidate cache when node is added
                 
-                // Determine status and styling
-                const status = node.info?.status || 'inactive';
-                const statusClass = this.getStatusClass(status);
-                const timeAgo = this.getTimeAgoText(node.info?.last_seen_hours_ago);
-                const role = this.sanitizeHtml(node.role || 'Unknown');
-                const roleIcon = this.getIconForRole(role);
-                const safeName = this.sanitizeHtml(node.long_name || node.id);
-                const safeStatusLabel = this.sanitizeHtml(this.getStatusLabel(status));
-                
                 // Check for movement and heading
                 const hasSpeed = node.position && node.position.ground_speed_ms !== undefined && node.position.ground_speed_ms !== null && node.position.ground_speed_ms > 0;
                 const hasHeading = node.position && node.position.heading !== null && node.position.heading !== undefined;
                 const shouldShowDirection = hasSpeed && hasHeading;
-                
-                // Create custom node marker with optional red border for movement
-                const movingClass = shouldShowDirection ? 'moving' : '';
-                const iconHtml = `<div class="node-icon ${statusClass} ${movingClass}" 
-                                     title="${safeName}\nRole: ${role}\nStatus: ${safeStatusLabel}\nLast packet: ${timeAgo}">
-                                    <i class="mdi ${roleIcon}"></i>
-                                   </div>`;
-                
-                const icon = L.divIcon({
-                    className: 'node-marker',
-                    html: iconHtml,
-                    iconSize: [24, 24],
-                    iconAnchor: [12, 12]
-                });
-                
-                const marker = L.marker([node.position.latitude, node.position.longitude], { icon })
+
+                const marker = L.marker([node.position.latitude, node.position.longitude])
                     .bindPopup(() => {
                         try {
                             // Prevent popup during zoom animations
@@ -1176,6 +1153,8 @@ function meshApp() {
                 
                 // Store marker reference
                 node.marker = marker;
+
+                this.updateNodeIcon(node, shouldShowDirection);
                 
                 // No overlap detection needed - built-in spiderfying handles it
             } catch (error) {
