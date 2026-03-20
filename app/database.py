@@ -78,7 +78,7 @@ class DbCleanupManager:
         self.packet_timestamp_col = 'createdAt'
         self.node_timestamp_col = 'updated'
         self.metrics_timestamp_col = 'createdAt'
-        self.message_timestamp_col = 'timestamp'
+        self.message_timestamp_col = 'createdAt'
         self.telemetry_timestamp_col = 'createdAt'
 
         self.start()
