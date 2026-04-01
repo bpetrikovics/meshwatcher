@@ -192,8 +192,12 @@ class EventManager:
 
     def _update_node_last_seen(self, node_id: str, db, channel: Optional[int] = None, channel_name: Optional[str] = None):
         """Update node's last seen timestamp to current time and optionally channel info. Returns the node object."""
-        existing_node = db.get(NodeInfo, node_id)
         current_time = datetime.now(timezone.utc)
+        return self._update_node_last_seen_with_time(node_id, db, current_time, channel, channel_name)
+
+    def _update_node_last_seen_with_time(self, node_id: str, db, current_time: datetime, channel: Optional[int] = None, channel_name: Optional[str] = None):
+        """Update node's last seen timestamp to specified time and optionally channel info. Returns the node object."""
+        existing_node = db.get(NodeInfo, node_id)
         if existing_node:
             existing_node.updated = current_time
             # Update channel info if provided
@@ -203,7 +207,7 @@ class EventManager:
                 existing_node.last_channel_name = channel_name
             return existing_node
         else:
-            # Create placeholder node with current timestamp, default role, and channel info
+            # Create placeholder node with specified timestamp, default role, and channel info
             placeholder_node = NodeInfo(
                 id_=node_id, 
                 updated=current_time, 
@@ -285,8 +289,12 @@ class EventManager:
         self.logger.info(position)
 
         with self.db_factory() as db:
-            # Update node's last seen timestamp and channel info
-            updated_node = self._update_node_last_seen(node_id, db, packet.channel, packet.channel_name)
+            # Update node's last seen timestamp and get the synchronized timestamp
+            current_time = datetime.now(timezone.utc)
+            updated_node = self._update_node_last_seen_with_time(node_id, db, current_time, packet.channel, packet.channel_name)
+            
+            # Ensure position timestamp matches node timestamp for consistency
+            position.created_at = current_time
             db.merge(position)
 
             # Extract node data while session is still open to avoid DetachedInstanceError
