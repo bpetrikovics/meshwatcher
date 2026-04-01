@@ -50,7 +50,8 @@ def build_nodes_query(include_params: List[str], filters: Dict[str, Any], sessio
     # Start with base query - select only needed columns
     query = session.query(NodeInfo.id_, NodeInfo.short_name, NodeInfo.long_name, 
                          NodeInfo.macaddr, NodeInfo.hw_model, NodeInfo.role, 
-                         NodeInfo.is_unmessagable, NodeInfo.updated)
+                         NodeInfo.is_unmessagable, NodeInfo.updated,
+                         NodeInfo.last_channel, NodeInfo.last_channel_name)
     
     # Pre-filter nodes if possible to reduce window function scope
     base_filter = None
@@ -141,8 +142,8 @@ def serialize_node(node, include_params: List[str], session=None) -> Dict[str, A
         "role": node.role or "CLIENT",
         "is_unmessagable": node.is_unmessagable,
         "updated": node.updated.isoformat() if node.updated else None,
-        "last_channel": getattr(node, 'last_channel', None),
-        "last_channel_name": getattr(node, 'last_channel_name', None),
+        "last_channel": node.last_channel,
+        "last_channel_name": node.last_channel_name,
     }
     
     # Add position data if requested and available (from joined query)
