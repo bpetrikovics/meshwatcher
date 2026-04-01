@@ -141,6 +141,8 @@ def serialize_node(node, include_params: List[str], session=None) -> Dict[str, A
         "role": node.role or "CLIENT",
         "is_unmessagable": node.is_unmessagable,
         "updated": node.updated.isoformat() if node.updated else None,
+        "last_channel": getattr(node, 'last_channel', None),
+        "last_channel_name": getattr(node, 'last_channel_name', None),
     }
     
     # Add position data if requested and available (from joined query)

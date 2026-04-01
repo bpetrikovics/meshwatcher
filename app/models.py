@@ -240,6 +240,14 @@ class NodeInfo(SQLModel, table=True):
         sa_column=Column("updated", DateTime, nullable=True),
         exclude=True
     )
+    last_channel: Optional[int] = Field(
+        default=None,
+        sa_column=Column("lastChannel", Integer, nullable=True),
+    )
+    last_channel_name: Optional[str] = Field(
+        default=None,
+        sa_column=Column("lastChannelName", String(12), nullable=True),
+    )
 
     def __str__(self) -> str:
 

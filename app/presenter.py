@@ -84,9 +84,26 @@ class Presenter:
 
         if missing_ids:
             with self.db_factory() as db:
-                result = db.execute(select(NodeInfo).where(NodeInfo.id_.in_(list(missing_ids))))
-                nodes = result.scalars().all()
-                node_map = {n.id_: n for n in nodes}
+                # Only select essential columns to avoid errors with missing channel fields
+                result = db.execute(text("""
+                    SELECT id, shortName, longName, macaddr, hwModel, 
+                           publicKey, role, isUnmessagable, updated
+                    FROM nodes 
+                    WHERE id IN :ids
+                """).bindparams(ids=list(missing_ids)))
+                nodes = result.fetchall()
+                # Convert tuples to dict format for compatibility
+                node_map = {n[0]: {
+                    'id_': n[0],
+                    'short_name': n[1], 
+                    'long_name': n[2], 
+                    'macaddr': n[3], 
+                    'hw_model': n[4], 
+                    'public_key': n[5], 
+                    'role': n[6], 
+                    'is_unmessagable': n[7], 
+                    'updated': n[8]
+                } for n in nodes}
 
                 for node_id in missing_ids:
                     resolved = self._node_payload(node_map, node_id)

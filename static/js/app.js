@@ -1176,6 +1176,7 @@ function meshApp() {
                         ${safeShortName ? `<p><strong>Short Name:</strong> ${safeShortName}</p>` : ''}
                         <p><strong>Status:</strong> <span class="status-badge ${this.getStatusClass(info.status)}">${this.getStatusLabel(info.status)}</span></p>
                         ${info.last_seen_hours_ago !== null ? `<p><strong>Last packet:</strong> ${this.getTimeAgoText(info.last_seen_hours_ago)}</p>` : ''}
+                        ${info.last_channel !== null ? `<p><strong>Last heard on:</strong> Channel ${info.last_channel} (${info.last_channel_name || 'Unknown'})</p>` : ''}
                         ${position.latitude ? `<p><strong>Position:</strong> ${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)}</p>` : ''}
                         ${position.position_age_hours_ago != null ? `<p><strong>Last position:</strong> ${this.getTimeAgoText(position.position_age_hours_ago)}</p>` : (position.latitude ? '<p><strong>Last position:</strong> Unknown</p>' : '')}
                         ${position.altitude ? `<p><strong>Altitude:</strong> ${position.altitude}m</p>` : ''}

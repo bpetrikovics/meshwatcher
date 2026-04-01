@@ -3,7 +3,7 @@ import logging
 
 from datetime import datetime, timezone
 import time
-from typing import Callable, Any
+from typing import Callable, Any, Optional
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 
@@ -190,16 +190,27 @@ class EventManager:
         self.mqtt.loop_start()
         self.logger.info("Initialized // version: %s", settings.git_commit)
 
-    def _update_node_last_seen(self, node_id: str, db):
-        """Update node's last seen timestamp to current time. Returns the node object."""
+    def _update_node_last_seen(self, node_id: str, db, channel: Optional[int] = None, channel_name: Optional[str] = None):
+        """Update node's last seen timestamp to current time and optionally channel info. Returns the node object."""
         existing_node = db.get(NodeInfo, node_id)
         current_time = datetime.now(timezone.utc)
         if existing_node:
             existing_node.updated = current_time
+            # Update channel info if provided
+            if channel is not None:
+                existing_node.last_channel = channel
+            if channel_name is not None:
+                existing_node.last_channel_name = channel_name
             return existing_node
         else:
-            # Create placeholder node with current timestamp and default role
-            placeholder_node = NodeInfo(id_=node_id, updated=current_time, role="CLIENT")
+            # Create placeholder node with current timestamp, default role, and channel info
+            placeholder_node = NodeInfo(
+                id_=node_id, 
+                updated=current_time, 
+                role="CLIENT",
+                last_channel=channel,
+                last_channel_name=channel_name
+            )
             db.add(placeholder_node)
             db.flush()  # Ensure the placeholder is in the database before returning
             return placeholder_node
@@ -256,8 +267,8 @@ class EventManager:
         self.logger.info(text_message)
 
         with self.db_factory() as db:
-            # Update node's last seen timestamp
-            self._update_node_last_seen(node_id, db)
+            # Update node's last seen timestamp and channel info
+            self._update_node_last_seen(node_id, db, packet.channel, packet.channel_name)
             db.merge(text_message)
 
     @raw_handler.validate_packet
@@ -284,8 +295,8 @@ class EventManager:
             self.logger.exception(exc)
 
         with self.db_factory() as db:
-            # Update node's last seen timestamp
-            self._update_node_last_seen(node_id, db)
+            # Update node's last seen timestamp and channel info
+            self._update_node_last_seen(node_id, db, packet.channel, packet.channel_name)
             db.merge(position)
 
     @raw_handler.validate_packet
@@ -302,7 +313,7 @@ class EventManager:
 
         with self.db_factory() as db:
             # Update node's last seen timestamp and get the node object
-            existing_node = self._update_node_last_seen(nodeinfo.id_, db)
+            existing_node = self._update_node_last_seen(nodeinfo.id_, db, packet.channel, packet.channel_name)
             
             # Update the existing node with nodeinfo data
             if nodeinfo.short_name is not None:
@@ -388,8 +399,8 @@ class EventManager:
             return
 
         with self.db_factory() as db:
-            # Update node's last seen timestamp
-            self._update_node_last_seen(node_id, db)
+            # Update node's last seen timestamp and channel info
+            self._update_node_last_seen(node_id, db, packet.channel, packet.channel_name)
 
             telemetry_id = None
 
@@ -458,10 +469,10 @@ class EventManager:
 
         self.logger.info(routing)
 
-        # Update node's last seen timestamp even though we don't store routing data
+        # Update node's last seen timestamp and channel info even though we don't store routing data
         node_id = f"!{packet.from_:08x}"
         with self.db_factory() as db:
-            self._update_node_last_seen(node_id, db)
+            self._update_node_last_seen(node_id, db, packet.channel, packet.channel_name)
 
         # For now, we're not storing routing packets in database as requested
         # The routing data is parsed and logged for analysis purposes only

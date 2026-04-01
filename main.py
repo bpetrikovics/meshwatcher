@@ -5,7 +5,7 @@ from meshtastic_mqtt_json import MeshtasticMQTT
 
 from app import create_app
 from app.config import settings
-from app.database import db_session, get_cleanup_manager
+from app.database import db_session, get_cleanup_manager, init_db
 from app.event_manager import EventManager
 from app.presenter import Presenter
 from app.extensions import socketio
@@ -15,6 +15,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(nam
 logger = logging.getLogger("main")
 
 app = create_app()
+
+# Ensure database schema is up to date
+init_db()
 
 cleanup_manager = get_cleanup_manager()  # Starts background thread automatically
 atexit.register(cleanup_manager.stop) # Stop background thread on exit
