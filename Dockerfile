@@ -5,7 +5,7 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
 RUN groupadd -r appuser && \
-    useradd -r -g appuser appuser
+    RUN useradd -r -g appuser -m -d /home/appuser appuser
 
 RUN apt-get update && \
     apt-get -y --no-install-recommends install git curl && \
