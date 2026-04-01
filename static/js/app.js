@@ -175,6 +175,7 @@ function meshApp() {
         initializeEventsSocket() {
             const config = window.APP_CONFIG || {};
             const namespace = config.SOCKET_NAMESPACE_EVENTS || '/events';
+            
             if (this.eventsSocket && this.eventsSocket.connected) {
                 console.log('Events socket already connected');
                 return; // Already connected
@@ -212,15 +213,34 @@ function meshApp() {
 
                     console.log('Position updated for node:', nodeId);
                     if (!this.nodes[nodeId] || !this.nodes[nodeId].marker) {
+                        const nodeData = evt.payload?.node || {};
+                        console.log('Node data from event:', nodeData);
+                        
                         const placeholderNode = {
                             id: nodeId,
                             position: position,
-                            info: { status: 'inactive', last_seen_hours_ago: 0 },
-                            role: 'CLIENT'
+                            info: { 
+                                status: nodeData.status || 'currently_active', 
+                                last_seen_hours_ago: 0
+                            },
+                            role: nodeData.role || 'CLIENT',
+                            last_channel: nodeData.last_channel,
+                            last_channel_name: nodeData.last_channel_name
                         };
+                        console.log('Created placeholder node:', placeholderNode);
                         this.addNodeToMap(placeholderNode);
                     } else {
                         this.updateNodePosition(nodeId, position);
+                        // Update existing node with latest channel info if available
+                        const nodeData = evt.payload?.node;
+                        if (nodeData && this.nodes[nodeId]) {
+                            if (nodeData.last_channel !== undefined) {
+                                this.nodes[nodeId].last_channel = nodeData.last_channel;
+                            }
+                            if (nodeData.last_channel_name !== undefined) {
+                                this.nodes[nodeId].last_channel_name = nodeData.last_channel_name;
+                            }
+                        }
                     }
 
                     this.flashNodeMarker(nodeId);

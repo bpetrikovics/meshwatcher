@@ -273,6 +273,9 @@ class EventManager:
 
     @raw_handler.validate_packet
     def on_position(self, packet: MeshtasticPacket):
+        print("=" * 50)
+        print("POSITION PACKET RECEIVED!")
+        print("=" * 50)
         try:
             position = self.extract_payload(packet, Position)
         except ValidationError as exc:
@@ -284,20 +287,31 @@ class EventManager:
 
         self.logger.info(position)
 
+        with self.db_factory() as db:
+            # Update node's last seen timestamp and channel info
+            updated_node = self._update_node_last_seen(node_id, db, packet.channel, packet.channel_name)
+            db.merge(position)
+
+            # Extract node data while session is still open to avoid DetachedInstanceError
+            node_data = {
+                "status": "currently_active",  # Node is active because we just received a packet
+                "role": updated_node.role or "CLIENT",
+                "last_channel": updated_node.last_channel,
+                "last_channel_name": updated_node.last_channel_name,
+            }
+            print(f"DEBUG: Extracted node data: {node_data}")
+            print(f"DEBUG: packet.channel: {packet.channel}, packet.channel_name: {packet.channel_name}")
+
         try:
             self.presenter.emit_position_event(
                 node_id=node_id,
                 position=position,
+                node_data=node_data,  # Use extracted data instead of detached object
                 ts=int(time.time()),
                 packet_id=packet.id_,
             )
         except Exception as exc:
             self.logger.exception(exc)
-
-        with self.db_factory() as db:
-            # Update node's last seen timestamp and channel info
-            self._update_node_last_seen(node_id, db, packet.channel, packet.channel_name)
-            db.merge(position)
 
     @raw_handler.validate_packet
     def on_nodeinfo(self, packet: MeshtasticPacket):
