@@ -550,10 +550,10 @@ function meshApp() {
         // Create custom cluster icons
         createClusterIcon(cluster) {
             const count = cluster.getChildCount();
-            const size = Math.min(30 + Math.min(count * 3, 30), 60);
+            const size = 35; // Same size as individual node icons
             
             return L.divIcon({
-                html: `<div class="cluster-icon" style="width: ${size}px; height: ${size}px; font-size: ${Math.max(12, size/4)}px;">${count}</div>`,
+                html: `<div class="cluster-icon" style="width: ${size}px; height: ${size}px; font-size: 12px;">${count}</div>`,
                 className: 'custom-cluster-marker',
                 iconSize: [size, size],
                 iconAnchor: [size/2, size/2]
