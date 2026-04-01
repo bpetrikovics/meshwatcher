@@ -16,9 +16,6 @@ logger = logging.getLogger("main")
 
 app = create_app()
 
-# Ensure database schema is up to date
-init_db()
-
 cleanup_manager = get_cleanup_manager()  # Starts background thread automatically
 atexit.register(cleanup_manager.stop) # Stop background thread on exit
 
