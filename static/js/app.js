@@ -553,24 +553,7 @@ function meshApp() {
             const size = Math.min(30 + Math.min(count * 3, 30), 60);
             
             return L.divIcon({
-                html: `
-                    <div class="cluster-icon" style="
-                        width: ${size}px; 
-                        height: ${size}px; 
-                        background: linear-gradient(135deg, #2196F3, #1976D2);
-                        border: 3px solid white;
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                        font-weight: bold;
-                        color: white;
-                        font-size: ${Math.max(12, size/4)}px;
-                    ">
-                        ${count}
-                    </div>
-                `,
+                html: `<div class="cluster-icon" style="width: ${size}px; height: ${size}px; font-size: ${Math.max(12, size/4)}px;">${count}</div>`,
                 className: 'custom-cluster-marker',
                 iconSize: [size, size],
                 iconAnchor: [size/2, size/2]
