@@ -137,14 +137,11 @@ class Presenter:
         # Include node status and channel info if available
         if node_data:
             payload["payload"]["node"] = node_data
-            print(f"DEBUG: Including node data in payload: {node_data}")
 
         if packet_id is not None:
             payload["meta"]["packet_id"] = int(packet_id)
 
-        print(f"DEBUG: Final payload being sent: {payload}")
         self.socketio.emit("event", payload, namespace=settings.namespace_events)
-        print(f"DEBUG: Event emitted successfully")
 
 
     def emit_nodeinfo_event(self, *, nodeinfo: NodeInfo, ts: int, packet_id: Optional[int] = None) -> None:

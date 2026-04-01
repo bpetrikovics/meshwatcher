@@ -211,10 +211,8 @@ function meshApp() {
                     const position = evt.payload?.position;
                     if (!position || position.latitude == null || position.longitude == null) return;
 
-                    console.log('Position updated for node:', nodeId);
                     if (!this.nodes[nodeId] || !this.nodes[nodeId].marker) {
                         const nodeData = evt.payload?.node || {};
-                        console.log('Node data from event:', nodeData);
                         
                         const placeholderNode = {
                             id: nodeId,
@@ -227,7 +225,6 @@ function meshApp() {
                             last_channel: nodeData.last_channel,
                             last_channel_name: nodeData.last_channel_name
                         };
-                        console.log('Created placeholder node:', placeholderNode);
                         this.addNodeToMap(placeholderNode);
                     } else {
                         this.updateNodePosition(nodeId, position);
@@ -745,7 +742,6 @@ function meshApp() {
                 return;
             }
             
-            console.log('Starting resize for panel:', panelName);
             this.resizing.active = true;
             this.resizing.panel = panelName;
             this.resizing.startX = touch.clientX;
@@ -785,7 +781,6 @@ function meshApp() {
             } else if (this.resizing.panel === 'bottom') {
                 const newHeight = this.resizing.startHeight - (touch.clientY - this.resizing.startY);
                 panel.height = Math.max(panel.minHeight, Math.min(panel.maxHeight, newHeight));
-                console.log('Resizing bottom panel to:', panel.height);
             }
             
             // Resize map during resize
@@ -1267,7 +1262,6 @@ function meshApp() {
                 const movementChanged = currentlyMoving !== shouldShowDirection;
                 
                 if (movementChanged) {
-                    console.log(`Node ${nodeId} movement state changed: ${currentlyMoving} → ${shouldShowDirection}`);
                 }
                 
                 // Animate marker to new position
@@ -1447,13 +1441,11 @@ function meshApp() {
         // Placeholder for future event-driven animations
         animateNodeEvent(nodeId, eventType, data) {
             // Future: blinking markers, communication lines, etc.
-            console.log(`Event animation placeholder: ${eventType} for node ${nodeId}`);
         },
 
         // Placeholder for event animation system
         initializeEventAnimations() {
             // Future: socket.io integration, event listeners
-            console.log('Event animations placeholder - to be implemented');
         }
     };
 }

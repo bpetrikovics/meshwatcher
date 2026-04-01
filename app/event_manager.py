@@ -273,9 +273,6 @@ class EventManager:
 
     @raw_handler.validate_packet
     def on_position(self, packet: MeshtasticPacket):
-        print("=" * 50)
-        print("POSITION PACKET RECEIVED!")
-        print("=" * 50)
         try:
             position = self.extract_payload(packet, Position)
         except ValidationError as exc:
@@ -299,8 +296,6 @@ class EventManager:
                 "last_channel": updated_node.last_channel,
                 "last_channel_name": updated_node.last_channel_name,
             }
-            print(f"DEBUG: Extracted node data: {node_data}")
-            print(f"DEBUG: packet.channel: {packet.channel}, packet.channel_name: {packet.channel_name}")
 
         try:
             self.presenter.emit_position_event(
