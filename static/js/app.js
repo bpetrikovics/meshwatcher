@@ -2,6 +2,9 @@
 const CONFIG = {
     DEFAULT_MAP_CENTER: [47.5, 19.0],
     DEFAULT_ZOOM: 8,
+    MOVEMENT: {
+        MAX_POSITION_AGE_HOURS: 1,
+    },
     API: {
         DEFAULT_LIMIT: 1000,
         MAX_LIMIT: 5000,
@@ -36,6 +39,17 @@ function meshApp() {
             const div = document.createElement('div');
             div.textContent = str;
             return div.innerHTML;
+        },
+
+        isNodeMoving(position) {
+            if (!position) return false;
+
+            const hasSpeed = position.ground_speed_ms !== undefined && position.ground_speed_ms !== null && position.ground_speed_ms > 0;
+            const hasHeading = position.heading !== null && position.heading !== undefined;
+            const ageHours = position.position_age_hours_ago;
+            const isRecent = ageHours !== null && ageHours !== undefined && ageHours <= CONFIG.MOVEMENT.MAX_POSITION_AGE_HOURS;
+
+            return hasSpeed && hasHeading && isRecent;
         },
         
         // Map instance
@@ -243,10 +257,7 @@ function meshApp() {
             const node = this.nodes[nodeId];
             if (!node || !node.marker) return;
 
-            // Check for movement and heading
-            const hasSpeed = node.position && node.position.ground_speed_ms !== undefined && node.position.ground_speed_ms !== null && node.position.ground_speed_ms > 0;
-            const hasHeading = node.position && node.position.heading !== null && node.position.heading !== undefined;
-            const shouldShowDirection = hasSpeed && hasHeading;
+            const shouldShowDirection = this.isNodeMoving(node.position);
 
             // Use the same helper method for consistency
             this.updateNodeIcon(node, shouldShowDirection);
@@ -1131,10 +1142,7 @@ function meshApp() {
                 this.nodes[node.id] = node;
                 this.invalidateRoleCache(); // Invalidate cache when node is added
                 
-                // Check for movement and heading
-                const hasSpeed = node.position && node.position.ground_speed_ms !== undefined && node.position.ground_speed_ms !== null && node.position.ground_speed_ms > 0;
-                const hasHeading = node.position && node.position.heading !== null && node.position.heading !== undefined;
-                const shouldShowDirection = hasSpeed && hasHeading;
+                const shouldShowDirection = this.isNodeMoving(node.position);
 
                 const marker = L.marker([node.position.latitude, node.position.longitude])
                     .bindPopup(() => {
@@ -1248,10 +1256,7 @@ function meshApp() {
                 // Update node position data
                 node.position = position;
                 
-                // Check for movement and heading
-                const hasSpeed = position.ground_speed_ms !== undefined && position.ground_speed_ms !== null && position.ground_speed_ms > 0;
-                const hasHeading = position.heading !== null && position.heading !== undefined;
-                const shouldShowDirection = hasSpeed && hasHeading;
+                const shouldShowDirection = this.isNodeMoving(position);
                 
                 // Check if movement status changed for debugging
                 const currentlyMoving = this.getCurrentMovementState(node);
