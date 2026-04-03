@@ -80,6 +80,9 @@ function meshApp() {
     eventsSocketHasConnectedOnce: false,
     markerFlashTimers: {},
 
+    // Version tracking for auto-refresh
+    storedVersion: null,
+
     // Get cached unique roles
     getUniqueRoles() {
       if (this.needsRoleUpdate || this.cachedRoles === null) {
@@ -163,6 +166,9 @@ function meshApp() {
       const config = window.APP_CONFIG || {};
       this.clusteringRadius = config.CLUSTERING_RADIUS || 5;
 
+      // Store initial version for comparison on reconnects
+      this.storedVersion = config.GIT_COMMIT || null;
+
       this.initializeEventsSocket();
 
       if (document.readyState === "loading") {
@@ -208,6 +214,11 @@ function meshApp() {
         });
         this.eventsSocket.on("event", (evt) => {
           this.handleRealtimeEvent(evt);
+
+          // Handle version events for auto-refresh
+          if (evt.type === "version" && evt.payload && evt.payload.git_commit) {
+            this.handleVersionEvent(evt.payload.git_commit);
+          }
         });
       } catch (error) {
         console.error("Failed to initialize events socket:", error);
@@ -245,6 +256,23 @@ function meshApp() {
           } catch (error) {}
         }
       }
+    },
+
+    handleVersionEvent(receivedVersion) {
+      console.log("Version event received:", receivedVersion, "stored:", this.storedVersion);
+
+      // Only check version on reconnects (not initial connection)
+      if (this.eventsSocketHasConnectedOnce && this.storedVersion !== null) {
+        if (receivedVersion !== this.storedVersion) {
+          console.log("Version mismatch detected, refreshing page...");
+          location.reload();
+        } else {
+          console.log("Version matches, no refresh needed");
+        }
+      }
+
+      // Update stored version for next comparison
+      this.storedVersion = receivedVersion;
     },
 
     handleRealtimeEvent(evt) {

@@ -35,6 +35,12 @@ def _handle_connect_events() -> None:
     sid = request.sid
     logger.info("Client connected to events with sid %s", sid)
 
+    # Emit version information for frontend comparison
+    socketio.emit("event", {
+        "type": "version",
+        "payload": {"git_commit": settings.git_commit}
+    }, namespace=settings.namespace_events)
+
 
 def _handle_disconnect_events() -> None:
     """Handle events namespace disconnection."""
