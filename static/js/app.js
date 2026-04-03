@@ -70,6 +70,7 @@ function meshApp() {
 
         // Socket.IO events
         eventsSocket: null,
+        eventsSocketHasConnectedOnce: false,
         markerFlashTimers: {},
         
         // Get cached unique roles
@@ -188,6 +189,10 @@ function meshApp() {
                 this.eventsSocket = io(namespace);
                 this.eventsSocket.on('connect', () => {
                     console.log('Connected to events socket', namespace);
+                    if (this.eventsSocketHasConnectedOnce) {
+                        this.reloadNodes();
+                    }
+                    this.eventsSocketHasConnectedOnce = true;
                 });
                 this.eventsSocket.on('disconnect', () => {
                     console.log('Disconnected from events socket');
@@ -197,6 +202,39 @@ function meshApp() {
                 });
             } catch (error) {
                 console.error('Failed to initialize events socket:', error);
+            }
+        },
+
+        async reloadNodes() {
+            console.warn('reloadNodes() called')
+            if (!this.map || !this.map._loaded || !this.nodeLayer) return;
+            if (this.loading.nodes) return;
+
+            const existingCenter = this.map.getCenter?.();
+            const existingZoom = this.map.getZoom?.();
+
+            Object.values(this.markerFlashTimers).forEach((t) => {
+                try { clearTimeout(t); } catch (e) {}
+            });
+            this.markerFlashTimers = {};
+
+            try {
+                this.nodeLayer.clearLayers();
+            } catch (error) {
+            }
+
+            this.nodes = {};
+            this.invalidateRoleCache();
+
+            try {
+                await this.loadNodes();
+            } finally {
+                if (existingCenter && existingZoom != null) {
+                    try {
+                        this.map.setView(existingCenter, existingZoom, { animate: false });
+                    } catch (error) {
+                    }
+                }
             }
         },
 
@@ -460,7 +498,7 @@ function meshApp() {
                 console.log('Map initialized successfully');
                 
                 setTimeout(() => {
-                    this.loadInitialNodes();
+                    this.loadNodes();
                 }, CONFIG.API.MAP_INIT_DELAY);
                 // Delay node loading to ensure map is fully rendered
                 // Loading nodes too early can cause positioning issues and performance problems
@@ -984,10 +1022,10 @@ function meshApp() {
             
             return `/api/nodes?${queryParams.toString()}`;
         },
-        async loadInitialNodes() {
+        async loadNodes() {
             try {
                 this.loading.nodes = true;
-                console.log('Loading initial nodes...');
+                console.log('Loading nodes...');
                 const url = this.buildApiUrl();
                 const response = await fetch(url);
                 const data = await response.json();
