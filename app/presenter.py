@@ -128,6 +128,8 @@ class Presenter:
                     "altitude": position.altitude,
                     "ground_speed_ms": position.ground_speed_ms,
                     "heading": position.heading,
+                    "precision_bits": position.precision_bits,
+                    "radius": position.radius,
                     "position_age_hours_ago": 0,  # Real-time events are always current
                 }
             },

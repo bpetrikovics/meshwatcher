@@ -80,6 +80,10 @@ function meshApp() {
     eventsSocketHasConnectedOnce: false,
     markerFlashTimers: {},
 
+    // Node selection state for precision circle
+    selectedNodeId: null,
+    selectedNodePrecisionCircle: null,
+
     // Version tracking for auto-refresh
     storedVersion: null,
 
@@ -537,6 +541,22 @@ function meshApp() {
           this.isZooming = false;
           // Prevent popup creation during zoom animations
           // Popups created during zoom can have incorrect positioning
+        });
+
+        // Handle map clicks to deselect node and remove precision circle
+        this.map.on("click", (e) => {
+          const target = e?.originalEvent?.target;
+          if (!(target instanceof Element)) {
+            this.deselectNode();
+            return;
+          }
+
+          if (
+            !target.closest(".node-marker") &&
+            !target.closest(".leaflet-popup")
+          ) {
+            this.deselectNode();
+          }
         });
 
         // disable legend for now
@@ -1270,6 +1290,7 @@ function meshApp() {
               if (this.isZooming || !this.map || !this.map._loaded) {
                 return "";
               }
+              this.selectNode(node.id);
               return this.createNodePopup(node);
             } catch (error) {
               console.error("Error creating popup:", error);
@@ -1397,6 +1418,9 @@ function meshApp() {
 
         // Update popup
         node.marker.setPopupContent(this.createNodePopup(node));
+
+        // Update precision circle if this node is selected
+        this.updateSelectedNodeCircle(nodeId, position);
       } catch (error) {
         console.error("Failed to update node position:", error);
       }
@@ -1579,6 +1603,9 @@ function meshApp() {
         this._cleanupHandlers = null;
       }
 
+      // Deselect node to clean up precision circle
+      this.deselectNode();
+
       // Perform full cleanup
       this.cleanup();
     },
@@ -1591,6 +1618,83 @@ function meshApp() {
     // Placeholder for event animation system
     initializeEventAnimations() {
       // Future: socket.io integration, event listeners
+    },
+
+    // Node selection and precision circle management
+    selectNode(nodeId) {
+      if (this.selectedNodeId === nodeId) {
+        const node = this.nodes[nodeId];
+        if (node?.position) {
+          this.updateSelectedNodeCircle(nodeId, node.position);
+        }
+        return;
+      }
+
+      // Deselect previous node
+      this.deselectNode();
+
+      const node = this.nodes[nodeId];
+      if (!node || !node.position) return;
+
+      this.selectedNodeId = nodeId;
+
+      // Create precision circle if radius > 0
+      if (node.position.radius && node.position.radius > 0) {
+        this.selectedNodePrecisionCircle = L.circle(
+          [node.position.latitude, node.position.longitude],
+          {
+            radius: node.position.radius,
+            color: "#3b82f6", // subtle blue
+            fillColor: "#3b82f6",
+            fillOpacity: 0.12,
+            weight: 1,
+          }
+        ).addTo(this.map);
+      }
+    },
+
+    deselectNode() {
+      if (this.selectedNodePrecisionCircle) {
+        this.map.removeLayer(this.selectedNodePrecisionCircle);
+        this.selectedNodePrecisionCircle = null;
+      }
+      this.selectedNodeId = null;
+    },
+
+    // Update precision circle when selected node position changes
+    updateSelectedNodeCircle(nodeId, position) {
+      if (this.selectedNodeId !== nodeId) return;
+      if (!this.map || !position) return;
+
+      const hasRadius = position.radius && position.radius > 0;
+      if (!hasRadius) {
+        if (this.selectedNodePrecisionCircle) {
+          this.map.removeLayer(this.selectedNodePrecisionCircle);
+          this.selectedNodePrecisionCircle = null;
+        }
+        return;
+      }
+
+      // Create circle if selection existed before radius became available
+      if (!this.selectedNodePrecisionCircle) {
+        this.selectedNodePrecisionCircle = L.circle(
+          [position.latitude, position.longitude],
+          {
+            radius: position.radius,
+            color: "#3b82f6", // subtle blue
+            fillColor: "#3b82f6",
+            fillOpacity: 0.12,
+            weight: 1,
+          }
+        ).addTo(this.map);
+        return;
+      }
+
+      this.selectedNodePrecisionCircle.setLatLng([
+        position.latitude,
+        position.longitude,
+      ]);
+      this.selectedNodePrecisionCircle.setRadius(position.radius);
     },
   };
 }
