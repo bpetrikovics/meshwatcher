@@ -252,7 +252,7 @@ function meshApp() {
       this.invalidateRoleCache();
 
       try {
-        await this.loadNodes();
+        await this.loadNodes({ fitBounds: false });
       } finally {
         if (existingCenter && existingZoom != null) {
           try {
@@ -1112,7 +1112,7 @@ function meshApp() {
 
       return `/api/nodes?${queryParams.toString()}`;
     },
-    async loadNodes() {
+    async loadNodes(options = {}) {
       try {
         this.loading.nodes = true;
         console.log("Loading nodes...");
@@ -1132,6 +1132,7 @@ function meshApp() {
 
         // Fit map to show all nodes
         if (
+          options.fitBounds !== false &&
           this.nodeLayer.getLayers().length > 0 &&
           this.map &&
           this.map._loaded
