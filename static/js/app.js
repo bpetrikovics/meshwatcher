@@ -1655,11 +1655,20 @@ function meshApp() {
     },
 
     deselectNode() {
-      if (this.selectedNodePrecisionCircle) {
-        this.map.removeLayer(this.selectedNodePrecisionCircle);
-        this.selectedNodePrecisionCircle = null;
-      }
+      const circle = this.selectedNodePrecisionCircle;
+      this.selectedNodePrecisionCircle = null;
       this.selectedNodeId = null;
+
+      if (!circle) return;
+
+      try {
+        if (!this.map) return;
+        if (typeof this.map.hasLayer === "function" && !this.map.hasLayer(circle)) {
+          return;
+        }
+        this.map.removeLayer(circle);
+      } catch (error) {
+      }
     },
 
     // Update precision circle when selected node position changes
@@ -1669,9 +1678,16 @@ function meshApp() {
 
       const hasRadius = position.radius && position.radius > 0;
       if (!hasRadius) {
-        if (this.selectedNodePrecisionCircle) {
-          this.map.removeLayer(this.selectedNodePrecisionCircle);
-          this.selectedNodePrecisionCircle = null;
+        const circle = this.selectedNodePrecisionCircle;
+        this.selectedNodePrecisionCircle = null;
+        if (circle) {
+          try {
+            if (typeof this.map.hasLayer === "function" && !this.map.hasLayer(circle)) {
+              return;
+            }
+            this.map.removeLayer(circle);
+          } catch (error) {
+          }
         }
         return;
       }
