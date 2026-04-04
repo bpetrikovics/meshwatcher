@@ -44,10 +44,8 @@ function meshApp() {
     isNodeMoving(position) {
       if (!position) return false;
 
-      const hasSpeed =
-        position.ground_speed_ms !== undefined &&
-        position.ground_speed_ms !== null &&
-        position.ground_speed_ms > 0;
+      const speedKmph = this.getGroundSpeedKmph(position);
+      const hasSpeed = speedKmph !== null && speedKmph > 0;
       const hasHeading =
         position.heading !== null && position.heading !== undefined;
       const ageHours = position.position_age_hours_ago;
@@ -1338,12 +1336,19 @@ function meshApp() {
                         ${position.latitude ? `<p><strong>Position:</strong> ${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)}</p>` : ""}
                         ${position.position_age_hours_ago != null ? `<p><strong>Last position:</strong> ${this.getTimeAgoText(position.position_age_hours_ago)}</p>` : position.latitude ? "<p><strong>Last position:</strong> Unknown</p>" : ""}
                         ${position.altitude ? `<p><strong>Altitude:</strong> ${position.altitude}m</p>` : ""}
-                        ${position.ground_speed_ms !== undefined && position.ground_speed_ms !== null && position.ground_speed_ms > 0 ? `<p><strong>Ground Speed:</strong> ${position.ground_speed_ms.toFixed(1)} m/s (${(position.ground_speed_ms * 3.6).toFixed(1)} km/h)</p>` : ""}
-                        ${position.heading !== null && position.heading !== undefined && position.ground_speed_ms !== undefined && position.ground_speed_ms !== null && position.ground_speed_ms > 0 ? `<p><strong>Heading:</strong> ${position.heading.toFixed(1)}° (${this.getCompassDirection(position.heading)})</p>` : ""}
+                        ${this.getGroundSpeedKmph(position) !== null && this.getGroundSpeedKmph(position) > 0 ? `<p><strong>Ground Speed:</strong> ${this.getGroundSpeedKmph(position).toFixed(1)} km/h</p>` : ""}
+                        ${position.heading !== null && position.heading !== undefined && this.getGroundSpeedKmph(position) !== null && this.getGroundSpeedKmph(position) > 0 ? `<p><strong>Heading:</strong> ${position.heading.toFixed(1)}° (${this.getCompassDirection(position.heading)})</p>` : ""}
                         ${info.is_unmessagable ? "<p><em>Node is unmessagable</em></p>" : ""}
                     </div>
                 </div>
             `;
+    },
+
+    getGroundSpeedKmph(position) {
+      if (!position) return null;
+      return position.ground_speed_kmph !== undefined && position.ground_speed_kmph !== null
+        ? position.ground_speed_kmph
+        : null;
     },
 
     // Helper method to safely get current movement state

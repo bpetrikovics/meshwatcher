@@ -126,7 +126,7 @@ class Presenter:
                     "latitude": position.latitude,
                     "longitude": position.longitude,
                     "altitude": position.altitude,
-                    "ground_speed_ms": position.ground_speed_ms,
+                    "ground_speed_kmph": position.ground_speed,
                     "heading": position.heading,
                     "precision_bits": position.precision_bits,
                     "radius": position.radius,

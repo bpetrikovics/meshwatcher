@@ -117,7 +117,7 @@ Stores GPS position data from nodes.
 - `latitude` (Float, Nullable) - Latitude in decimal degrees (converted from integer)
 - `longitude` (Float, Nullable) - Longitude in decimal degrees (converted from integer)
 - `heading` (Float, Nullable) - Heading in degrees (converted from ground_track, returns None if ground_track is None)
-- `ground_speed_ms` (Float, Nullable) - Ground speed in m/s (converted from km/h)
+- `ground_speed_ms` (Float, Nullable) - Ground speed in m/s (computed from km/h)
 - `radius` (Float) - Precision radius in meters (calculated from precision_bits)
 
 **Foreign Keys:**
