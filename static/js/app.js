@@ -1807,26 +1807,14 @@ function meshApp() {
         return R * c;
       }
 
-      // Render points and arrows
+      // Render single element per position (triangle for moving, dot for stationary)
       history.forEach((pos, i) => {
         const color = getAgeColor(pos.created_at);
-        const point = L.circleMarker([pos.latitude, pos.longitude], {
-          radius: 4,
-          fillColor: color,
-          color: "#fff",
-          weight: 1,
-          opacity: 1,
-          fillOpacity: 0.8,
-        }).bindTooltip(() => {
-          const ts = pos.created_at ? new Date(pos.created_at).toLocaleString() : "Unknown";
-          const speed = pos.ground_speed_kmph != null ? `${pos.ground_speed_kmph.toFixed(1)} km/h` : "N/A";
-          const heading = pos.heading != null ? `${pos.heading.toFixed(1)}°` : "N/A";
-          return `Time: ${ts}<br>Lat: ${pos.latitude.toFixed(6)}<br>Lon: ${pos.longitude.toFixed(6)}<br>Speed: ${speed}<br>Heading: ${heading}`;
-        });
-        this.selectedNodeHistoryLayer.addLayer(point);
-
-        // Arrow for heading if available and speed > 0
-        if (pos.heading != null && pos.ground_speed_kmph != null && pos.ground_speed_kmph > 0) {
+        const isMoving = pos.heading != null && pos.ground_speed_kmph != null && pos.ground_speed_kmph > 0;
+        
+        let marker;
+        if (isMoving) {
+          // Create triangle/arrow for moving nodes
           const arrowIcon = L.divIcon({
             className: "history-arrow",
             html: `<div style="width: 12px; height: 12px; position: relative;">
@@ -1838,9 +1826,28 @@ function meshApp() {
             iconSize: [12, 12],
             iconAnchor: [6, 6],
           });
-          const arrow = L.marker([pos.latitude, pos.longitude], { icon: arrowIcon });
-          this.selectedNodeHistoryLayer.addLayer(arrow);
+          marker = L.marker([pos.latitude, pos.longitude], { icon: arrowIcon });
+        } else {
+          // Create dot for stationary nodes
+          marker = L.circleMarker([pos.latitude, pos.longitude], {
+            radius: 4,
+            fillColor: color,
+            color: "#fff",
+            weight: 1,
+            opacity: 1,
+            fillOpacity: 0.8,
+          });
         }
+        
+        // Add tooltip to all markers
+        marker.bindTooltip(() => {
+          const ts = pos.created_at ? new Date(pos.created_at).toLocaleString() : "Unknown";
+          const speed = pos.ground_speed_kmph != null ? `${pos.ground_speed_kmph.toFixed(1)} km/h` : "N/A";
+          const heading = pos.heading != null ? `${pos.heading.toFixed(1)}°` : "N/A";
+          return `Time: ${ts}<br>Lat: ${pos.latitude.toFixed(6)}<br>Lon: ${pos.longitude.toFixed(6)}<br>Speed: ${speed}<br>Heading: ${heading}`;
+        });
+        
+        this.selectedNodeHistoryLayer.addLayer(marker);
       });
 
       // Render line segments with speed colors
