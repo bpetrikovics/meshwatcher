@@ -1,11 +1,15 @@
 import pytest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import Mock, patch
-from app.models import NodeInfo, Position
-from app.routes.api_routes import get_node_positions
 
-# Mock database engine and initialization to avoid any database connections during import
-with patch('app.database.create_engine'), patch('app.database.init_db'):
+# Mock database engine creation at module level before any imports that trigger database connections
+mock_engine = Mock()
+with patch('app.database.create_engine', return_value=mock_engine), \
+     patch('app.database.init_db'), \
+     patch('sqlalchemy.engine.Engine', mock_engine):
+    
+    from app.models import NodeInfo, Position
+    from app.routes.api_routes import get_node_positions
     from app import create_app
 
 
