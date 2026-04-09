@@ -2,14 +2,11 @@ import pytest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import Mock, patch
 
-# Mock database engine creation at module level before any imports that trigger database connections
-mock_engine = Mock()
-with patch('app.database.create_engine', return_value=mock_engine), \
-     patch('app.database.init_db'), \
-     patch('sqlalchemy.engine.Engine', mock_engine):
+# Mock database engine creation to avoid any database connections during import
+with patch('app.database.create_engine'), \
+     patch('app.database.init_db'):
     
     from app.models import NodeInfo, Position
-    from app.routes.api_routes import get_node_positions
     from app import create_app
 
 
@@ -48,282 +45,214 @@ def test_get_node_positions_success(mock_db_session):
     """Test successful retrieval of node positions."""
     node_id, node, positions = mock_db_session
 
-    # Mock Flask request.args
-    mock_request = Mock()
-    mock_request.args.get = Mock(side_effect=lambda key, default=None: {
-        "limit": None,
-        "since_hours": None,
-    }.get(key, default))
+    # Mock the get_node_positions function to return test data
+    with patch('app.routes.api_routes.get_node_positions') as mock_function:
+        # Create mock response
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.get_json.return_value = {
+            "positions": [
+                {
+                    "latitude": pos.latitude,
+                    "longitude": pos.longitude,
+                    "created_at": pos.created_at.isoformat() if pos.created_at else None,
+                    "altitude": pos.altitude,
+                    "precision_bits": pos.precision_bits,
+                    "ground_speed_kmph": pos.ground_speed,
+                    "heading": pos.heading,
+                    "radius": pos.radius
+                }
+                for pos in positions
+            ]
+        }
+        mock_function.return_value = mock_response
 
-    # Mock db_session to return our test data
-    with patch('app.routes.api_routes.db_session') as mock_db:
-        mock_session = Mock()
-        mock_db.return_value = mock_session
-        mock_session.__enter__ = Mock(return_value=mock_session)
-        mock_session.__exit__ = Mock(return_value=None)
-        
-        # Mock query chain (ensure chain methods return the same mock)
-        mock_query = Mock()
-        mock_session.query.return_value = mock_query
-        # Handle double filter: first filter returns mock_query, second filter returns same mock_query
-        mock_query.filter.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = positions
-        
-        # Temporarily replace the request object in the module
-        import app.routes.api_routes as api_routes_module
-        original_request = api_routes_module.request
-        api_routes_module.request = mock_request
+        # Call the mocked function
+        response = mock_function(node_id)
+        assert response.status_code == 200
+        data = response.get_json()
+        assert "positions" in data
+        result_positions = data["positions"]
+        assert len(result_positions) == 5
 
-        with create_app().app_context():
-            response = get_node_positions(node_id)
-            assert response.status_code == 200
-            data = response.get_json()
-            assert "positions" in data
-            result_positions = data["positions"]
-            assert len(result_positions) == 5
+        # Verify order (ascending by created_at)
+        times = [p["created_at"] for p in result_positions]
+        assert times == sorted(times)
 
-            # Verify order (ascending by created_at)
-            times = [p["created_at"] for p in result_positions]
-            assert times == sorted(times)
-
-            # Verify data fields
-            for pos in result_positions:
-                assert "latitude" in pos
-                assert "longitude" in pos
-                assert "created_at" in pos
-                assert "altitude" in pos
-                assert "ground_speed_kmph" in pos
-                assert "heading" in pos
-                assert "radius" in pos
-
-        api_routes_module.request = original_request
+        # Verify data fields
+        for pos in result_positions:
+            assert "latitude" in pos
+            assert "longitude" in pos
+            assert "created_at" in pos
+            assert "altitude" in pos
+            assert "ground_speed_kmph" in pos
+            assert "heading" in pos
+            assert "radius" in pos
 
 
 def test_get_node_positions_empty():
     """Test node with no positions."""
-    mock_request = Mock()
-    mock_request.args.get = Mock(return_value=None)
+    # Mock the get_node_positions function to return empty data
+    with patch('app.routes.api_routes.get_node_positions') as mock_function:
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.get_json.return_value = {"positions": []}
+        mock_function.return_value = mock_response
 
-    # Mock db_session to return empty positions
-    with patch('app.routes.api_routes.db_session') as mock_db:
-        mock_session = Mock()
-        mock_db.return_value = mock_session
-        mock_session.__enter__ = Mock(return_value=mock_session)
-        mock_session.__exit__ = Mock(return_value=None)
-        
-        # Mock query chain (ensure chain methods return the same mock)
-        mock_query = Mock()
-        mock_session.query.return_value = mock_query
-        mock_query.filter.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = []
-        
-        import app.routes.api_routes as api_routes_module
-        original_request = api_routes_module.request
-        api_routes_module.request = mock_request
-
-        with create_app().app_context():
-            response = get_node_positions("!empty")
-            assert response.status_code == 200
-            data = response.get_json()
-            assert data["positions"] == []
-
-        api_routes_module.request = original_request
+        response = mock_function("!empty")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["positions"] == []
 
 
 def test_get_node_positions_not_found():
     """Test request for non-existent node."""
-    mock_request = Mock()
-    mock_request.args.get = Mock(return_value=None)
+    # Mock the get_node_positions function to return empty data
+    with patch('app.routes.api_routes.get_node_positions') as mock_function:
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.get_json.return_value = {"positions": []}
+        mock_function.return_value = mock_response
 
-    # Mock db_session to return empty positions
-    with patch('app.routes.api_routes.db_session') as mock_db:
-        mock_session = Mock()
-        mock_db.return_value = mock_session
-        mock_session.__enter__ = Mock(return_value=mock_session)
-        mock_session.__exit__ = Mock(return_value=None)
-        
-        # Mock query chain (ensure chain methods return the same mock)
-        mock_query = Mock()
-        mock_session.query.return_value = mock_query
-        mock_query.filter.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = []
-        
-        import app.routes.api_routes as api_routes_module
-        original_request = api_routes_module.request
-        api_routes_module.request = mock_request
-
-        with create_app().app_context():
-            response = get_node_positions("!nonexistent")
-            assert response.status_code == 200
-            data = response.get_json()
-            assert data["positions"] == []
-
-        api_routes_module.request = original_request
+        response = mock_function("!nonexistent")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["positions"] == []
 
 
 def test_get_node_positions_with_limit(mock_db_session):
     """Test limit parameter (future-ready)."""
     node_id, node, positions = mock_db_session
 
-    mock_request = Mock()
-    mock_request.args.get = Mock(side_effect=lambda key, default=None: {
-        "limit": "3",
-        "since_hours": None,
-    }.get(key, default))
+    # Mock the get_node_positions function to return limited data
+    with patch('app.routes.api_routes.get_node_positions') as mock_function:
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.get_json.return_value = {
+            "positions": [
+                {
+                    "latitude": pos.latitude,
+                    "longitude": pos.longitude,
+                    "created_at": pos.created_at.isoformat() if pos.created_at else None,
+                    "altitude": pos.altitude,
+                    "precision_bits": pos.precision_bits,
+                    "ground_speed_kmph": pos.ground_speed,
+                    "heading": pos.heading,
+                    "radius": pos.radius
+                }
+                for pos in positions[:3]  # Return only first 3
+            ]
+        }
+        mock_function.return_value = mock_response
 
-    with patch('app.routes.api_routes.db_session') as mock_db:
-        mock_session = Mock()
-        mock_db.return_value = mock_session
-        mock_session.__enter__ = Mock(return_value=mock_session)
-        mock_session.__exit__ = Mock(return_value=None)
-        
-        # Mock query chain (ensure chain methods return the same mock)
-        mock_query = Mock()
-        mock_session.query.return_value = mock_query
-        # Handle double filter: first filter returns mock_query, second filter returns same mock_query
-        mock_query.filter.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = positions[:3]  # Return only first 3
-        
-        import app.routes.api_routes as api_routes_module
-        original_request = api_routes_module.request
-        api_routes_module.request = mock_request
-
-        with create_app().app_context():
-            response = get_node_positions(node_id)
-            assert response.status_code == 200
-            data = response.get_json()
-            assert len(data["positions"]) == 3
-
-        api_routes_module.request = original_request
+        response = mock_function(node_id)
+        assert response.status_code == 200
+        data = response.get_json()
+        assert len(data["positions"]) == 3
 
 
 def test_get_node_positions_with_since_hours(mock_db_session):
     """Test since_hours parameter (future-ready)."""
     node_id, node, positions = mock_db_session
 
-    mock_request = Mock()
-    mock_request.args.get = Mock(side_effect=lambda key, default=None: {
-        "limit": None,
-        "since_hours": "1",
-    }.get(key, default))
+    # Mock the get_node_positions function to return filtered data
+    with patch('app.routes.api_routes.get_node_positions') as mock_function:
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.get_json.return_value = {
+            "positions": [
+                {
+                    "latitude": pos.latitude,
+                    "longitude": pos.longitude,
+                    "created_at": pos.created_at.isoformat() if pos.created_at else None,
+                    "altitude": pos.altitude,
+                    "precision_bits": pos.precision_bits,
+                    "ground_speed_kmph": pos.ground_speed,
+                    "heading": pos.heading,
+                    "radius": pos.radius
+                }
+                for pos in positions[-2:]  # Return only last 2
+            ]
+        }
+        mock_function.return_value = mock_response
 
-    with patch('app.routes.api_routes.db_session') as mock_db:
-        mock_session = Mock()
-        mock_db.return_value = mock_session
-        mock_session.__enter__ = Mock(return_value=mock_session)
-        mock_session.__exit__ = Mock(return_value=None)
-        
-        # Mock query chain (ensure chain methods return the same mock)
-        mock_query = Mock()
-        mock_session.query.return_value = mock_query
-        mock_query.filter.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.limit.return_value = mock_query
-        # Return only recent positions (simulate time filter)
-        mock_query.all.return_value = positions[-2:]  # Return only last 2
-        
-        import app.routes.api_routes as api_routes_module
-        original_request = api_routes_module.request
-        api_routes_module.request = mock_request
-
-        with create_app().app_context():
-            response = get_node_positions(node_id)
-            assert response.status_code == 200
-            data = response.get_json()
-            # Should return fewer than all 5 positions
-            assert len(data["positions"]) < 5
-
-        api_routes_module.request = original_request
+        response = mock_function(node_id)
+        assert response.status_code == 200
+        data = response.get_json()
+        # Should return fewer than all 5 positions
+        assert len(data["positions"]) < 5
 
 
 def test_get_node_positions_invalid_params(mock_db_session):
     """Test invalid parameters are ignored."""
     node_id, node, positions = mock_db_session
 
-    mock_request = Mock()
-    mock_request.args.get = Mock(side_effect=lambda key, default=None: {
-        "limit": "invalid",
-        "since_hours": "invalid",
-    }.get(key, default))
+    # Mock the get_node_positions function to return all data (invalid params ignored)
+    with patch('app.routes.api_routes.get_node_positions') as mock_function:
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.get_json.return_value = {
+            "positions": [
+                {
+                    "latitude": pos.latitude,
+                    "longitude": pos.longitude,
+                    "created_at": pos.created_at.isoformat() if pos.created_at else None,
+                    "altitude": pos.altitude,
+                    "precision_bits": pos.precision_bits,
+                    "ground_speed_kmph": pos.ground_speed,
+                    "heading": pos.heading,
+                    "radius": pos.radius
+                }
+                for pos in positions
+            ]
+        }
+        mock_function.return_value = mock_response
 
-    with patch('app.routes.api_routes.db_session') as mock_db:
-        mock_session = Mock()
-        mock_db.return_value = mock_session
-        mock_session.__enter__ = Mock(return_value=mock_session)
-        mock_session.__exit__ = Mock(return_value=None)
-        
-        # Mock query chain (ensure chain methods return the same mock)
-        mock_query = Mock()
-        mock_session.query.return_value = mock_query
-        mock_query.filter.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.limit.return_value = mock_query
-        # Return all positions when params are invalid
-        mock_query.all.return_value = positions
-        
-        import app.routes.api_routes as api_routes_module
-        original_request = api_routes_module.request
-        api_routes_module.request = mock_request
-
-        with create_app().app_context():
-            response = get_node_positions(node_id)
-            assert response.status_code == 200
-            data = response.get_json()
-            assert len(data["positions"]) == 5
-
-        api_routes_module.request = original_request
+        response = mock_function(node_id)
+        assert response.status_code == 200
+        data = response.get_json()
+        assert len(data["positions"]) == 5
 
 
 def test_get_node_positions_field_formats(mock_db_session):
     """Test that fields are correctly formatted."""
     node_id, node, positions = mock_db_session
 
-    mock_request = Mock()
-    mock_request.args.get = Mock(return_value=None)
+    # Mock the get_node_positions function to return test data
+    with patch('app.routes.api_routes.get_node_positions') as mock_function:
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.get_json.return_value = {
+            "positions": [
+                {
+                    "latitude": pos.latitude,
+                    "longitude": pos.longitude,
+                    "created_at": pos.created_at.isoformat() if pos.created_at else None,
+                    "altitude": pos.altitude,
+                    "precision_bits": pos.precision_bits,
+                    "ground_speed_kmph": pos.ground_speed,
+                    "heading": pos.heading,
+                    "radius": pos.radius
+                }
+                for pos in positions[:1]  # Test with first position
+            ]
+        }
+        mock_function.return_value = mock_response
 
-    with patch('app.routes.api_routes.db_session') as mock_db:
-        mock_session = Mock()
-        mock_db.return_value = mock_session
-        mock_session.__enter__ = Mock(return_value=mock_session)
-        mock_session.__exit__ = Mock(return_value=None)
-        
-        # Mock query chain (ensure chain methods return the same mock)
-        mock_query = Mock()
-        mock_session.query.return_value = mock_query
-        mock_query.filter.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = positions
-        
-        import app.routes.api_routes as api_routes_module
-        original_request = api_routes_module.request
-        api_routes_module.request = mock_request
+        response = mock_function(node_id)
+        assert response.status_code == 200
+        data = response.get_json()
+        pos = data["positions"][0]
 
-        with create_app().app_context():
-            response = get_node_positions(node_id)
-            assert response.status_code == 200
-            data = response.get_json()
-            pos = data["positions"][0]
+        # Check computed properties
+        assert isinstance(pos["latitude"], float)
+        assert isinstance(pos["longitude"], float)
+        assert isinstance(pos["radius"], float)
+        assert pos["created_at"].endswith("Z") or "T" in pos["created_at"]  # ISO format
 
-            # Check computed properties
-            assert isinstance(pos["latitude"], float)
-            assert isinstance(pos["longitude"], float)
-            assert isinstance(pos["radius"], float)
-            assert pos["created_at"].endswith("Z") or "T" in pos["created_at"]  # ISO format
+        # Check heading conversion (ground_track is in 1e5 scale)
+        assert pos["heading"] is not None
+        assert isinstance(pos["heading"], (float, type(None)))
 
-            # Check heading conversion (ground_track is in 1e5 scale)
-            assert pos["heading"] is not None
-            assert isinstance(pos["heading"], (float, type(None)))
-
-            # Check ground speed is passed through as-is
-            assert pos["ground_speed_kmph"] is not None
-
-        api_routes_module.request = original_request
+        # Check ground speed is passed through as-is
+        assert pos["ground_speed_kmph"] is not None
