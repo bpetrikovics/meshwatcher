@@ -282,3 +282,60 @@ def get_nodes():
         }
         
         return jsonify(response)
+
+
+@bp.route("/nodes/<string:node_id>/positions")
+def get_node_positions(node_id):
+    """Get all position history for a specific node."""
+    
+    # Parse optional query params (future-ready for GUI controls)
+    limit = request.args.get("limit")
+    since_hours = request.args.get("since_hours")
+    
+    # Use database session
+    with db_session() as session:
+        # Build base query
+        query = session.query(Position).filter(Position.node_id == node_id)
+        
+        # Apply time filter if provided (future)
+        if since_hours:
+            try:
+                hours = float(since_hours)
+                since_time = datetime.now(timezone.utc) - timedelta(hours=hours)
+                query = query.filter(Position.created_at >= since_time)
+            except (ValueError, TypeError):
+                # Invalid parameter, ignore
+                pass
+        
+        # Order by creation time ascending
+        query = query.order_by(Position.created_at.asc())
+        
+        # Apply limit if provided (future)
+        if limit:
+            try:
+                limit_val = int(limit)
+                if limit_val > 0:
+                    query = query.limit(limit_val)
+            except (ValueError, TypeError):
+                # Invalid parameter, ignore
+                pass
+        
+        positions = query.all()
+        
+        # Serialize positions
+        results = []
+        for pos in positions:
+            # Use Position model's computed properties
+            result = {
+                "latitude": pos.latitude,
+                "longitude": pos.longitude,
+                "created_at": pos.created_at.isoformat() if pos.created_at else None,
+                "altitude": pos.altitude,
+                "precision_bits": pos.precision_bits,
+                "radius": pos.radius,
+                "ground_speed_kmph": pos.ground_speed,
+                "heading": pos.heading,
+            }
+            results.append(result)
+        
+        return jsonify({"positions": results})

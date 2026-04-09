@@ -81,6 +81,8 @@ function meshApp() {
     // Node selection state for precision circle
     selectedNodeId: null,
     selectedNodePrecisionCircle: null,
+    selectedNodeHistory: [],
+    selectedNodeHistoryLayer: null,
 
     // Version tracking for auto-refresh
     storedVersion: null,
@@ -321,6 +323,9 @@ function meshApp() {
                   nodeData.last_channel_name;
               }
             }
+
+            // Append to history if this node is selected
+            this.appendRealtimePosition(nodeId, position);
           }
 
           this.flashNodeMarker(nodeId);
@@ -541,7 +546,7 @@ function meshApp() {
           // Popups created during zoom can have incorrect positioning
         });
 
-        // Handle map clicks to deselect node and remove precision circle
+        // Handle map clicks to deselect node and remove precision circle/history
         this.map.on("click", (e) => {
           const target = e?.originalEvent?.target;
           if (!(target instanceof Element)) {
@@ -549,10 +554,9 @@ function meshApp() {
             return;
           }
 
-          if (
-            !target.closest(".node-marker") &&
-            !target.closest(".leaflet-popup")
-          ) {
+          // Check if click was on a marker or its popup
+          const markerElement = target.closest(".leaflet-marker-icon, .leaflet-popup");
+          if (!markerElement) {
             this.deselectNode();
           }
         });
@@ -1657,12 +1661,26 @@ function meshApp() {
           }
         ).addTo(this.map);
       }
+
+      // Load and display location history
+      this.loadNodeHistory(nodeId);
     },
 
     deselectNode() {
       const circle = this.selectedNodePrecisionCircle;
       this.selectedNodePrecisionCircle = null;
       this.selectedNodeId = null;
+      this.selectedNodeHistory = [];
+
+      // Remove history layer if it exists
+      if (this.selectedNodeHistoryLayer && this.map) {
+        try {
+          this.map.removeLayer(this.selectedNodeHistoryLayer);
+        } catch (error) {
+          // Ignore removal errors
+        }
+        this.selectedNodeHistoryLayer = null;
+      }
 
       if (!circle) return;
 
@@ -1717,6 +1735,158 @@ function meshApp() {
         position.longitude,
       ]);
       this.selectedNodePrecisionCircle.setRadius(position.radius);
+    },
+
+    async loadNodeHistory(nodeId) {
+      try {
+        const response = await fetch(`/api/nodes/${encodeURIComponent(nodeId)}/positions`);
+        if (!response.ok) {
+          console.warn("Failed to load node history:", response.statusText);
+          return;
+        }
+        const data = await response.json();
+        this.selectedNodeHistory = data.positions || [];
+        this.renderNodeHistory();
+      } catch (error) {
+        console.error("Error loading node history:", error);
+      }
+    },
+
+    renderNodeHistory() {
+      if (!this.map) return;
+
+      // Always clear previous history layer before re-rendering to avoid stacking/leaks
+      if (this.selectedNodeHistoryLayer) {
+        try {
+          this.map.removeLayer(this.selectedNodeHistoryLayer);
+        } catch (error) {
+          // Ignore
+        }
+        this.selectedNodeHistoryLayer = null;
+      }
+
+      if (!this.selectedNodeHistory.length) {
+        return;
+      }
+
+      // Create layer group for history
+      this.selectedNodeHistoryLayer = L.layerGroup().addTo(this.map);
+
+      const history = this.selectedNodeHistory;
+      const now = new Date();
+      const oldestTs = history[0] ? new Date(history[0].created_at) : now;
+      const ageRangeMs = now - oldestTs;
+
+      // Helper to get age bucket color
+      function getAgeColor(createdAt) {
+        if (!createdAt) return "#9ca3af"; // gray for unknown
+        const ageMs = now - new Date(createdAt);
+        const ratio = ageRangeMs > 0 ? Math.min(ageMs / ageRangeMs, 1) : 0;
+        if (ratio < 0.33) return "#3b82f6"; // blue (newest)
+        if (ratio < 0.66) return "#8b5cf6"; // purple (mid)
+        return "#6b7280"; // gray (oldest)
+      }
+
+      // Helper to get speed bucket color
+      function getSpeedColor(kmph) {
+        if (kmph == null || kmph <= 0) return "#9ca3af"; // gray for none
+        if (kmph < 5) return "#9ca3af"; // gray (slow)
+        if (kmph < 20) return "#f59e0b"; // orange (medium)
+        return "#ef4444"; // red (fast)
+      }
+
+      // Helper to compute distance between two lat/lon points (Haversine)
+      function haversine(lat1, lon1, lat2, lon2) {
+        const R = 6371000; // Earth radius in meters
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+      }
+
+      // Render points and arrows
+      history.forEach((pos, i) => {
+        const color = getAgeColor(pos.created_at);
+        const point = L.circleMarker([pos.latitude, pos.longitude], {
+          radius: 4,
+          fillColor: color,
+          color: "#fff",
+          weight: 1,
+          opacity: 1,
+          fillOpacity: 0.8,
+        }).bindTooltip(() => {
+          const ts = pos.created_at ? new Date(pos.created_at).toLocaleString() : "Unknown";
+          const speed = pos.ground_speed_kmph != null ? `${pos.ground_speed_kmph.toFixed(1)} km/h` : "N/A";
+          const heading = pos.heading != null ? `${pos.heading.toFixed(1)}°` : "N/A";
+          return `Time: ${ts}<br>Lat: ${pos.latitude.toFixed(6)}<br>Lon: ${pos.longitude.toFixed(6)}<br>Speed: ${speed}<br>Heading: ${heading}`;
+        });
+        this.selectedNodeHistoryLayer.addLayer(point);
+
+        // Arrow for heading if available and speed > 0
+        if (pos.heading != null && pos.ground_speed_kmph != null && pos.ground_speed_kmph > 0) {
+          const arrowIcon = L.divIcon({
+            className: "history-arrow",
+            html: `<div style="width: 12px; height: 12px; position: relative;">
+                     <div style="position: absolute; top: 0; left: 0; width: 0; height: 0; 
+                         border-left: 6px solid transparent; border-right: 6px solid transparent;
+                         border-bottom: 12px solid ${color}; transform: rotate(${pos.heading}deg);
+                         transform-origin: center 6px;"></div>
+                   </div>`,
+            iconSize: [12, 12],
+            iconAnchor: [6, 6],
+          });
+          const arrow = L.marker([pos.latitude, pos.longitude], { icon: arrowIcon });
+          this.selectedNodeHistoryLayer.addLayer(arrow);
+        }
+      });
+
+      // Render line segments with speed colors
+      for (let i = 0; i < history.length - 1; i++) {
+        const p1 = history[i];
+        const p2 = history[i + 1];
+        const dist = haversine(p1.latitude, p1.longitude, p2.latitude, p2.longitude);
+        const t1 = p1.created_at ? new Date(p1.created_at) : null;
+        const t2 = p2.created_at ? new Date(p2.created_at) : null;
+        const deltaMs = t1 && t2 && Number.isFinite(t1.getTime()) && Number.isFinite(t2.getTime()) ? (t2 - t1) : null;
+        let segmentSpeed = null;
+        if (deltaMs != null && deltaMs > 0) {
+          const speedMs = dist / (deltaMs / 1000);
+          segmentSpeed = speedMs * 3.6; // m/s to km/h
+        }
+        const color = getSpeedColor(segmentSpeed);
+        const polyline = L.polyline([[p1.latitude, p1.longitude], [p2.latitude, p2.longitude]], {
+          color: color,
+          weight: 2,
+          opacity: 0.7,
+        });
+        this.selectedNodeHistoryLayer.addLayer(polyline);
+      }
+    },
+
+    // Append realtime position to history and re-render
+    appendRealtimePosition(nodeId, position) {
+      if (this.selectedNodeId !== nodeId || !this.selectedNodeHistory) return;
+
+      const createdAt = position?.created_at ? position.created_at : new Date().toISOString();
+
+      // Convert position to history format
+      const historyEntry = {
+        latitude: position.latitude,
+        longitude: position.longitude,
+        created_at: createdAt,
+        altitude: position.altitude,
+        precision_bits: position.precision_bits,
+        radius: position.radius,
+        ground_speed_kmph: position.ground_speed_kmph,
+        heading: position.heading,
+      };
+
+      // Append and re-render
+      this.selectedNodeHistory.push(historyEntry);
+      this.renderNodeHistory();
     },
   };
 }
