@@ -4,8 +4,8 @@ from unittest.mock import Mock, patch
 from app.models import NodeInfo, Position
 from app.routes.api_routes import get_node_positions
 
-# Mock database initialization to avoid connection during import
-with patch('app.database.init_db'):
+# Mock database engine and initialization to avoid any database connections during import
+with patch('app.database.create_engine'), patch('app.database.init_db'):
     from app import create_app
 
 
