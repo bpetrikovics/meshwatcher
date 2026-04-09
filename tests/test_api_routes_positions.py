@@ -3,7 +3,10 @@ from datetime import datetime, timezone, timedelta
 from unittest.mock import Mock, patch
 from app.models import NodeInfo, Position
 from app.routes.api_routes import get_node_positions
-from main import app
+
+# Mock database initialization to avoid connection during import
+with patch('app.database.init_db'):
+    from app import create_app
 
 
 @pytest.fixture
@@ -69,7 +72,7 @@ def test_get_node_positions_success(mock_db_session):
         original_request = api_routes_module.request
         api_routes_module.request = mock_request
 
-        with app.app_context():
+        with create_app().app_context():
             response = get_node_positions(node_id)
             assert response.status_code == 200
             data = response.get_json()
@@ -118,7 +121,7 @@ def test_get_node_positions_empty():
         original_request = api_routes_module.request
         api_routes_module.request = mock_request
 
-        with app.app_context():
+        with create_app().app_context():
             response = get_node_positions("!empty")
             assert response.status_code == 200
             data = response.get_json()
@@ -151,7 +154,7 @@ def test_get_node_positions_not_found():
         original_request = api_routes_module.request
         api_routes_module.request = mock_request
 
-        with app.app_context():
+        with create_app().app_context():
             response = get_node_positions("!nonexistent")
             assert response.status_code == 200
             data = response.get_json()
@@ -189,7 +192,7 @@ def test_get_node_positions_with_limit(mock_db_session):
         original_request = api_routes_module.request
         api_routes_module.request = mock_request
 
-        with app.app_context():
+        with create_app().app_context():
             response = get_node_positions(node_id)
             assert response.status_code == 200
             data = response.get_json()
@@ -227,7 +230,7 @@ def test_get_node_positions_with_since_hours(mock_db_session):
         original_request = api_routes_module.request
         api_routes_module.request = mock_request
 
-        with app.app_context():
+        with create_app().app_context():
             response = get_node_positions(node_id)
             assert response.status_code == 200
             data = response.get_json()
@@ -266,7 +269,7 @@ def test_get_node_positions_invalid_params(mock_db_session):
         original_request = api_routes_module.request
         api_routes_module.request = mock_request
 
-        with app.app_context():
+        with create_app().app_context():
             response = get_node_positions(node_id)
             assert response.status_code == 200
             data = response.get_json()
@@ -300,7 +303,7 @@ def test_get_node_positions_field_formats(mock_db_session):
         original_request = api_routes_module.request
         api_routes_module.request = mock_request
 
-        with app.app_context():
+        with create_app().app_context():
             response = get_node_positions(node_id)
             assert response.status_code == 200
             data = response.get_json()
