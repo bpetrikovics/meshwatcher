@@ -65,7 +65,9 @@ function meshApp() {
           if (this.nodeLayer && typeof this.nodeLayer.refreshClusters === "function") {
             this.nodeLayer.refreshClusters();
           }
-        } catch (error) {}
+        } catch (error) {
+          console.warn("Cluster refresh failed after zoom:", error);
+        }
 
         try {
           Object.values(this.nodes).forEach((node) => {
@@ -78,7 +80,9 @@ function meshApp() {
               marker.redraw();
             }
           });
-        } catch (error) {}
+        } catch (error) {
+          console.warn("Marker refresh failed after zoom:", error);
+        }
 
         try {
           if (this.selectedNodeHistoryLayer) {
@@ -91,7 +95,9 @@ function meshApp() {
               }
             });
           }
-        } catch (error) {}
+        } catch (error) {
+          console.warn("History layer refresh failed after zoom:", error);
+        }
 
         if (
           this.selectedNodeId &&
@@ -120,6 +126,8 @@ function meshApp() {
     nodeLayer: null,
     networkLayer: null,
     traceLayer: null,
+
+    pendingNodePositionUpdates: {},
 
     // Performance caching
     cachedRoles: null,
@@ -626,6 +634,16 @@ function meshApp() {
 
           this.zoomStartedWithOpenPopup = false;
           this.resyncMapLayersAfterZoom();
+
+          const queued = this.pendingNodePositionUpdates;
+          this.pendingNodePositionUpdates = {};
+          Object.entries(queued).forEach(([nodeId, position]) => {
+            try {
+              this.updateNodePosition(nodeId, position);
+            } catch (error) {
+              console.warn("Failed to apply queued node position update:", error);
+            }
+          });
           // Prevent popup creation during zoom animations
           // Popups created during zoom can have incorrect positioning
         });
@@ -1489,18 +1507,17 @@ function meshApp() {
         return;
       }
 
+      if (this.isZooming) {
+        this.pendingNodePositionUpdates[nodeId] = position;
+        node.position = position;
+        return;
+      }
+
       try {
         // Update node position data
         node.position = position;
 
         const shouldShowDirection = this.isNodeMoving(position);
-
-        // Check if movement status changed for debugging
-        const currentlyMoving = this.getCurrentMovementState(node);
-        const movementChanged = currentlyMoving !== shouldShowDirection;
-
-        if (movementChanged) {
-        }
 
         // Animate marker to new position
         const newLatLng = L.latLng(position.latitude, position.longitude);
