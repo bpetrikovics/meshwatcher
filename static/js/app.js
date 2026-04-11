@@ -57,6 +57,58 @@ function meshApp() {
       return hasSpeed && hasHeading && isRecent;
     },
 
+    resyncMapLayersAfterZoom() {
+      if (!this.map || !this.map._loaded) return;
+
+      const run = () => {
+        try {
+          if (this.nodeLayer && typeof this.nodeLayer.refreshClusters === "function") {
+            this.nodeLayer.refreshClusters();
+          }
+        } catch (error) {}
+
+        try {
+          Object.values(this.nodes).forEach((node) => {
+            const marker = node?.marker;
+            if (!marker) return;
+            if (typeof marker.update === "function") {
+              marker.update();
+            }
+            if (typeof marker.redraw === "function") {
+              marker.redraw();
+            }
+          });
+        } catch (error) {}
+
+        try {
+          if (this.selectedNodeHistoryLayer) {
+            this.selectedNodeHistoryLayer.eachLayer((layer) => {
+              if (typeof layer.update === "function") {
+                layer.update();
+              }
+              if (typeof layer.redraw === "function") {
+                layer.redraw();
+              }
+            });
+          }
+        } catch (error) {}
+
+        if (
+          this.selectedNodeId &&
+          this.selectedNodeHistory?.length &&
+          !this.selectedNodeHistoryLayer
+        ) {
+          this.renderNodeHistory();
+        }
+      };
+
+      try {
+        requestAnimationFrame(() => requestAnimationFrame(run));
+      } catch (error) {
+        run();
+      }
+    },
+
     // Map instance
     map: null,
 
@@ -83,6 +135,8 @@ function meshApp() {
     selectedNodePrecisionCircle: null,
     selectedNodeHistory: [],
     selectedNodeHistoryLayer: null,
+
+    zoomStartedWithOpenPopup: false,
 
     // Version tracking for auto-refresh
     storedVersion: null,
@@ -535,6 +589,9 @@ function meshApp() {
         // Add zoom event handlers
         this.map.on("zoomstart", () => {
           this.isZooming = true;
+
+          this.zoomStartedWithOpenPopup = !!this.map?._popup;
+
           // Close popups during zoom to prevent "Cannot read properties of null" errors
           // Leaflet popups can crash if they try to update while the map is zooming
           this.map.closePopup();
@@ -542,6 +599,11 @@ function meshApp() {
 
         this.map.on("zoomend", () => {
           this.isZooming = false;
+
+          if (this.zoomStartedWithOpenPopup) {
+            this.zoomStartedWithOpenPopup = false;
+            this.resyncMapLayersAfterZoom();
+          }
           // Prevent popup creation during zoom animations
           // Popups created during zoom can have incorrect positioning
         });
