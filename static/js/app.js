@@ -1847,6 +1847,7 @@ function meshApp() {
         }
         const data = await response.json();
         this.selectedNodeHistory = data.positions || [];
+        console.log("Node", nodeId, "history loaded:", this.selectedNodeHistory.length, "positions");
         this.renderNodeHistory();
       } catch (error) {
         console.error("Error loading node history:", error);
