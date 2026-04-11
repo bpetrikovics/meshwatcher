@@ -576,6 +576,22 @@ function meshApp() {
           };
         }
 
+        const originalTooltipAnimateZoom = L.Tooltip?.prototype?._animateZoom;
+        if (originalTooltipAnimateZoom) {
+          L.Tooltip.prototype._animateZoom = function (opt) {
+            if (!this._map) return;
+            return originalTooltipAnimateZoom.call(this, opt);
+          };
+        }
+
+        const originalPopupAnimateZoom = L.Popup?.prototype?._animateZoom;
+        if (originalPopupAnimateZoom) {
+          L.Popup.prototype._animateZoom = function (opt) {
+            if (!this._map) return;
+            return originalPopupAnimateZoom.call(this, opt);
+          };
+        }
+
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
           attribution: "© OpenStreetMap contributors",
           maxZoom: 18,
@@ -600,10 +616,8 @@ function meshApp() {
         this.map.on("zoomend", () => {
           this.isZooming = false;
 
-          if (this.zoomStartedWithOpenPopup) {
-            this.zoomStartedWithOpenPopup = false;
-            this.resyncMapLayersAfterZoom();
-          }
+          this.zoomStartedWithOpenPopup = false;
+          this.resyncMapLayersAfterZoom();
           // Prevent popup creation during zoom animations
           // Popups created during zoom can have incorrect positioning
         });
