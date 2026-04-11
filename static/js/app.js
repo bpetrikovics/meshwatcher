@@ -592,6 +592,14 @@ function meshApp() {
           };
         }
 
+        const originalTooltipUpdatePosition = L.Tooltip?.prototype?._updatePosition;
+        if (originalTooltipUpdatePosition) {
+          L.Tooltip.prototype._updatePosition = function () {
+            if (!this._map) return;
+            return originalTooltipUpdatePosition.call(this);
+          };
+        }
+
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
           attribution: "© OpenStreetMap contributors",
           maxZoom: 18,
