@@ -1911,7 +1911,7 @@ function meshApp() {
 
       // Render single element per position (triangle for moving, dot for stationary)
       history.forEach((pos, i) => {
-        const color = getAgeColor(pos.created_at);
+        const markerColor = getSpeedColor(pos.ground_speed_kmph);
         const isMoving = pos.heading != null && pos.ground_speed_kmph != null && pos.ground_speed_kmph > 0;
         
         let marker;
@@ -1922,7 +1922,7 @@ function meshApp() {
             html: `<div style="width: 12px; height: 12px; position: relative;">
                      <div style="position: absolute; top: 0; left: 0; width: 0; height: 0; 
                          border-left: 6px solid transparent; border-right: 6px solid transparent;
-                         border-bottom: 12px solid ${color}; transform: rotate(${pos.heading}deg);
+                         border-bottom: 12px solid ${markerColor}; transform: rotate(${pos.heading}deg);
                          transform-origin: center 6px;"></div>
                    </div>`,
             iconSize: [12, 12],
@@ -1933,7 +1933,7 @@ function meshApp() {
           // Create dot for stationary nodes
           marker = L.circleMarker([pos.latitude, pos.longitude], {
             radius: 4,
-            fillColor: color,
+            fillColor: markerColor,
             color: "#fff",
             weight: 1,
             opacity: 1,
@@ -1952,23 +1952,14 @@ function meshApp() {
         this.selectedNodeHistoryLayer.addLayer(marker);
       });
 
-      // Render line segments with speed colors
+      // Render line segments with age colors
       for (let i = 0; i < history.length - 1; i++) {
         const p1 = history[i];
         const p2 = history[i + 1];
-        const dist = haversine(p1.latitude, p1.longitude, p2.latitude, p2.longitude);
-        const t1 = p1.created_at ? new Date(p1.created_at) : null;
-        const t2 = p2.created_at ? new Date(p2.created_at) : null;
-        const deltaMs = t1 && t2 && Number.isFinite(t1.getTime()) && Number.isFinite(t2.getTime()) ? (t2 - t1) : null;
-        let segmentSpeed = null;
-        if (deltaMs != null && deltaMs > 0) {
-          const speedMs = dist / (deltaMs / 1000);
-          segmentSpeed = speedMs * 3.6; // m/s to km/h
-        }
-        const color = getSpeedColor(segmentSpeed);
+        const color = getAgeColor(p1.created_at);
         const polyline = L.polyline([[p1.latitude, p1.longitude], [p2.latitude, p2.longitude]], {
           color: color,
-          weight: 2,
+          weight: 3,
           opacity: 0.7,
         });
         this.selectedNodeHistoryLayer.addLayer(polyline);
