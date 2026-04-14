@@ -346,6 +346,18 @@ function meshApp() {
       const nodeId = evt.id;
       if (!nodeId) return;
 
+      if (!this.nodes[nodeId]) {
+        this.nodes[nodeId] = { id: nodeId, role: "CLIENT" };
+      }
+      this.nodes[nodeId].info = {
+        ...(this.nodes[nodeId].info || {}),
+        status: "currently_active",
+        last_seen_hours_ago: 0,
+      };
+      if (this.nodes[nodeId].marker) {
+        this.refreshNodeMarker(nodeId);
+      }
+
       const type = evt.type;
       try {
         if (type === "position") {
@@ -364,7 +376,8 @@ function meshApp() {
               id: nodeId,
               position: position,
               info: {
-                status: nodeData.status || "currently_active",
+                ...(this.nodes[nodeId].info || {}),
+                status: "currently_active",
                 last_seen_hours_ago: 0,
               },
               role: nodeData.role || "CLIENT",
