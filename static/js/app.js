@@ -1923,7 +1923,12 @@ function meshApp() {
       }
 
       // Render single element per position (triangle for moving, dot for stationary)
+      const newestIndex = history.length - 1;
       history.forEach((pos, i) => {
+        // Skip the newest/current point marker to avoid overlapping the existing node marker
+        if (i === newestIndex) {
+          return;
+        }
         const markerColor = getSpeedColor(pos.ground_speed_kmph);
         const isMoving = pos.heading != null && pos.ground_speed_kmph != null && pos.ground_speed_kmph > 0;
         
