@@ -143,6 +143,7 @@ function meshApp() {
     selectedNodePrecisionCircle: null,
     selectedNodeHistory: [],
     selectedNodeHistoryLayer: null,
+    selectedNodeHistoryRequestSeq: 0,
 
     zoomStartedWithOpenPopup: false,
 
@@ -1408,14 +1409,35 @@ function meshApp() {
               if (this.isZooming || !this.map || !this.map._loaded) {
                 return "";
               }
-              this.selectNode(node.id);
-              return this.createNodePopup(node);
+              const currentNode = this.nodes?.[node.id] || node;
+              return this.createNodePopup(currentNode);
             } catch (error) {
               console.error("Error creating popup:", error);
               return "";
             }
           })
           .addTo(this.nodeLayer);
+
+        marker.on("click", () => {
+          try {
+            if (!this.map) return;
+            this.selectNode(node.id);
+          } catch (error) {
+            console.error("Failed to handle marker click:", error);
+          }
+        });
+
+        marker.on("popupopen", () => {
+          try {
+            if (!this.map) return;
+            this.selectNode(node.id);
+
+            const currentNode = this.nodes?.[node.id] || node;
+            marker.setPopupContent(this.createNodePopup(currentNode));
+          } catch (error) {
+            console.error("Failed to handle popup open:", error);
+          }
+        });
 
         // Store marker reference
         node.marker = marker;
@@ -1751,6 +1773,9 @@ function meshApp() {
         if (node?.position) {
           this.updateSelectedNodeCircle(nodeId, node.position);
         }
+        if (!this.selectedNodeHistoryLayer || !this.selectedNodeHistory?.length) {
+          this.loadNodeHistory(nodeId);
+        }
         return;
       }
 
@@ -1758,9 +1783,12 @@ function meshApp() {
       this.deselectNode();
 
       const node = this.nodes[nodeId];
-      if (!node || !node.position) return;
-
       this.selectedNodeId = nodeId;
+
+      if (!node || !node.position) {
+        this.loadNodeHistory(nodeId);
+        return;
+      }
 
       // Create precision circle if radius > 0
       if (node.position.radius && node.position.radius > 0) {
@@ -1853,12 +1881,16 @@ function meshApp() {
 
     async loadNodeHistory(nodeId) {
       try {
+        const requestSeq = ++this.selectedNodeHistoryRequestSeq;
         const response = await fetch(`/api/nodes/${encodeURIComponent(nodeId)}/positions`);
         if (!response.ok) {
           console.warn("Failed to load node history:", response.statusText);
           return;
         }
         const data = await response.json();
+        if (requestSeq !== this.selectedNodeHistoryRequestSeq) {
+          return;
+        }
         this.selectedNodeHistory = data.positions || [];
         console.log("Node", nodeId, "history loaded:", this.selectedNodeHistory.length, "positions");
         this.renderNodeHistory();
