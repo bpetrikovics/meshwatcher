@@ -10,6 +10,8 @@
     --panel-right-width: 350px;
     --panel-bottom-height: 200px;
     --panel-opacity: 0.65;
+    --panel-gap: 8px;
+    --panel-radius: 8px;
 }
 
 /* Ensure full viewport height on mobile */
@@ -255,6 +257,27 @@ header.bg-gray-800 h1 {
         height: calc(100vh - 52px) !important;
         height: calc(100dvh - 52px) !important;
     }
+
+    /* Reset floating geometry on mobile: edge-attached */
+    .panel {
+        border-radius: 0 !important;
+    }
+
+    aside.panel.fixed.left-0 {
+        left: 0 !important;
+    }
+
+    aside.panel.fixed.right-0 {
+        right: 0 !important;
+    }
+
+    footer.panel.fixed.bottom-0 {
+        bottom: 0 !important;
+    }
+
+    aside.panel.fixed.top-16 {
+        top: 52px !important;
+    }
     
     /* Larger touch targets */
     .resize-handle-top {
@@ -436,11 +459,42 @@ body.modal-open #map {
 /* Glass Panel Styling */
 .glass-panel {
     background: rgba(255, 255, 255, var(--panel-opacity));
-    backdrop-filter: blur(3px);
-    -webkit-backdrop-filter: blur(3px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 2px solid rgba(255, 255, 255, 0.45);
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     z-index: 1100; /* Ensure panels appear above map and controls */
+}
+
+/* Floating panel geometry for desktop */
+.panel {
+    border-radius: var(--panel-radius);
+}
+
+/* Left panel: gap from left edge */
+aside.panel.fixed.left-0 {
+    left: var(--panel-gap);
+}
+
+/* Right panel: gap from right edge */
+aside.panel.fixed.right-0 {
+    right: var(--panel-gap);
+}
+
+/* Bottom panel: gap from bottom edge */
+footer.panel.fixed.bottom-0 {
+    bottom: var(--panel-gap);
+}
+
+/* Adjust vertical positioning for left/right panels to account for gap */
+aside.panel.fixed.top-16 {
+    top: calc(56px + var(--panel-gap));
+}
+
+/* Adjust height for left/right panels to account for gap */
+aside.panel.fixed.h-full {
+    height: calc(100vh - 56px - (2 * var(--panel-gap)));
+    height: calc(100dvh - 56px - (2 * var(--panel-gap)));
 }
 
 /* Ensure bottom panel has identical top border */
