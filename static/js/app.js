@@ -1436,7 +1436,8 @@ function meshApp() {
     createNodePopup(node) {
       const info = node.info || {};
       const position = node.position || {};
-      const role = this.sanitizeHtml(node.role || "Unknown");
+      const rawRole = node.role || "Unknown";
+      const role = this.sanitizeHtml(rawRole);
       const roleIcon = this.getIconForRole(role);
       const safeName = this.sanitizeHtml(node.long_name || node.id);
       const safeShortName = this.sanitizeHtml(node.short_name || "");
@@ -1472,7 +1473,8 @@ function meshApp() {
     createNodeSidebarHtml(node) {
       const info = node.info || {};
       const position = node.position || {};
-      const role = this.sanitizeHtml(node.role || "Unknown");
+      const rawRole = node.role || "Unknown";
+      const role = this.sanitizeHtml(rawRole);
       const roleIcon = this.getIconForRole(role);
       const safeName = this.sanitizeHtml(node.long_name || node.id);
       const safeShortName = this.sanitizeHtml(node.short_name || "");
@@ -1494,9 +1496,19 @@ function meshApp() {
         statusBadges.push('<span class="status-badge status-inactive"><i class="mdi mdi-message-off text-xs mr-1"></i>Unmessageable</span>');
       }
       
-      const deviceTypeBadge = role.toLowerCase() === 'router' 
-        ? '<span class="device-type-badge device-router"><i class="mdi mdi-router-network text-xs mr-1"></i>Router</span>'
-        : '<span class="device-type-badge device-client"><i class="mdi mdi-cellphone text-xs mr-1"></i>Client</span>';
+      const roleBadgeMap = {
+        ROUTER: '<span class="device-type-badge device-router"><i class="mdi mdi-router-network text-xs mr-1"></i>ROUTER</span>',
+        ROUTER_LATE: '<span class="device-type-badge device-router"><i class="mdi mdi-router-network text-xs mr-1"></i>ROUTER_LATE</span>',
+        CLIENT: '<span class="device-type-badge device-client"><i class="mdi mdi-cellphone text-xs mr-1"></i>CLIENT</span>',
+        CLIENT_MUTE: '<span class="device-type-badge device-client"><i class="mdi mdi-volume-mute text-xs mr-1"></i>CLIENT_MUTE</span>',
+        CLIENT_BASE: '<span class="device-type-badge device-client"><i class="mdi mdi-home text-xs mr-1"></i>CLIENT_BASE</span>',
+        REPEATER: '<span class="device-type-badge device-client"><i class="mdi mdi-repeat text-xs mr-1"></i>REPEATER</span>',
+        SENSOR: '<span class="device-type-badge device-client"><i class="mdi mdi-thermometer text-xs mr-1"></i>SENSOR</span>',
+        TRACKER: '<span class="device-type-badge device-client"><i class="mdi mdi-crosshairs-gps text-xs mr-1"></i>TRACKER</span>',
+        TAK: '<span class="device-type-badge device-client"><i class="mdi mdi-radar text-xs mr-1"></i>TAK</span>',
+        TAK_TRACKER: '<span class="device-type-badge device-client"><i class="mdi mdi-radar text-xs mr-1"></i>TAK_TRACKER</span>',
+      };
+      const deviceTypeBadge = roleBadgeMap[rawRole] || `<span class="device-type-badge device-client"><i class="mdi ${roleIcon} text-xs mr-1"></i>${rawRole}</span>`;
 
       const lastSeenText = info.last_seen_hours_ago !== null ? this.getTimeAgoText(info.last_seen_hours_ago) : "Unknown";
 
