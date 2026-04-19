@@ -41,13 +41,7 @@
             </div>
             
             <div class="flex items-center space-x-2">
-                <button @click="togglePanel('right')" 
-                        class="p-2 hover:bg-gray-700 rounded transition-colors"
-                        :class="panels.right.visible ? 'bg-gray-700' : ''"
-                        :aria-expanded="panels.right.visible"
-                        aria-label="Toggle right panel">
-                    <i class="mdi mdi-information text-xl" aria-hidden="true"></i>
-                </button>
+                <!-- Right panel toggle removed - sidebar now auto-opens on node selection -->
                 <button @click="togglePanel('bottom')" 
                         class="p-2 hover:bg-gray-700 rounded transition-colors"
                         :class="panels.bottom.visible ? 'bg-gray-700' : ''"

@@ -4,7 +4,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 
 from app.database import db_session
-from app.models import NodeInfo, Position, Telemetry
+from app.models import NodeInfo, Position, Telemetry, Metric, MeshtasticPacket
 from app.config import settings
 
 bp = Blueprint("api", __name__, url_prefix="/api")
@@ -339,3 +339,126 @@ def get_node_positions(node_id):
             results.append(result)
         
         return jsonify({"positions": results})
+
+
+@bp.route("/nodes/<string:node_id>/telemetry/summary")
+def get_node_telemetry_summary(node_id):
+    """Get telemetry summary for a specific node (available metrics and recency)."""
+    
+    since_hours = request.args.get("since_hours", "24")
+    try:
+        since_hours_val = float(since_hours)
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid since_hours parameter"}), 400
+
+    since_hours_val = min(max(since_hours_val, 0), 168)  # clamp to 0-7 days
+
+    with db_session() as session:
+        # Get metrics from the requested window
+        since_time = datetime.now(timezone.utc) - timedelta(hours=since_hours_val)
+        
+        # Query distinct metric types and metrics with their latest timestamps
+        from sqlalchemy import func, desc
+        
+        # Get the latest timestamp for each metric_type + metric combination
+        subquery = session.query(
+            Metric.metric_type,
+            Metric.metric,
+            func.max(Metric.ts).label('latest_ts')
+        ).filter(
+            Metric.node_id == node_id,
+            Metric.created_at >= since_time
+        ).group_by(
+            Metric.metric_type,
+            Metric.metric
+        ).subquery()
+        
+        # Join back to get the full results ordered by recency
+        results = session.query(
+            subquery.c.metric_type,
+            subquery.c.metric,
+            subquery.c.latest_ts
+        ).order_by(
+            desc(subquery.c.latest_ts)
+        ).all()
+        
+        # Build response
+        metrics = []
+        for metric_type, metric, latest_ts in results:
+            metrics.append({
+                "metric_type": metric_type,
+                "metric": metric,
+                "latest_ts": latest_ts
+            })
+        
+        summary = {
+            "node_id": node_id,
+            "since_hours": since_hours_val,
+            "metrics": metrics[:20],  # Limit to 20 as per plan
+            "total_metrics": len(metrics)
+        }
+        
+        return jsonify(summary)
+
+
+@bp.route("/nodes/<string:node_id>/metrics/series")
+def get_node_metrics_series(node_id):
+    """Get time series data for a specific metric."""
+    
+    # Get query parameters
+    metric_type = request.args.get("metric_type")
+    metric = request.args.get("metric")
+    since_hours = request.args.get("since_hours", "24")
+    max_points = request.args.get("max_points", "1000")
+    
+    if not metric_type or not metric:
+        return jsonify({"error": "metric_type and metric parameters are required"}), 400
+    
+    try:
+        since_hours_val = float(since_hours)
+        max_points_val = int(max_points)
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid since_hours or max_points parameter"}), 400
+    
+    # Enforce limits
+    since_hours_val = min(since_hours_val, 168)  # Max 7 days
+    max_points_val = min(max_points_val, 5000)   # Max 5000 points
+    
+    with db_session() as session:
+        # Calculate since time
+        since_time = datetime.now(timezone.utc) - timedelta(hours=since_hours_val)
+        
+        # Query metrics
+        query = session.query(Metric.ts, Metric.value).filter(
+            Metric.node_id == node_id,
+            Metric.metric_type == metric_type,
+            Metric.metric == metric,
+            Metric.created_at >= since_time
+        ).order_by(Metric.ts.asc())
+        
+        results = query.all()
+        
+        # Simple downsampling if too many points
+        if len(results) > max_points_val:
+            # Take every nth point
+            step = len(results) // max_points_val
+            results = results[::step]
+        
+        # Build response
+        series = []
+        for ts, value in results:
+            series.append({
+                "ts": ts,
+                "value": float(value)
+            })
+        
+        response = {
+            "node_id": node_id,
+            "metric_type": metric_type,
+            "metric": metric,
+            "since_hours": since_hours_val,
+            "points": len(series),
+            "series": series
+        }
+        
+        return jsonify(response)

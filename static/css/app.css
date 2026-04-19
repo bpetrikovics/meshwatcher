@@ -908,3 +908,73 @@ footer.glass-panel {
     margin-left: 8px;
 }
 
+/* Node Sidebar Card Styles */
+.card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+    margin-bottom: 16px;
+}
+
+.card:hover {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.status-active {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-inactive {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-moving {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.status-stationary {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.device-type-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.device-router {
+    background: #ede9fe;
+    color: #5b21b6;
+}
+
+.device-client {
+    background: #ecfdf5;
+    color: #065f46;
+}
+
+.chart-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f9fafb;
+    border: 2px dashed #d1d5db;
+    border-radius: 6px;
+}
+

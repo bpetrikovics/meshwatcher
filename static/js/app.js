@@ -144,6 +144,10 @@ function meshApp() {
     selectedNodeHistory: [],
     selectedNodeHistoryLayer: null,
     selectedNodeHistoryRequestSeq: 0,
+    telemetryWindow: 24,  // Default to 24 hours
+
+    // Refresh state
+    refreshingNodeId: null,
 
     zoomStartedWithOpenPopup: false,
 
@@ -1464,6 +1468,184 @@ function meshApp() {
             `;
     },
 
+    // New sidebar HTML generator for Design 1 card-based layout
+    createNodeSidebarHtml(node) {
+      const info = node.info || {};
+      const position = node.position || {};
+      const role = this.sanitizeHtml(node.role || "Unknown");
+      const roleIcon = this.getIconForRole(role);
+      const safeName = this.sanitizeHtml(node.long_name || node.id);
+      const safeShortName = this.sanitizeHtml(node.short_name || "");
+      const safeHwModel = this.sanitizeHtml(node.hw_model || "");
+      const safeId = this.sanitizeHtml(node.id);
+      const safeMac = this.sanitizeHtml(node.mac_address || "");
+
+      // Determine status badges
+      const isMoving = this.getCurrentMovementState(node);
+      const statusBadges = [];
+      
+      if (isMoving) {
+        statusBadges.push('<span class="status-badge status-moving"><i class="mdi mdi-motion text-xs mr-1"></i>Moving</span>');
+      } else {
+        statusBadges.push('<span class="status-badge status-stationary"><i class="mdi mdi-motion-pause text-xs mr-1"></i>Stationary</span>');
+      }
+      
+      if (info.is_unmessagable) {
+        statusBadges.push('<span class="status-badge status-inactive"><i class="mdi mdi-message-off text-xs mr-1"></i>Unmessageable</span>');
+      }
+      
+      const deviceTypeBadge = role.toLowerCase() === 'router' 
+        ? '<span class="device-type-badge device-router"><i class="mdi mdi-router-network text-xs mr-1"></i>Router</span>'
+        : '<span class="device-type-badge device-client"><i class="mdi mdi-cellphone text-xs mr-1"></i>Client</span>';
+
+      const lastSeenText = info.last_seen_hours_ago !== null ? this.getTimeAgoText(info.last_seen_hours_ago) : "Unknown";
+
+      return `
+        <div class="space-y-4">
+          <!-- Header with refresh button -->
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900">Node Details</h2>
+            <button @click="refreshNodeData('${node.id}')" 
+                    :class="refreshingNodeId === '${node.id}' ? 'animate-spin' : ''"
+                    class="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-full transition-all duration-200 transform hover:scale-110"
+                    title="Refresh node data">
+              <i class="mdi mdi-refresh text-gray-600"></i>
+            </button>
+          </div>
+
+          <!-- Header Card -->
+          <div class="card p-4">
+            <div class="flex items-center space-x-3">
+              <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <i class="mdi ${roleIcon} text-white text-lg"></i>
+              </div>
+              <div class="flex-1">
+                <h3 class="font-semibold text-gray-900">${safeName}</h3>
+                <div class="flex items-center space-x-2 flex-wrap gap-1">
+                  ${statusBadges.join('')}
+                  ${deviceTypeBadge}
+                </div>
+              </div>
+            </div>
+            <div class="mt-3 pt-3 border-t border-gray-100">
+              <div class="flex justify-between text-sm">
+                <span class="text-gray-500">Last seen</span>
+                <span class="text-gray-700">${lastSeenText}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Information Card -->
+          <div class="card p-4">
+            <h4 class="font-medium text-gray-900 mb-3 flex items-center">
+              <i class="mdi mdi-information mr-2 text-blue-500"></i>
+              Information
+            </h4>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span class="text-gray-500">Long Name</span>
+                <span class="text-gray-700">${safeName}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-500">Short Name</span>
+                <span class="text-gray-700">${safeShortName || '—'}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-500">Node ID</span>
+                <span class="text-gray-700 font-mono">${safeId}</span>
+              </div>
+              ${safeMac ? `
+              <div class="flex justify-between">
+                <span class="text-gray-500">MAC Address</span>
+                <span class="text-gray-700 font-mono">${safeMac}</span>
+              </div>
+              ` : ''}
+              <div class="flex justify-between">
+                <span class="text-gray-500">Hardware</span>
+                <span class="text-gray-700">${safeHwModel || '—'}</span>
+              </div>
+              ${node.last_channel !== null ? `
+              <div class="flex justify-between">
+                <span class="text-gray-500">Last Channel</span>
+                <span class="text-gray-700">Channel ${node.last_channel}${node.last_channel_name ? ` (${node.last_channel_name})` : ''}</span>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- Location Card -->
+          <div class="card p-4">
+            <h4 class="font-medium text-gray-900 mb-3 flex items-center">
+              <i class="mdi mdi-map-marker mr-2 text-blue-500"></i>
+              Location
+            </h4>
+            <div class="space-y-2 text-sm">
+              ${position.latitude ? `
+              <div class="flex justify-between">
+                <span class="text-gray-500">Coordinates</span>
+                <span class="text-gray-700 font-mono">${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)}</span>
+              </div>
+              ` : ''}
+              ${position.altitude ? `
+              <div class="flex justify-between">
+                <span class="text-gray-500">Altitude</span>
+                <span class="text-gray-700">${position.altitude}m</span>
+              </div>
+              ` : ''}
+              ${this.getGroundSpeedKmph(position) !== null && this.getGroundSpeedKmph(position) > 0 ? `
+              <div class="flex justify-between">
+                <span class="text-gray-500">Speed</span>
+                <span class="text-gray-700">${this.getGroundSpeedKmph(position).toFixed(1)} km/h</span>
+              </div>
+              ` : ''}
+              ${position.heading !== null && position.heading !== undefined && this.getGroundSpeedKmph(position) !== null && this.getGroundSpeedKmph(position) > 0 ? `
+              <div class="flex justify-between">
+                <span class="text-gray-500">Heading</span>
+                <span class="text-gray-700">${position.heading.toFixed(1)}° (${this.getCompassDirection(position.heading)})</span>
+              </div>
+              ` : ''}
+              ${position.position_age_hours_ago != null ? `
+              <div class="flex justify-between">
+                <span class="text-gray-500">Last position</span>
+                <span class="text-gray-700">${this.getTimeAgoText(position.position_age_hours_ago)}</span>
+              </div>
+              ` : position.latitude ? `
+              <div class="flex justify-between">
+                <span class="text-gray-500">Last position</span>
+                <span class="text-gray-700">Unknown</span>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- Telemetry Section -->
+          <div class="card p-4">
+            <div class="flex items-center justify-between mb-4">
+              <h4 class="font-medium text-gray-900 flex items-center">
+                <i class="mdi mdi-chart-line mr-2 text-green-500"></i>
+                Telemetry
+              </h4>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-500 font-medium" data-telemetry-label="24h">24h</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" class="sr-only telemetry-window-toggle" data-node-id="${node.id}" ${this.telemetryWindow === 168 ? 'checked' : ''}>
+                  <div class="w-10 h-5 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+                </label>
+                <span class="text-xs text-gray-500 font-medium" data-telemetry-label="7d">7d</span>
+              </div>
+            </div>
+            <div id="telemetry-charts" class="space-y-4">
+              <!-- Charts will be loaded here -->
+              <div class="text-center text-gray-500 py-8">
+                <i class="mdi mdi-chart-line text-2xl mb-2"></i>
+                <p>Loading telemetry data...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    },
+
     getGroundSpeedKmph(position) {
       if (!position) return null;
       return position.ground_speed_kmph !== undefined && position.ground_speed_kmph !== null
@@ -1757,7 +1939,7 @@ function meshApp() {
         try {
           const currentNode = this.nodes?.[nodeId] || node;
           this.selectedNodeDetailsHtml = currentNode
-            ? this.createNodePopup(currentNode)
+            ? this.createNodeSidebarHtml(currentNode)
             : "";
         } catch (error) {
           this.selectedNodeDetailsHtml = "";
@@ -1769,6 +1951,8 @@ function meshApp() {
         if (!this.selectedNodeHistoryLayer || !this.selectedNodeHistory?.length) {
           this.loadNodeHistory(nodeId);
         }
+        // Fetch telemetry for the sidebar
+        this.fetchTelemetrySummary(nodeId);
         return;
       }
 
@@ -1782,7 +1966,7 @@ function meshApp() {
       try {
         const currentNode = this.nodes?.[nodeId] || node;
         this.selectedNodeDetailsHtml = currentNode
-          ? this.createNodePopup(currentNode)
+          ? this.createNodeSidebarHtml(currentNode)
           : "";
       } catch (error) {
         this.selectedNodeDetailsHtml = "";
@@ -1809,6 +1993,9 @@ function meshApp() {
 
       // Load and display location history
       this.loadNodeHistory(nodeId);
+      
+      // Fetch telemetry for the sidebar
+      this.fetchTelemetrySummary(nodeId);
     },
 
     deselectNode() {
@@ -1837,6 +2024,28 @@ function meshApp() {
         }
         this.map.removeLayer(circle);
       } catch (error) {
+      }
+    },
+
+    // Refresh data for the currently selected node
+    async refreshNodeData(nodeId) {
+      if (!nodeId || this.selectedNodeId !== nodeId) return;
+      
+      const node = this.nodes[nodeId];
+      if (!node) return;
+
+      // Set refreshing state
+      this.refreshingNodeId = nodeId;
+
+      try {
+        // Update the sidebar HTML
+        this.selectedNodeDetailsHtml = this.createNodeSidebarHtml(node);
+        
+        // Fetch fresh telemetry data
+        await this.fetchTelemetrySummary(nodeId);
+      } finally {
+        // Clear refreshing state
+        this.refreshingNodeId = null;
       }
     },
 
@@ -2041,6 +2250,218 @@ function meshApp() {
       // Append and re-render
       this.selectedNodeHistory.push(historyEntry);
       this.renderNodeHistory();
+    },
+
+    // Fetch node statistics for the sidebar
+    // Fetch telemetry summary for the sidebar
+    async fetchTelemetrySummary(nodeId, sinceHours = null) {
+      const hours = sinceHours !== null ? sinceHours : this.telemetryWindow;
+      try {
+        const response = await fetch(`/api/nodes/${encodeURIComponent(nodeId)}/telemetry/summary?since_hours=${hours}`);
+        if (!response.ok) {
+          console.warn(`Failed to fetch telemetry summary for node ${nodeId}:`, response.status);
+          return;
+        }
+        const summary = await response.json();
+        
+        // Update the telemetry charts display
+        this.updateTelemetryChartsDisplay(summary);
+        
+        // Set up the toggle listener
+        this.setupTelemetryWindowToggle(nodeId);
+      } catch (error) {
+        console.error(`Error fetching telemetry summary for node ${nodeId}:`, error);
+      }
+    },
+
+    // Set up the telemetry window toggle listener
+    setupTelemetryWindowToggle(nodeId) {
+      const toggle = document.querySelector('.telemetry-window-toggle');
+      if (!toggle) return;
+
+      // Remove existing listener if present
+      const existingHandler = toggle._handleTelemetryToggle;
+      if (existingHandler) {
+        toggle.removeEventListener('change', existingHandler);
+      }
+
+      const handleTelemetryToggle = (e) => {
+        const newWindow = e.target.checked ? 168 : 24;
+        this.telemetryWindow = newWindow;
+        
+        // Refetch telemetry summary with new window
+        this.fetchTelemetrySummary(nodeId, newWindow);
+      };
+
+      toggle._handleTelemetryToggle = handleTelemetryToggle;
+      toggle.addEventListener('change', handleTelemetryToggle);
+    },
+
+    // Update the telemetry charts display in the sidebar
+    updateTelemetryChartsDisplay(summary) {
+      const chartsContainer = document.getElementById('telemetry-charts');
+      if (!chartsContainer) return;
+
+      if (!summary.metrics || summary.metrics.length === 0) {
+        chartsContainer.innerHTML = `
+          <div class="text-center text-gray-500 py-8">
+            <i class="mdi mdi-chart-line text-2xl mb-2"></i>
+            <p>No telemetry data available</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Create chart placeholders with IntersectionObserver for lazy loading
+      const chartHtml = summary.metrics.slice(0, 20).map((metric, index) => `
+        <div class="chart-container mb-4" data-metric-type="${metric.metric_type}" data-metric="${metric.metric}">
+          <div class="chart-placeholder h-32 bg-gray-50 rounded border-2 border-dashed border-gray-200 flex items-center justify-center">
+            <div class="text-center">
+              <i class="mdi mdi-chart-line text-gray-400 text-xl mb-1"></i>
+              <p class="text-sm text-gray-500">${metric.metric_type} - ${metric.metric}</p>
+              <p class="text-xs text-gray-400">Loading chart...</p>
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      chartsContainer.innerHTML = chartHtml;
+
+      // Set up IntersectionObserver for lazy loading
+      this.setupChartIntersectionObserver();
+    },
+
+    // Set up IntersectionObserver to load charts when they come into view
+    setupChartIntersectionObserver() {
+      const chartContainers = document.querySelectorAll('.chart-container');
+      
+      if (chartContainers.length === 0) return;
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const container = entry.target;
+            const metricType = container.dataset.metricType;
+            const metric = container.dataset.metric;
+            
+            // Load the chart for this metric
+            this.loadChartForMetric(container, metricType, metric);
+            
+            // Stop observing this element
+            observer.unobserve(container);
+          }
+        });
+      }, {
+        root: document.getElementById('telemetry-charts'),
+        rootMargin: '50px',
+        threshold: 0.1
+      });
+
+      chartContainers.forEach(container => {
+        observer.observe(container);
+      });
+    },
+
+    // Load chart data for a specific metric
+    async loadChartForMetric(container, metricType, metric) {
+      try {
+        const nodeId = this.selectedNodeId;
+        if (!nodeId) return;
+
+        const response = await fetch(`/api/nodes/${encodeURIComponent(nodeId)}/metrics/series?metric_type=${encodeURIComponent(metricType)}&metric=${encodeURIComponent(metric)}&since_hours=24&max_points=100`);
+        
+        if (!response.ok) {
+          console.warn(`Failed to load chart for ${metricType}/${metric}:`, response.status);
+          return;
+        }
+
+        const data = await response.json();
+        
+        const placeholder = container.querySelector('.chart-placeholder');
+        if (!placeholder) return;
+
+        this.renderMetricChart(placeholder, metricType, metric, data);
+      } catch (error) {
+        console.error(`Error loading chart for ${metricType}/${metric}:`, error);
+        const placeholder = container.querySelector('.chart-placeholder');
+        if (placeholder) {
+          placeholder.innerHTML = `
+            <div class="text-center">
+              <i class="mdi mdi-alert-circle text-red-400 text-xl mb-1"></i>
+              <p class="text-sm text-gray-500">${metricType} - ${metric}</p>
+              <p class="text-xs text-red-400">Failed to load chart</p>
+            </div>
+          `;
+          placeholder.classList.remove('h-32');
+        }
+      }
+    },
+
+    renderMetricChart(placeholder, metricType, metric, data) {
+      const points = Array.isArray(data.series) ? data.series : [];
+      if (points.length === 0) {
+        placeholder.innerHTML = `
+          <div class="text-center">
+            <i class="mdi mdi-chart-line-off text-gray-400 text-xl mb-1"></i>
+            <p class="text-sm text-gray-700">${metricType} - ${metric}</p>
+            <p class="text-xs text-gray-500">No data available</p>
+          </div>
+        `;
+        placeholder.classList.remove('h-32');
+        return;
+      }
+
+      const width = 340;
+      const height = 120;
+      const padding = 14;
+      const values = points.map(point => point.value);
+      const minValue = Math.min(...values);
+      const maxValue = Math.max(...values);
+      const range = Math.max(maxValue - minValue, 1);
+      const startTs = points[0].ts;
+      const endTs = points[points.length - 1].ts;
+      const duration = Math.max(endTs - startTs, 1);
+
+      const svgPoints = points.map(point => {
+        const x = padding + ((point.ts - startTs) / duration) * (width - padding * 2);
+        const y = height - padding - ((point.value - minValue) / range) * (height - padding * 2);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(' ');
+
+      const minLabel = minValue.toFixed(2);
+      const maxLabel = maxValue.toFixed(2);
+      const lastLabel = points[points.length - 1].value.toFixed(2);
+      const title = `${metricType} · ${metric}`;
+      const gradientId = `metric-gradient-${metricType}-${metric}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+      placeholder.innerHTML = `
+        <div class="space-y-2">
+          <div class="flex items-center justify-between text-sm font-medium text-gray-800">
+            <span>${title}</span>
+            <span class="text-xs text-gray-500">${data.points} pts</span>
+          </div>
+          <div class="rounded-lg bg-white border border-gray-200 p-2">
+            <svg viewBox="0 0 ${width} ${height}" class="w-full h-32">
+              <defs>
+                <linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#10b981" stop-opacity="0.9" />
+                  <stop offset="100%" stop-color="#10b981" stop-opacity="0.1" />
+                </linearGradient>
+              </defs>
+              <rect x="0" y="0" width="${width}" height="${height}" fill="transparent" />
+              <polyline fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="${svgPoints}" />
+              <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="#e5e7eb" stroke-width="1" />
+            </svg>
+          </div>
+          <div class="flex justify-between text-xs text-gray-500">
+            <span>min ${minLabel}</span>
+            <span>last ${lastLabel}</span>
+            <span>max ${maxLabel}</span>
+          </div>
+        </div>
+      `;
+      placeholder.classList.remove('h-32', 'border-dashed', 'border-gray-200', 'bg-gray-50', 'flex', 'items-center', 'justify-center');
+      placeholder.classList.add('border-solid', 'border-gray-200', 'bg-white', 'p-3');
     },
   };
 }
