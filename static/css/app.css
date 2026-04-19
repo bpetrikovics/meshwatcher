@@ -684,11 +684,20 @@ footer.glass-panel {
     min-width: 200px;
 }
 
+.node-popup h3 {
+    margin: 0 0 12px 0;
+    color: #1f2937;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 6px;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
 .node-popup h4 {
     margin: 0 0 10px 0;
     color: #333;
     border-bottom: 1px solid #eee;
-    padding-bottom: 5px;
+    padding-bottom: 4px;
 }
 
 .node-popup p {

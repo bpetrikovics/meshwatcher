@@ -214,6 +214,7 @@ function meshApp() {
         maxHeight: CONFIG.PANEL_SIZES.bottom.max,
       },
     },
+    selectedNodeDetailsHtml: "",
     // Clustering control
     clusteringRadius: 5, // Default value, will be updated from config
     clusteringUpdateTimeout: null,
@@ -452,7 +453,9 @@ function meshApp() {
       this.updateNodeIcon(node, shouldShowDirection);
 
       try {
-        node.marker.setPopupContent(this.createNodePopup(node));
+        if (typeof node.marker.getPopup === "function" && node.marker.getPopup()) {
+          node.marker.setPopupContent(this.createNodePopup(node));
+        }
       } catch (error) {}
     },
 
@@ -667,6 +670,7 @@ function meshApp() {
           const target = e?.originalEvent?.target;
           if (!(target instanceof Element)) {
             this.deselectNode();
+            this.panels.right.visible = false;
             return;
           }
 
@@ -674,6 +678,7 @@ function meshApp() {
           const markerElement = target.closest(".leaflet-marker-icon, .leaflet-popup");
           if (!markerElement) {
             this.deselectNode();
+            this.panels.right.visible = false;
           }
         });
 
@@ -1402,21 +1407,7 @@ function meshApp() {
         const marker = L.marker([
           node.position.latitude,
           node.position.longitude,
-        ])
-          .bindPopup(() => {
-            try {
-              // Prevent popup during zoom animations
-              if (this.isZooming || !this.map || !this.map._loaded) {
-                return "";
-              }
-              const currentNode = this.nodes?.[node.id] || node;
-              return this.createNodePopup(currentNode);
-            } catch (error) {
-              console.error("Error creating popup:", error);
-              return "";
-            }
-          })
-          .addTo(this.nodeLayer);
+        ]).addTo(this.nodeLayer);
 
         marker.on("click", () => {
           try {
@@ -1424,18 +1415,6 @@ function meshApp() {
             this.selectNode(node.id);
           } catch (error) {
             console.error("Failed to handle marker click:", error);
-          }
-        });
-
-        marker.on("popupopen", () => {
-          try {
-            if (!this.map) return;
-            this.selectNode(node.id);
-
-            const currentNode = this.nodes?.[node.id] || node;
-            marker.setPopupContent(this.createNodePopup(currentNode));
-          } catch (error) {
-            console.error("Failed to handle popup open:", error);
           }
         });
 
@@ -1462,7 +1441,7 @@ function meshApp() {
 
       return `
                 <div class="node-popup">
-                    <h4>${safeName}</h4>
+                    <h3>${safeName}</h3>
                     <div class="node-role-section">
                         <i class="mdi ${roleIcon} role-icon"></i>
                         <span class="role-badge">${role}</span>
@@ -1562,8 +1541,11 @@ function meshApp() {
         // This fixes the race condition and ensures consistency
         this.updateNodeIcon(node, shouldShowDirection);
 
-        // Update popup
-        node.marker.setPopupContent(this.createNodePopup(node));
+        try {
+          if (typeof node.marker.getPopup === "function" && node.marker.getPopup()) {
+            node.marker.setPopupContent(this.createNodePopup(node));
+          }
+        } catch (error) {}
 
         // Update precision circle if this node is selected
         this.updateSelectedNodeCircle(nodeId, position);
@@ -1770,6 +1752,17 @@ function meshApp() {
     selectNode(nodeId) {
       if (this.selectedNodeId === nodeId) {
         const node = this.nodes[nodeId];
+        this.panels.right.visible = true;
+
+        try {
+          const currentNode = this.nodes?.[nodeId] || node;
+          this.selectedNodeDetailsHtml = currentNode
+            ? this.createNodePopup(currentNode)
+            : "";
+        } catch (error) {
+          this.selectedNodeDetailsHtml = "";
+        }
+
         if (node?.position) {
           this.updateSelectedNodeCircle(nodeId, node.position);
         }
@@ -1784,6 +1777,16 @@ function meshApp() {
 
       const node = this.nodes[nodeId];
       this.selectedNodeId = nodeId;
+
+      this.panels.right.visible = true;
+      try {
+        const currentNode = this.nodes?.[nodeId] || node;
+        this.selectedNodeDetailsHtml = currentNode
+          ? this.createNodePopup(currentNode)
+          : "";
+      } catch (error) {
+        this.selectedNodeDetailsHtml = "";
+      }
 
       if (!node || !node.position) {
         this.loadNodeHistory(nodeId);
@@ -1813,6 +1816,7 @@ function meshApp() {
       this.selectedNodePrecisionCircle = null;
       this.selectedNodeId = null;
       this.selectedNodeHistory = [];
+      this.selectedNodeDetailsHtml = "";
 
       // Remove history layer if it exists
       if (this.selectedNodeHistoryLayer && this.map) {
