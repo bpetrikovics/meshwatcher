@@ -247,7 +247,7 @@ function meshApp() {
 
       // Initialize clustering radius from config
       const config = window.APP_CONFIG || {};
-      this.clusteringRadius = config.CLUSTERING_RADIUS || 5;
+      this.clusteringRadius = config.CLUSTERING_RADIUS ?? 5;
 
       // Store initial version for comparison on reconnects
       this.storedVersion = config.GIT_COMMIT || null;
@@ -722,7 +722,7 @@ function meshApp() {
     // Initialize node layer with clustering
     initializeNodeLayer() {
       const config = window.APP_CONFIG || {};
-      const clusteringRadius = config.CLUSTERING_RADIUS || 0;
+      const clusteringRadius = config.CLUSTERING_RADIUS ?? 0;
 
       this.nodeLayer = L.markerClusterGroup({
         maxClusterRadius: clusteringRadius, // 0 = spiderfying only, >0 = clustering
