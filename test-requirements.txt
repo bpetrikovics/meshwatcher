@@ -2,6 +2,7 @@ pytest
 gunicorn[eventlet]
 flask
 flask-socketio
+flask-cors
 pydantic-settings
 sqlalchemy
 pymysql
