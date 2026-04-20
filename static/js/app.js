@@ -18,6 +18,7 @@ const CONFIG = {
   PANEL_SIZES: {
     left: { default: 300, min: 200, max: 500 },
     right: { default: 350, min: 250, max: 600 },
+    rightSheet: { default: 320, min: 160, max: 700 },
     bottom: { default: 200, min: 100, max: 400 },
   },
   Z_INDEX: {
@@ -210,6 +211,9 @@ function meshApp() {
         width: CONFIG.PANEL_SIZES.right.default,
         minWidth: CONFIG.PANEL_SIZES.right.min,
         maxWidth: CONFIG.PANEL_SIZES.right.max,
+        height: CONFIG.PANEL_SIZES.rightSheet.default,
+        minHeight: CONFIG.PANEL_SIZES.rightSheet.min,
+        maxHeight: CONFIG.PANEL_SIZES.rightSheet.max,
       },
       bottom: {
         visible: false,
@@ -224,6 +228,8 @@ function meshApp() {
     clusteringUpdateTimeout: null,
     mouseMoveHandler: null,
     mouseUpHandler: null,
+    touchMoveHandler: null,
+    touchEndHandler: null,
 
     // Initialize application
     init() {
@@ -630,7 +636,7 @@ function meshApp() {
         }
 
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution: "© OpenStreetMap contributors",
+          attribution: " OpenStreetMap contributors",
           maxZoom: 18,
         }).addTo(this.map);
 
@@ -831,12 +837,31 @@ function meshApp() {
       };
       document.addEventListener("mousemove", this.mouseMoveHandler);
 
+      this.touchMoveHandler = (e) => {
+        if (this.resizing && this.resizing.active) {
+          this.handleResize(e);
+        }
+      };
+      document.addEventListener("touchmove", this.touchMoveHandler, {
+        passive: false,
+      });
+
       // Handle mouse up to end resize operations
       // Mouse up can occur anywhere on document, not just on resize handle
       this.mouseUpHandler = () => {
-        this.stopResize();
+        if (this.resizing && this.resizing.active) {
+          this.stopResize();
+        }
       };
       document.addEventListener("mouseup", this.mouseUpHandler);
+
+      this.touchEndHandler = () => {
+        if (this.resizing && this.resizing.active) {
+          this.stopResize();
+        }
+      };
+      document.addEventListener("touchend", this.touchEndHandler);
+      document.addEventListener("touchcancel", this.touchEndHandler);
     },
 
     // Cleanup event listeners
@@ -857,6 +882,15 @@ function meshApp() {
       if (this.mouseUpHandler) {
         document.removeEventListener("mouseup", this.mouseUpHandler);
         this.mouseUpHandler = null;
+      }
+      if (this.touchMoveHandler) {
+        document.removeEventListener("touchmove", this.touchMoveHandler);
+        this.touchMoveHandler = null;
+      }
+      if (this.touchEndHandler) {
+        document.removeEventListener("touchend", this.touchEndHandler);
+        document.removeEventListener("touchcancel", this.touchEndHandler);
+        this.touchEndHandler = null;
       }
 
       // Clean up map resources
@@ -961,6 +995,15 @@ function meshApp() {
         return;
       }
 
+      if (panelName === "right") {
+        const isMobile = window.matchMedia
+          ? window.matchMedia("(max-width: 768px)").matches
+          : window.innerWidth <= 768;
+        if (!isMobile) {
+          return;
+        }
+      }
+
       if (this.resizing.active) {
         console.warn("Resize already in progress");
         return;
@@ -1005,6 +1048,10 @@ function meshApp() {
 
       const panel = this.panels[this.resizing.panel];
 
+      const isMobile = window.matchMedia
+        ? window.matchMedia("(max-width: 768px)").matches
+        : window.innerWidth <= 768;
+
       if (this.resizing.panel === "left") {
         const newWidth =
           this.resizing.startWidth + (touch.clientX - this.resizing.startX);
@@ -1013,12 +1060,14 @@ function meshApp() {
           Math.min(panel.maxWidth, newWidth),
         );
       } else if (this.resizing.panel === "right") {
-        const newWidth =
-          this.resizing.startWidth - (touch.clientX - this.resizing.startX);
-        panel.width = Math.max(
-          panel.minWidth,
-          Math.min(panel.maxWidth, newWidth),
-        );
+        if (isMobile) {
+          const newHeight =
+            this.resizing.startHeight - (touch.clientY - this.resizing.startY);
+          panel.height = Math.max(
+            panel.minHeight,
+            Math.min(panel.maxHeight, newHeight),
+          );
+        }
       } else if (this.resizing.panel === "bottom") {
         const newHeight =
           this.resizing.startHeight - (touch.clientY - this.resizing.startY);
@@ -1061,8 +1110,13 @@ function meshApp() {
     getResizeCursor(panelName) {
       switch (panelName) {
         case "left":
-        case "right":
           return "col-resize";
+        case "right": {
+          const isMobile = window.matchMedia
+            ? window.matchMedia("(max-width: 768px)").matches
+            : window.innerWidth <= 768;
+          return isMobile ? "row-resize" : "default";
+        }
         case "bottom":
           return "row-resize";
         default:

@@ -104,15 +104,15 @@
             <!-- Right Sidebar -->
             <aside x-show="panels.right.visible" 
                    class="fixed right-0 top-16 h-full glass-panel z-40 flex panel"
-                   :style="`width: ${panels.right.width}px`">
-                
-                <!-- Resize Handle -->
-                <div class="resize-handle-left absolute left-0 top-0 w-1 h-full bg-gray-300 hover:bg-blue-500 cursor-col-resize z-50"
-                     @mousedown="startResize('right', $event)"
-                     @touchstart="startResize('right', $event)"></div>
+                   :style="`width: ${panels.right.width}px; --right-sheet-height: ${panels.right.height}px`">
                 
                 <!-- Panel Content -->
                 <div class="flex-1 p-4 overflow-y-auto">
+                    <div class="right-sheet-handle"
+                         @mousedown="startResize('right', $event)"
+                         @touchstart="startResize('right', $event)">
+                        <div class="right-sheet-handle-bar"></div>
+                    </div>
                     <div x-html="selectedNodeDetailsHtml"></div>
                 </div>
             </aside>
