@@ -26,7 +26,9 @@ def _mock_db_session_with_results(results):
 
 @pytest.fixture
 def app():
-    app = create_app()
+    # create_app() calls app.init_db; keep it mocked in tests to avoid real DB access.
+    with patch("app.init_db"):
+        app = create_app()
     app.config.update({"TESTING": True})
     return app
 
