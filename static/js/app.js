@@ -1518,14 +1518,14 @@ function meshApp() {
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-gray-900">Node Details</h2>
             <div class="flex items-center gap-2">
-              <button @click="refreshNodeData('${node.id}')" 
+              <button @click="refreshNodeData('${node.id}'); $event.currentTarget.blur()" 
                       :class="refreshingNodeId === '${node.id}' ? 'animate-spin' : ''"
                       class="w-7 h-7 flex items-center justify-center rounded-full border border-black bg-transparent text-gray-700 transition-colors duration-200 hover:bg-emerald-500 hover:text-white"
                       title="Refresh node data"
                       aria-label="Refresh node data">
                 <i class="mdi mdi-refresh text-lg"></i>
               </button>
-              <button @click="deselectNode(); panels.right.visible = false"
+              <button @click="deselectNode(); panels.right.visible = false; $event.currentTarget.blur()"
                       class="w-7 h-7 flex items-center justify-center rounded-full border border-black bg-transparent text-gray-700 transition-colors duration-200 hover:bg-rose-500 hover:text-white"
                       title="Close sidebar"
                       aria-label="Close sidebar">
