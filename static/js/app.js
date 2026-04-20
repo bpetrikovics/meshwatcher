@@ -160,6 +160,9 @@ function meshApp() {
     // Version tracking for auto-refresh
     storedVersion: null,
 
+    // Websocket connection status
+    socketConnected: false,
+
     // Get cached unique roles
     getUniqueRoles() {
       if (this.needsRoleUpdate || this.cachedRoles === null) {
@@ -287,6 +290,7 @@ function meshApp() {
         this.eventsSocket = io(namespace);
         this.eventsSocket.on("connect", () => {
           console.log("Connected to events socket", namespace);
+          this.socketConnected = true;
           if (this.eventsSocketHasConnectedOnce) {
             this.reloadNodes();
           }
@@ -294,6 +298,7 @@ function meshApp() {
         });
         this.eventsSocket.on("disconnect", () => {
           console.log("Disconnected from events socket");
+          this.socketConnected = false;
         });
         this.eventsSocket.on("event", (evt) => {
           this.handleRealtimeEvent(evt);

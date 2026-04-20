@@ -49,6 +49,15 @@
                         aria-label="Toggle bottom panel">
                     <i class="mdi mdi-console text-xl" aria-hidden="true"></i>
                 </button>
+                
+                <!-- Websocket Connection Indicator -->
+                <div class="flex items-center space-x-2 px-2 py-1 rounded"
+                     :class="socketConnected ? 'bg-green-900 bg-opacity-30' : 'bg-red-900 bg-opacity-30'"
+                     :title="socketConnected ? 'Websocket: connected' : 'Websocket: disconnected'">
+                    <div class="w-2.5 h-2.5 rounded-full"
+                         :class="socketConnected ? 'bg-green-500 shadow-lg shadow-green-500' : 'bg-red-500 shadow-lg shadow-red-500'">
+                    </div>
+                </div>
             </div>
         </header>
 
