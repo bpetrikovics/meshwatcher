@@ -1517,12 +1517,21 @@ function meshApp() {
           <!-- Header with refresh button -->
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-gray-900">Node Details</h2>
-            <button @click="refreshNodeData('${node.id}')" 
-                    :class="refreshingNodeId === '${node.id}' ? 'animate-spin' : ''"
-                    class="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-full transition-all duration-200 transform hover:scale-110"
-                    title="Refresh node data">
-              <i class="mdi mdi-refresh text-gray-600"></i>
-            </button>
+            <div class="flex items-center gap-2">
+              <button @click="refreshNodeData('${node.id}')" 
+                      :class="refreshingNodeId === '${node.id}' ? 'animate-spin' : ''"
+                      class="w-7 h-7 flex items-center justify-center rounded-full border border-black bg-transparent text-gray-700 transition-colors duration-200 hover:bg-emerald-500 hover:text-white"
+                      title="Refresh node data"
+                      aria-label="Refresh node data">
+                <i class="mdi mdi-refresh text-lg"></i>
+              </button>
+              <button @click="deselectNode(); panels.right.visible = false"
+                      class="w-7 h-7 flex items-center justify-center rounded-full border border-black bg-transparent text-gray-700 transition-colors duration-200 hover:bg-rose-500 hover:text-white"
+                      title="Close sidebar"
+                      aria-label="Close sidebar">
+                <i class="mdi mdi-close text-lg"></i>
+              </button>
+            </div>
           </div>
 
           <!-- Header Card -->
@@ -2424,8 +2433,19 @@ function meshApp() {
       }
 
       const width = 340;
-      const height = 120;
-      const padding = 14;
+      const height = 140;
+      const marginLeft = 42;
+      const marginRight = 10;
+      const marginTop = 10;
+      const marginBottom = 28;
+
+      const plotLeft = marginLeft;
+      const plotRight = width - marginRight;
+      const plotTop = marginTop;
+      const plotBottom = height - marginBottom;
+
+      const plotWidth = Math.max(plotRight - plotLeft, 1);
+      const plotHeight = Math.max(plotBottom - plotTop, 1);
       const values = points.map(point => point.value);
       const minValue = Math.min(...values);
       const maxValue = Math.max(...values);
@@ -2435,10 +2455,52 @@ function meshApp() {
       const duration = Math.max(endTs - startTs, 1);
 
       const svgPoints = points.map(point => {
-        const x = padding + ((point.ts - startTs) / duration) * (width - padding * 2);
-        const y = height - padding - ((point.value - minValue) / range) * (height - padding * 2);
+        const x = plotLeft + ((point.ts - startTs) / duration) * plotWidth;
+        const y = plotBottom - ((point.value - minValue) / range) * plotHeight;
         return `${x.toFixed(1)},${y.toFixed(1)}`;
       }).join(' ');
+
+      const formatTickValue = (v) => {
+        if (!Number.isFinite(v)) return String(v);
+        const abs = Math.abs(v);
+        if (abs >= 100) return v.toFixed(0);
+        if (abs >= 10) return v.toFixed(1);
+        return v.toFixed(2);
+      };
+
+      const formatTickTime = (tsSeconds) => {
+        const d = new Date(tsSeconds * 1000);
+        if (isNaN(d.getTime())) return String(tsSeconds);
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      };
+
+      const midValue = (minValue + maxValue) / 2;
+      const yTicks = [
+        { value: maxValue, label: formatTickValue(maxValue) },
+        { value: midValue, label: formatTickValue(midValue) },
+        { value: minValue, label: formatTickValue(minValue) },
+      ];
+
+      const midTs = startTs + duration / 2;
+      const xTicks = [
+        { ts: startTs, label: formatTickTime(startTs), anchor: 'start', x: plotLeft },
+        { ts: midTs, label: formatTickTime(midTs), anchor: 'middle', x: width / 2 },
+        { ts: endTs, label: formatTickTime(endTs), anchor: 'end', x: plotRight },
+      ];
+
+      const svgCircles = points.map(point => {
+        const x = plotLeft + ((point.ts - startTs) / duration) * plotWidth;
+        const y = plotBottom - ((point.value - minValue) / range) * plotHeight;
+        const ts = new Date(point.ts * 1000);
+        const tsText = isNaN(ts.getTime()) ? String(point.ts) : ts.toLocaleString();
+        const valueText = Number.isFinite(point.value) ? point.value.toFixed(3) : String(point.value);
+        return `
+          <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6" fill="transparent" stroke="transparent" style="pointer-events: all;">
+            <title>${tsText}\n${metricType} · ${metric}: ${valueText}</title>
+          </circle>
+          <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2" fill="#10b981" opacity="0.95" style="pointer-events: none;"></circle>
+        `;
+      }).join('');
 
       const minLabel = minValue.toFixed(2);
       const maxLabel = maxValue.toFixed(2);
@@ -2461,8 +2523,23 @@ function meshApp() {
                 </linearGradient>
               </defs>
               <rect x="0" y="0" width="${width}" height="${height}" fill="transparent" />
+              ${yTicks.map(tick => {
+                const y = plotBottom - ((tick.value - minValue) / range) * plotHeight;
+                return `
+                  <line x1="${plotLeft.toFixed(1)}" y1="${y.toFixed(1)}" x2="${plotRight.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#e5e7eb" stroke-width="1" />
+                  <text x="${(plotLeft - 6).toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="#6b7280">${tick.label}</text>
+                `;
+              }).join('')}
               <polyline fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="${svgPoints}" />
-              <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="#e5e7eb" stroke-width="1" />
+              <line x1="${plotLeft.toFixed(1)}" y1="${plotBottom.toFixed(1)}" x2="${plotRight.toFixed(1)}" y2="${plotBottom.toFixed(1)}" stroke="#e5e7eb" stroke-width="1" />
+              ${xTicks.map(tick => {
+                return `
+                  <text x="${tick.x.toFixed(1)}" y="${(plotBottom + 14).toFixed(1)}" text-anchor="${tick.anchor}" font-size="9" fill="#6b7280">${tick.label}</text>
+                `;
+              }).join('')}
+              <text x="${(plotLeft + plotWidth / 2).toFixed(1)}" y="${(height - 2).toFixed(1)}" text-anchor="middle" font-size="10" fill="#6b7280">Time</text>
+              <text x="12" y="${(plotTop + plotHeight / 2).toFixed(1)}" text-anchor="middle" font-size="10" fill="#6b7280" transform="rotate(-90 12 ${(plotTop + plotHeight / 2).toFixed(1)})">Value</text>
+              ${svgCircles}
             </svg>
           </div>
           <div class="flex justify-between text-xs text-gray-500">
