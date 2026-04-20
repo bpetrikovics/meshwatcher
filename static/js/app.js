@@ -147,6 +147,11 @@ function meshApp() {
     selectedNodeHistoryRequestSeq: 0,
     telemetryWindow: 24,  // Default to 24 hours
 
+    // Chart fetch concurrency limiting (avoid burst /metrics/series requests)
+    chartFetchMaxConcurrent: 4,
+    chartFetchInFlight: 0,
+    chartFetchWaiters: [],
+
     // Refresh state
     refreshingNodeId: null,
 
@@ -2439,14 +2444,31 @@ function meshApp() {
 
     // Load chart data for a specific metric
     async loadChartForMetric(container, metricType, metric) {
+      let acquiredSlot = false;
       try {
+        const initialNodeId = this.selectedNodeId;
+        if (!initialNodeId) return;
+
+        // Log if about to be throttled (before waiting)
+        if (this.chartFetchInFlight >= this.chartFetchMaxConcurrent) {
+          console.log(`Chart fetch throttled for node ${initialNodeId}: ${metricType}/${metric} - waiting for slot (${this.chartFetchInFlight}/${this.chartFetchMaxConcurrent} in flight)`);
+        }
+
+        while (this.chartFetchInFlight >= this.chartFetchMaxConcurrent) {
+          await new Promise((resolve) => this.chartFetchWaiters.push(resolve));
+        }
+
         const nodeId = this.selectedNodeId;
         if (!nodeId) return;
 
+        this.chartFetchInFlight += 1;
+        acquiredSlot = true;
+
+        console.log(`Fetching chart data for node ${nodeId}: ${metricType}/${metric} (${this.telemetryWindow}h window)`);
         const response = await fetch(`/api/nodes/${encodeURIComponent(nodeId)}/metrics/series?metric_type=${encodeURIComponent(metricType)}&metric=${encodeURIComponent(metric)}&since_hours=${this.telemetryWindow}&max_points=100`);
         
         if (!response.ok) {
-          console.warn(`Failed to load chart for ${metricType}/${metric}:`, response.status);
+          console.warn(`Failed to load chart for node ${nodeId} (${metricType}/${metric}):`, response.status);
           return;
         }
 
@@ -2461,13 +2483,16 @@ function meshApp() {
         const placeholder = container.querySelector('.chart-placeholder');
         if (placeholder) {
           placeholder.innerHTML = `
-            <div class="text-center">
-              <i class="mdi mdi-alert-circle text-red-400 text-xl mb-1"></i>
-              <p class="text-sm text-gray-500">${metricType} - ${metric}</p>
-              <p class="text-xs text-red-400">Failed to load chart</p>
+            <div class="text-center text-red-500 text-sm">
+              Failed to load chart
             </div>
           `;
-          placeholder.classList.remove('h-32');
+        }
+      } finally {
+        if (acquiredSlot) {
+          this.chartFetchInFlight = Math.max(0, this.chartFetchInFlight - 1);
+          const next = this.chartFetchWaiters.shift();
+          if (next) next();
         }
       }
     },
