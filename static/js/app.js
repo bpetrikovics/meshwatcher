@@ -1703,7 +1703,7 @@ function meshApp() {
               <div class="flex items-center gap-2">
                 <span class="text-xs text-gray-500 font-medium" data-telemetry-label="24h">24h</span>
                 <label class="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" class="sr-only telemetry-window-toggle" data-node-id="${node.id}" ${this.telemetryWindow === 168 ? 'checked' : ''}>
+                  <input type="checkbox" class="sr-only peer telemetry-window-toggle" data-node-id="${node.id}" ${this.telemetryWindow === 168 ? 'checked' : ''}>
                   <div class="w-10 h-5 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
                 </label>
                 <span class="text-xs text-gray-500 font-medium" data-telemetry-label="7d">7d</span>
@@ -2443,7 +2443,7 @@ function meshApp() {
         const nodeId = this.selectedNodeId;
         if (!nodeId) return;
 
-        const response = await fetch(`/api/nodes/${encodeURIComponent(nodeId)}/metrics/series?metric_type=${encodeURIComponent(metricType)}&metric=${encodeURIComponent(metric)}&since_hours=24&max_points=100`);
+        const response = await fetch(`/api/nodes/${encodeURIComponent(nodeId)}/metrics/series?metric_type=${encodeURIComponent(metricType)}&metric=${encodeURIComponent(metric)}&since_hours=${this.telemetryWindow}&max_points=100`);
         
         if (!response.ok) {
           console.warn(`Failed to load chart for ${metricType}/${metric}:`, response.status);
