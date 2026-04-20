@@ -1,3 +1,5 @@
+from typing import Union
+
 from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 
@@ -52,7 +54,8 @@ class Settings(BaseSettings):
     namespace_packets: str = "/packets"
     namespace_events: str = "/events"
     event_flash_ms: int = 3000
-
+    cors_allowed_origins: str = "*"
+    
     # Map clustering (pixels) - sensible default can be 5
     clustering_radius: int = 0  # 0 = spiderfying only, >0 = clustering radius
 
@@ -63,6 +66,19 @@ class Settings(BaseSettings):
         env_file=".env",
         extra="ignore",
     )
+
+    @property
+    def parsed_cors_allowed_origins(self) -> Union[str, list[str]]:
+        """Normalize configured origins for Flask-CORS and Socket.IO."""
+        if self.cors_allowed_origins.strip() == "*":
+            return "*"
+
+        origins = [
+            origin.strip()
+            for origin in self.cors_allowed_origins.split(",")
+            if origin.strip()
+        ]
+        return origins or "*"
 
 # Create a single instance of settings to be used application-wide
 settings = Settings()

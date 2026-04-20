@@ -1,6 +1,7 @@
 gunicorn
 flask
 flask-socketio
+flask-cors
 pydantic-settings
 sqlalchemy
 pymysql
