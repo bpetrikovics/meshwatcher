@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from sqlalchemy import desc, and_, or_, func
 from datetime import datetime, timezone, timedelta
+import math
 from typing import Optional, List, Dict, Any
 
 from app.database import db_session
@@ -441,8 +442,10 @@ def get_node_metrics_series(node_id):
         # Simple downsampling if too many points
         if len(results) > max_points_val:
             # Take every nth point
-            step = len(results) // max_points_val
+            step = max(1, math.ceil(len(results) / max_points_val))
             results = results[::step]
+            if len(results) > max_points_val:
+                results = results[:max_points_val]
         
         # Build response
         series = []
