@@ -53,8 +53,8 @@ class Settings(BaseSettings):
     namespace_events: str = "/events"
     event_flash_ms: int = 3000
 
-    # Map clustering (pixels)
-    clustering_radius: int = 5  # 0 = spiderfying only, >0 = clustering radius
+    # Map clustering (pixels) - sensible default can be 5
+    clustering_radius: int = 0  # 0 = spiderfying only, >0 = clustering radius
 
     # Features
     event_animations_enabled: bool = False  # Future: event-driven animations
