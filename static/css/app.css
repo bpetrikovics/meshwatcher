@@ -676,6 +676,26 @@ footer.glass-panel {
     animation: cluster-flash-pulse 0.6s ease-in-out 2;
 }
 
+@keyframes ws-indicator-pulse {
+    0% {
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.0);
+    }
+    50% {
+        opacity: 1;
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+    }
+    100% {
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.0);
+    }
+}
+
+.ws-indicator-pulse {
+    animation: ws-indicator-pulse 0.25s ease-out 1;
+    will-change: opacity, box-shadow;
+}
+
 .node-icon:hover {
     transform: scale(1.1);
     box-shadow: 0 4px 8px rgba(0,0,0,0.3);

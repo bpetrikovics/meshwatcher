@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     clustering_radius: int = 0  # 0 = spiderfying only, >0 = clustering radius
 
     # Features
-    event_animations_enabled: bool = False  # Future: event-driven animations
+    event_animations_enabled: bool = True  # Future: event-driven animations
 
     model_config = ConfigDict(
         env_file=".env",

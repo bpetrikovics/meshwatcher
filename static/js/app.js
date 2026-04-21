@@ -163,6 +163,9 @@ function meshApp() {
     // Websocket connection status
     socketConnected: false,
 
+    wsIndicatorLastPulseAtMs: 0,
+    wsIndicatorPulseTimer: null,
+
     // Get cached unique roles
     getUniqueRoles() {
       if (this.needsRoleUpdate || this.cachedRoles === null) {
@@ -301,6 +304,7 @@ function meshApp() {
           this.socketConnected = false;
         });
         this.eventsSocket.on("event", (evt) => {
+          this.pulseWebsocketIndicator();
           this.handleRealtimeEvent(evt);
 
           // Handle version events for auto-refresh
@@ -311,6 +315,51 @@ function meshApp() {
       } catch (error) {
         console.error("Failed to initialize events socket:", error);
       }
+    },
+
+    pulseWebsocketIndicator() {
+      const config = window.APP_CONFIG || {};
+      if (!config.EVENT_ANIMATIONS_ENABLED) return;
+
+      const now = Date.now();
+      const throttleMs = 200;
+      if (now - this.wsIndicatorLastPulseAtMs < throttleMs) return;
+      this.wsIndicatorLastPulseAtMs = now;
+
+      const dot = document.getElementById("ws-indicator-dot");
+      if (!dot) return;
+
+      if (this.wsIndicatorPulseTimer) {
+        try {
+          clearTimeout(this.wsIndicatorPulseTimer);
+        } catch (e) {}
+        this.wsIndicatorPulseTimer = null;
+      }
+
+      try {
+        dot.classList.remove("ws-indicator-pulse");
+      } catch (e) {
+        return;
+      }
+
+      try {
+        requestAnimationFrame(() => {
+          try {
+            dot.classList.add("ws-indicator-pulse");
+          } catch (e) {}
+        });
+      } catch (error) {
+        try {
+          dot.classList.add("ws-indicator-pulse");
+        } catch (e) {}
+      }
+
+      this.wsIndicatorPulseTimer = setTimeout(() => {
+        try {
+          dot.classList.remove("ws-indicator-pulse");
+        } catch (e) {}
+        this.wsIndicatorPulseTimer = null;
+      }, 300);
     },
 
     async reloadNodes() {
@@ -937,6 +986,13 @@ function meshApp() {
         } catch (e) {}
       });
       this.markerFlashTimers = {};
+
+      if (this.wsIndicatorPulseTimer) {
+        try {
+          clearTimeout(this.wsIndicatorPulseTimer);
+        } catch (e) {}
+        this.wsIndicatorPulseTimer = null;
+      }
 
       // Clear node references
       this.nodes = {};
