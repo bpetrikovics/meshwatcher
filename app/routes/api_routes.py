@@ -374,13 +374,14 @@ def get_node_telemetry_summary(node_id):
             Metric.metric
         ).subquery()
         
-        # Join back to get the full results ordered by recency
+        # Join back to get the full results ordered consistently
         results = session.query(
             subquery.c.metric_type,
             subquery.c.metric,
             subquery.c.latest_ts
         ).order_by(
-            desc(subquery.c.latest_ts)
+            subquery.c.metric_type,
+            subquery.c.metric
         ).all()
         
         # Build response
