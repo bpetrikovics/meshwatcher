@@ -145,6 +145,7 @@ function meshApp() {
     selectedNodeHistory: [],
     selectedNodeHistoryLayer: null,
     selectedNodeHistoryRequestSeq: 0,
+    positionHistoryEnabled: false,
     telemetryWindow: 24,  // Default to 24 hours
 
     // Chart fetch concurrency limiting (avoid burst /metrics/series requests)
@@ -1716,10 +1717,19 @@ function meshApp() {
 
           <!-- Location Card -->
           <div class="card p-4">
-            <h4 class="font-medium text-gray-900 mb-3 flex items-center">
-              <i class="mdi mdi-map-marker mr-2 text-blue-500"></i>
-              Location
-            </h4>
+            <div class="flex items-center justify-between mb-3">
+              <h4 class="font-medium text-gray-900 flex items-center">
+                <i class="mdi mdi-map-marker mr-2 text-blue-500"></i>
+                Location
+              </h4>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-500 font-medium">History</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" class="sr-only peer position-history-toggle" data-node-id="${node.id}" ${this.positionHistoryEnabled ? 'checked' : ''}>
+                  <div class="w-10 h-5 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                </label>
+              </div>
+            </div>
             <div class="space-y-2 text-sm">
               ${position.latitude ? `
               <div class="flex justify-between">
@@ -2089,8 +2099,56 @@ function meshApp() {
         if (node?.position) {
           this.updateSelectedNodeCircle(nodeId, node.position);
         }
-        if (!this.selectedNodeHistoryLayer || !this.selectedNodeHistory?.length) {
-          this.loadNodeHistory(nodeId);
+
+        queueMicrotask(() => {
+          const toggle = document.querySelector('.position-history-toggle');
+          if (!toggle) return;
+
+          const existingHandler = toggle._handlePositionHistoryToggle;
+          if (existingHandler) {
+            toggle.removeEventListener('change', existingHandler);
+          }
+
+          const handlePositionHistoryToggle = (e) => {
+            this.positionHistoryEnabled = !!e.target.checked;
+
+            if (!this.positionHistoryEnabled) {
+              if (this.selectedNodeHistoryLayer && this.map) {
+                try {
+                  this.map.removeLayer(this.selectedNodeHistoryLayer);
+                } catch (error) {
+                  // Ignore removal errors
+                }
+                this.selectedNodeHistoryLayer = null;
+              }
+              return;
+            }
+
+            if (!this.selectedNodeId) return;
+            if (!this.selectedNodeHistoryLayer || !this.selectedNodeHistory?.length) {
+              this.loadNodeHistory(this.selectedNodeId);
+            } else {
+              this.renderNodeHistory();
+            }
+          };
+
+          toggle._handlePositionHistoryToggle = handlePositionHistoryToggle;
+          toggle.addEventListener('change', handlePositionHistoryToggle);
+        });
+
+        if (this.positionHistoryEnabled) {
+          if (!this.selectedNodeHistoryLayer || !this.selectedNodeHistory?.length) {
+            this.loadNodeHistory(nodeId);
+          }
+        } else {
+          if (this.selectedNodeHistoryLayer && this.map) {
+            try {
+              this.map.removeLayer(this.selectedNodeHistoryLayer);
+            } catch (error) {
+              // Ignore removal errors
+            }
+            this.selectedNodeHistoryLayer = null;
+          }
         }
         // Fetch telemetry for the sidebar
         this.fetchTelemetrySummary(nodeId);
@@ -2113,8 +2171,46 @@ function meshApp() {
         this.selectedNodeDetailsHtml = "";
       }
 
+      queueMicrotask(() => {
+        const toggle = document.querySelector('.position-history-toggle');
+        if (!toggle) return;
+
+        const existingHandler = toggle._handlePositionHistoryToggle;
+        if (existingHandler) {
+          toggle.removeEventListener('change', existingHandler);
+        }
+
+        const handlePositionHistoryToggle = (e) => {
+          this.positionHistoryEnabled = !!e.target.checked;
+
+          if (!this.positionHistoryEnabled) {
+            if (this.selectedNodeHistoryLayer && this.map) {
+              try {
+                this.map.removeLayer(this.selectedNodeHistoryLayer);
+              } catch (error) {
+                // Ignore removal errors
+              }
+              this.selectedNodeHistoryLayer = null;
+            }
+            return;
+          }
+
+          if (!this.selectedNodeId) return;
+          if (!this.selectedNodeHistoryLayer || !this.selectedNodeHistory?.length) {
+            this.loadNodeHistory(this.selectedNodeId);
+          } else {
+            this.renderNodeHistory();
+          }
+        };
+
+        toggle._handlePositionHistoryToggle = handlePositionHistoryToggle;
+        toggle.addEventListener('change', handlePositionHistoryToggle);
+      });
+
       if (!node || !node.position) {
-        this.loadNodeHistory(nodeId);
+        if (this.positionHistoryEnabled) {
+          this.loadNodeHistory(nodeId);
+        }
         return;
       }
 
@@ -2132,8 +2228,10 @@ function meshApp() {
         ).addTo(this.map);
       }
 
-      // Load and display location history
-      this.loadNodeHistory(nodeId);
+      // Load and display location history (only when enabled)
+      if (this.positionHistoryEnabled) {
+        this.loadNodeHistory(nodeId);
+      }
       
       // Fetch telemetry for the sidebar
       this.fetchTelemetrySummary(nodeId);
