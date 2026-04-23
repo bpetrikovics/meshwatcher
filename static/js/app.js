@@ -144,6 +144,11 @@ function meshApp() {
     selectedNodePrecisionCircle: null,
     selectedNodeHistory: [],
     selectedNodeHistoryLayer: null,
+    selectedNodeHistoryRenderState: {
+      token: 0,
+      lastRenderedLength: 0,
+      rendering: false,
+    },
     selectedNodeHistoryRequestSeq: 0,
     positionHistoryEnabled: false,
     telemetryWindow: 24,  // Default to 24 hours
@@ -381,6 +386,8 @@ function meshApp() {
       try {
         this.nodeLayer.clearLayers();
       } catch (error) {}
+
+      this.clearSelectedNodeHistoryLayer();
 
       this.nodes = {};
       this.invalidateRoleCache();
@@ -2113,14 +2120,7 @@ function meshApp() {
             this.positionHistoryEnabled = !!e.target.checked;
 
             if (!this.positionHistoryEnabled) {
-              if (this.selectedNodeHistoryLayer && this.map) {
-                try {
-                  this.map.removeLayer(this.selectedNodeHistoryLayer);
-                } catch (error) {
-                  // Ignore removal errors
-                }
-                this.selectedNodeHistoryLayer = null;
-              }
+              this.clearSelectedNodeHistoryLayer();
               return;
             }
 
@@ -2141,14 +2141,7 @@ function meshApp() {
             this.loadNodeHistory(nodeId);
           }
         } else {
-          if (this.selectedNodeHistoryLayer && this.map) {
-            try {
-              this.map.removeLayer(this.selectedNodeHistoryLayer);
-            } catch (error) {
-              // Ignore removal errors
-            }
-            this.selectedNodeHistoryLayer = null;
-          }
+          this.clearSelectedNodeHistoryLayer();
         }
         // Fetch telemetry for the sidebar
         this.fetchTelemetrySummary(nodeId);
@@ -2184,14 +2177,7 @@ function meshApp() {
           this.positionHistoryEnabled = !!e.target.checked;
 
           if (!this.positionHistoryEnabled) {
-            if (this.selectedNodeHistoryLayer && this.map) {
-              try {
-                this.map.removeLayer(this.selectedNodeHistoryLayer);
-              } catch (error) {
-                // Ignore removal errors
-              }
-              this.selectedNodeHistoryLayer = null;
-            }
+            this.clearSelectedNodeHistoryLayer();
             return;
           }
 
@@ -2244,15 +2230,7 @@ function meshApp() {
       this.selectedNodeHistory = [];
       this.selectedNodeDetailsHtml = "";
 
-      // Remove history layer if it exists
-      if (this.selectedNodeHistoryLayer && this.map) {
-        try {
-          this.map.removeLayer(this.selectedNodeHistoryLayer);
-        } catch (error) {
-          // Ignore removal errors
-        }
-        this.selectedNodeHistoryLayer = null;
-      }
+      this.clearSelectedNodeHistoryLayer();
 
       if (!circle) return;
 
@@ -2333,144 +2311,267 @@ function meshApp() {
 
     async loadNodeHistory(nodeId) {
       try {
+        if (!nodeId || this.selectedNodeId !== nodeId) {
+          return;
+        }
+
+        const startedAtMs =
+          typeof performance !== "undefined" && typeof performance.now === "function"
+            ? performance.now()
+            : Date.now();
+
         const requestSeq = ++this.selectedNodeHistoryRequestSeq;
         const response = await fetch(`/api/nodes/${encodeURIComponent(nodeId)}/positions`);
+
+        if (requestSeq !== this.selectedNodeHistoryRequestSeq || this.selectedNodeId !== nodeId) {
+          return;
+        }
+
         if (!response.ok) {
           console.warn("Failed to load node history:", response.statusText);
           return;
         }
+
         const data = await response.json();
-        if (requestSeq !== this.selectedNodeHistoryRequestSeq) {
+        if (
+          requestSeq !== this.selectedNodeHistoryRequestSeq ||
+          this.selectedNodeId !== nodeId ||
+          !this.positionHistoryEnabled
+        ) {
           return;
         }
+
         this.selectedNodeHistory = data.positions || [];
+        this.selectedNodeHistoryRenderState.lastRenderedLength = 0;
         console.log("Node", nodeId, "history loaded:", this.selectedNodeHistory.length, "positions");
+        this.logHistoryPerf("load", {
+          nodeId,
+          points: this.selectedNodeHistory.length,
+          durationMs: Math.round(
+            (
+              (typeof performance !== "undefined" && typeof performance.now === "function"
+                ? performance.now()
+                : Date.now()) - startedAtMs
+            ) * 100
+          ) / 100,
+        });
         this.renderNodeHistory();
       } catch (error) {
         console.error("Error loading node history:", error);
       }
     },
 
-    renderNodeHistory() {
-      if (!this.map) return;
-
-      // Always clear previous history layer before re-rendering to avoid stacking/leaks
-      if (this.selectedNodeHistoryLayer) {
+    clearSelectedNodeHistoryLayer() {
+      if (this.selectedNodeHistoryLayer && this.map) {
         try {
           this.map.removeLayer(this.selectedNodeHistoryLayer);
         } catch (error) {
-          // Ignore
+          // Ignore removal errors
         }
-        this.selectedNodeHistoryLayer = null;
+      }
+      this.selectedNodeHistoryLayer = null;
+      this.selectedNodeHistoryRequestSeq += 1;
+      this.selectedNodeHistoryRenderState.token += 1;
+      this.selectedNodeHistoryRenderState.lastRenderedLength = 0;
+      this.selectedNodeHistoryRenderState.rendering = false;
+    },
+
+    isHistoryPerfLoggingEnabled() {
+      const config = window.APP_CONFIG || {};
+      return !!config.HISTORY_PERF_LOG;
+    },
+
+    logHistoryPerf(eventName, payload) {
+      if (!this.isHistoryPerfLoggingEnabled()) return;
+      console.debug("[history-perf]", eventName, payload || {});
+    },
+
+    getHistorySpeedColor(kmph) {
+      if (kmph == null || kmph <= 0) return "#9ca3af";
+      if (kmph < 5) return "#9ca3af";
+      if (kmph < 20) return "#f59e0b";
+      return "#ef4444";
+    },
+
+    getHistoryAgeColor(createdAt, nowMs, oldestMs) {
+      if (!createdAt) return "#9ca3af";
+      const ageRangeMs = Math.max(nowMs - oldestMs, 0);
+      const ageMs = nowMs - new Date(createdAt).getTime();
+      const ratio = ageRangeMs > 0 ? Math.min(Math.max(ageMs / ageRangeMs, 0), 1) : 0;
+      if (ratio < 0.33) return "#3b82f6";
+      if (ratio < 0.66) return "#8b5cf6";
+      return "#6b7280";
+    },
+
+    createHistoryTooltipHtml(pos) {
+      const ts = pos.created_at ? new Date(pos.created_at).toLocaleString() : "Unknown";
+      const speed = pos.ground_speed_kmph != null ? `${pos.ground_speed_kmph.toFixed(1)} km/h` : "N/A";
+      const heading = pos.heading != null ? `${pos.heading.toFixed(1)}°` : "N/A";
+      return `Time: ${ts}<br>Lat: ${pos.latitude.toFixed(6)}<br>Lon: ${pos.longitude.toFixed(6)}<br>Speed: ${speed}<br>Heading: ${heading}`;
+    },
+
+    createHistoryPointLayer(pos) {
+      if (!pos || pos.latitude == null || pos.longitude == null) return null;
+
+      const markerColor = this.getHistorySpeedColor(pos.ground_speed_kmph);
+      const isMoving = pos.heading != null && pos.ground_speed_kmph != null && pos.ground_speed_kmph > 0;
+      let marker;
+
+      if (isMoving) {
+        const arrowIcon = L.divIcon({
+          className: "history-arrow",
+          html: `<div style="width: 12px; height: 12px; position: relative;">
+                   <div style="position: absolute; top: 0; left: 0; width: 0; height: 0;
+                       border-left: 6px solid transparent; border-right: 6px solid transparent;
+                       border-bottom: 12px solid ${markerColor}; transform: rotate(${pos.heading}deg);
+                       transform-origin: center 6px;"></div>
+                 </div>`,
+          iconSize: [12, 12],
+          iconAnchor: [6, 6],
+        });
+        marker = L.marker([pos.latitude, pos.longitude], { icon: arrowIcon });
+      } else {
+        marker = L.circleMarker([pos.latitude, pos.longitude], {
+          radius: 4,
+          fillColor: markerColor,
+          color: "#fff",
+          weight: 1,
+          opacity: 1,
+          fillOpacity: 0.8,
+        });
       }
 
-      if (!this.selectedNodeHistory.length) {
+      marker.bindTooltip(this.createHistoryTooltipHtml(pos));
+      return marker;
+    },
+
+    createHistorySegmentLayer(p1, p2, nowMs, oldestMs) {
+      if (!p1 || !p2 || p1.latitude == null || p1.longitude == null || p2.latitude == null || p2.longitude == null) {
+        return null;
+      }
+      const color = this.getHistoryAgeColor(p1.created_at, nowMs, oldestMs);
+      return L.polyline([[p1.latitude, p1.longitude], [p2.latitude, p2.longitude]], {
+        color,
+        weight: 3,
+        opacity: 0.7,
+      });
+    },
+
+    renderNodeHistory() {
+      if (!this.map || !this.positionHistoryEnabled) return;
+
+      const history = this.selectedNodeHistory || [];
+      if (!history.length) {
+        this.clearSelectedNodeHistoryLayer();
         return;
       }
 
-      // Create layer group for history
-      this.selectedNodeHistoryLayer = L.layerGroup().addTo(this.map);
-
-      const history = this.selectedNodeHistory;
-      const now = new Date();
-      const oldestTs = history[0] ? new Date(history[0].created_at) : now;
-      const ageRangeMs = now - oldestTs;
-
-      // Helper to get age bucket color
-      function getAgeColor(createdAt) {
-        if (!createdAt) return "#9ca3af"; // gray for unknown
-        const ageMs = now - new Date(createdAt);
-        const ratio = ageRangeMs > 0 ? Math.min(ageMs / ageRangeMs, 1) : 0;
-        if (ratio < 0.33) return "#3b82f6"; // blue (newest)
-        if (ratio < 0.66) return "#8b5cf6"; // purple (mid)
-        return "#6b7280"; // gray (oldest)
+      if (!this.selectedNodeHistoryLayer) {
+        this.selectedNodeHistoryLayer = L.layerGroup().addTo(this.map);
+      } else {
+        this.selectedNodeHistoryLayer.clearLayers();
       }
 
-      // Helper to get speed bucket color
-      function getSpeedColor(kmph) {
-        if (kmph == null || kmph <= 0) return "#9ca3af"; // gray for none
-        if (kmph < 5) return "#9ca3af"; // gray (slow)
-        if (kmph < 20) return "#f59e0b"; // orange (medium)
-        return "#ef4444"; // red (fast)
-      }
+      const token = this.selectedNodeHistoryRenderState.token + 1;
+      this.selectedNodeHistoryRenderState.token = token;
+      this.selectedNodeHistoryRenderState.lastRenderedLength = 0;
+      this.selectedNodeHistoryRenderState.rendering = true;
 
-      // Helper to compute distance between two lat/lon points (Haversine)
-      function haversine(lat1, lon1, lat2, lon2) {
-        const R = 6371000; // Earth radius in meters
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                  Math.sin(dLon/2) * Math.sin(dLon/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c;
-      }
+      const startedAtMs =
+        typeof performance !== "undefined" && typeof performance.now === "function"
+          ? performance.now()
+          : Date.now();
+      let batchCount = 0;
+      let renderedPoints = 0;
+      let renderedSegments = 0;
 
-      // Render single element per position (triangle for moving, dot for stationary)
+      const nowMs = Date.now();
+      const oldestMs = history[0]?.created_at ? new Date(history[0].created_at).getTime() : nowMs;
       const newestIndex = history.length - 1;
-      history.forEach((pos, i) => {
-        // Skip the newest/current point marker to avoid overlapping the existing node marker
-        if (i === newestIndex) {
+      const BATCH_SIZE = 150;
+      let pointIndex = 0;
+      let segmentIndex = 0;
+
+      const renderBatch = () => {
+        if (this.selectedNodeHistoryRenderState.token !== token) {
+          this.selectedNodeHistoryRenderState.rendering = false;
+          this.logHistoryPerf("render_cancelled", {
+            token,
+            batches: batchCount,
+            points: renderedPoints,
+            segments: renderedSegments,
+          });
           return;
         }
-        const markerColor = getSpeedColor(pos.ground_speed_kmph);
-        const isMoving = pos.heading != null && pos.ground_speed_kmph != null && pos.ground_speed_kmph > 0;
-        
-        let marker;
-        if (isMoving) {
-          // Create triangle/arrow for moving nodes
-          const arrowIcon = L.divIcon({
-            className: "history-arrow",
-            html: `<div style="width: 12px; height: 12px; position: relative;">
-                     <div style="position: absolute; top: 0; left: 0; width: 0; height: 0; 
-                         border-left: 6px solid transparent; border-right: 6px solid transparent;
-                         border-bottom: 12px solid ${markerColor}; transform: rotate(${pos.heading}deg);
-                         transform-origin: center 6px;"></div>
-                   </div>`,
-            iconSize: [12, 12],
-            iconAnchor: [6, 6],
-          });
-          marker = L.marker([pos.latitude, pos.longitude], { icon: arrowIcon });
-        } else {
-          // Create dot for stationary nodes
-          marker = L.circleMarker([pos.latitude, pos.longitude], {
-            radius: 4,
-            fillColor: markerColor,
-            color: "#fff",
-            weight: 1,
-            opacity: 1,
-            fillOpacity: 0.8,
-          });
-        }
-        
-        // Add tooltip to all markers
-        marker.bindTooltip(() => {
-          const ts = pos.created_at ? new Date(pos.created_at).toLocaleString() : "Unknown";
-          const speed = pos.ground_speed_kmph != null ? `${pos.ground_speed_kmph.toFixed(1)} km/h` : "N/A";
-          const heading = pos.heading != null ? `${pos.heading.toFixed(1)}°` : "N/A";
-          return `Time: ${ts}<br>Lat: ${pos.latitude.toFixed(6)}<br>Lon: ${pos.longitude.toFixed(6)}<br>Speed: ${speed}<br>Heading: ${heading}`;
-        });
-        
-        this.selectedNodeHistoryLayer.addLayer(marker);
-      });
 
-      // Render line segments with age colors
-      for (let i = 0; i < history.length - 1; i++) {
-        const p1 = history[i];
-        const p2 = history[i + 1];
-        const color = getAgeColor(p1.created_at);
-        const polyline = L.polyline([[p1.latitude, p1.longitude], [p2.latitude, p2.longitude]], {
-          color: color,
-          weight: 3,
-          opacity: 0.7,
+        batchCount += 1;
+        let ops = 0;
+        while (pointIndex < newestIndex && ops < BATCH_SIZE) {
+          const marker = this.createHistoryPointLayer(history[pointIndex]);
+          if (marker) {
+            this.selectedNodeHistoryLayer.addLayer(marker);
+            renderedPoints += 1;
+          }
+          pointIndex += 1;
+          ops += 1;
+        }
+
+        while (segmentIndex < history.length - 1 && ops < BATCH_SIZE) {
+          const segment = this.createHistorySegmentLayer(
+            history[segmentIndex],
+            history[segmentIndex + 1],
+            nowMs,
+            oldestMs,
+          );
+          if (segment) {
+            this.selectedNodeHistoryLayer.addLayer(segment);
+            renderedSegments += 1;
+          }
+          segmentIndex += 1;
+          ops += 1;
+        }
+
+        if (pointIndex < newestIndex || segmentIndex < history.length - 1) {
+          try {
+            requestAnimationFrame(renderBatch);
+          } catch (error) {
+            renderBatch();
+          }
+          return;
+        }
+
+        this.selectedNodeHistoryRenderState.lastRenderedLength = history.length;
+        this.selectedNodeHistoryRenderState.rendering = false;
+        this.logHistoryPerf("render_complete", {
+          token,
+          batches: batchCount,
+          points: renderedPoints,
+          segments: renderedSegments,
+          durationMs: Math.round(
+            (
+              (typeof performance !== "undefined" && typeof performance.now === "function"
+                ? performance.now()
+                : Date.now()) - startedAtMs
+            ) * 100
+          ) / 100,
         });
-        this.selectedNodeHistoryLayer.addLayer(polyline);
+      };
+
+      try {
+        requestAnimationFrame(renderBatch);
+      } catch (error) {
+        renderBatch();
       }
     },
 
-    // Append realtime position to history and re-render
+    // Append realtime position to history and update incrementally when safe
     appendRealtimePosition(nodeId, position) {
       if (this.selectedNodeId !== nodeId || !this.selectedNodeHistory) return;
+
+      const startedAtMs =
+        typeof performance !== "undefined" && typeof performance.now === "function"
+          ? performance.now()
+          : Date.now();
 
       const createdAt = position?.created_at ? position.created_at : new Date().toISOString();
 
@@ -2488,7 +2589,67 @@ function meshApp() {
 
       // Append and re-render
       this.selectedNodeHistory.push(historyEntry);
-      this.renderNodeHistory();
+
+      if (!this.positionHistoryEnabled || !this.map || !this.selectedNodeHistoryLayer) {
+        return;
+      }
+
+      const history = this.selectedNodeHistory;
+      if (this.selectedNodeHistoryRenderState.rendering) {
+        this.logHistoryPerf("append_skipped_rendering", {
+          nodeId,
+          historyLength: history.length,
+        });
+        return;
+      }
+
+      const expectedPreviousLength = history.length - 1;
+      if (this.selectedNodeHistoryRenderState.lastRenderedLength !== expectedPreviousLength) {
+        this.logHistoryPerf("append_fallback_full_render", {
+          nodeId,
+          historyLength: history.length,
+          expectedPreviousLength,
+          lastRenderedLength: this.selectedNodeHistoryRenderState.lastRenderedLength,
+        });
+        this.renderNodeHistory();
+        return;
+      }
+
+      const prev = history[history.length - 2];
+      const latest = history[history.length - 1];
+      if (!prev || !latest) {
+        this.logHistoryPerf("append_fallback_missing_points", {
+          nodeId,
+          historyLength: history.length,
+        });
+        this.renderNodeHistory();
+        return;
+      }
+
+      const prevMarker = this.createHistoryPointLayer(prev);
+      if (prevMarker) {
+        this.selectedNodeHistoryLayer.addLayer(prevMarker);
+      }
+
+      const nowMs = Date.now();
+      const oldestMs = history[0]?.created_at ? new Date(history[0].created_at).getTime() : nowMs;
+      const latestSegment = this.createHistorySegmentLayer(prev, latest, nowMs, oldestMs);
+      if (latestSegment) {
+        this.selectedNodeHistoryLayer.addLayer(latestSegment);
+      }
+
+      this.selectedNodeHistoryRenderState.lastRenderedLength = history.length;
+      this.logHistoryPerf("append_incremental", {
+        nodeId,
+        historyLength: history.length,
+        durationMs: Math.round(
+          (
+            (typeof performance !== "undefined" && typeof performance.now === "function"
+              ? performance.now()
+              : Date.now()) - startedAtMs
+          ) * 100
+        ) / 100,
+      });
     },
 
     // Fetch node statistics for the sidebar
