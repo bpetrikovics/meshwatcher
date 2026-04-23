@@ -2431,6 +2431,10 @@ function meshApp() {
         });
         marker = L.marker([pos.latitude, pos.longitude], { icon: arrowIcon });
       } else {
+        // Canvas renderer avoids one SVG element per marker; critical for large histories.
+        if (!this.historyCanvasRenderer) {
+          this.historyCanvasRenderer = L.canvas();
+        }
         marker = L.circleMarker([pos.latitude, pos.longitude], {
           radius: 4,
           fillColor: markerColor,
@@ -2438,6 +2442,7 @@ function meshApp() {
           weight: 1,
           opacity: 1,
           fillOpacity: 0.8,
+          renderer: this.historyCanvasRenderer,
         });
       }
 
@@ -2481,16 +2486,50 @@ function meshApp() {
         typeof performance !== "undefined" && typeof performance.now === "function"
           ? performance.now()
           : Date.now();
-      let batchCount = 0;
-      let renderedPoints = 0;
-      let renderedSegments = 0;
 
       const nowMs = Date.now();
       const oldestMs = history[0]?.created_at ? new Date(history[0].created_at).getTime() : nowMs;
       const newestIndex = history.length - 1;
-      const BATCH_SIZE = 150;
-      let pointIndex = 0;
-      let segmentIndex = 0;
+
+      // Phase 1 (synchronous): merge consecutive same-color segments into a few
+      // multi-point polylines instead of N individual 1-segment polylines. With 3
+      // age-color buckets this produces <=3 DOM elements regardless of history
+      // length, making the path visible immediately without blocking the browser.
+      let currentColor = null;
+      let currentRun = [];
+      const flushPolylineRun = () => {
+        if (currentRun.length >= 2 && this.selectedNodeHistoryRenderState.token === token) {
+          this.selectedNodeHistoryLayer.addLayer(
+            L.polyline(currentRun, { color: currentColor, weight: 3, opacity: 0.7 }),
+          );
+        }
+      };
+      for (let i = 0; i < newestIndex; i++) {
+        const p1 = history[i], p2 = history[i + 1];
+        if (!p1 || !p2 || p1.latitude == null || p2.latitude == null) continue;
+        const color = this.getHistoryAgeColor(p1.created_at, nowMs, oldestMs);
+        if (color !== currentColor) {
+          flushPolylineRun();
+          currentColor = color;
+          currentRun = [[p1.latitude, p1.longitude]];
+        }
+        currentRun.push([p2.latitude, p2.longitude]);
+      }
+      flushPolylineRun();
+
+      // Phase 2 (RAF-batched): draw point markers. Cap to MAX_MARKERS most-recent
+      // points so tooltips are available on recent history; the path above already
+      // covers the full route.
+      const configuredMaxMarkers = Number(window.APP_CONFIG?.HISTORY_MAX_MARKERS);
+      const MAX_MARKERS = Number.isFinite(configuredMaxMarkers)
+        ? Math.max(50, Math.min(Math.floor(configuredMaxMarkers), 5000))
+        : 500;
+      const markerHistory = history.length > MAX_MARKERS ? history.slice(-MAX_MARKERS) : history;
+      const markerNewestIndex = markerHistory.length - 1;
+      let batchCount = 0;
+      let renderedPoints = 0;
+      const BATCH_SIZE = 500;
+      let markerIndex = 0;
 
       const renderBatch = () => {
         if (this.selectedNodeHistoryRenderState.token !== token) {
@@ -2499,39 +2538,24 @@ function meshApp() {
             token,
             batches: batchCount,
             points: renderedPoints,
-            segments: renderedSegments,
+            segments: newestIndex,
           });
           return;
         }
 
         batchCount += 1;
         let ops = 0;
-        while (pointIndex < newestIndex && ops < BATCH_SIZE) {
-          const marker = this.createHistoryPointLayer(history[pointIndex]);
+        while (markerIndex < markerNewestIndex && ops < BATCH_SIZE) {
+          const marker = this.createHistoryPointLayer(markerHistory[markerIndex]);
           if (marker) {
             this.selectedNodeHistoryLayer.addLayer(marker);
             renderedPoints += 1;
           }
-          pointIndex += 1;
+          markerIndex += 1;
           ops += 1;
         }
 
-        while (segmentIndex < history.length - 1 && ops < BATCH_SIZE) {
-          const segment = this.createHistorySegmentLayer(
-            history[segmentIndex],
-            history[segmentIndex + 1],
-            nowMs,
-            oldestMs,
-          );
-          if (segment) {
-            this.selectedNodeHistoryLayer.addLayer(segment);
-            renderedSegments += 1;
-          }
-          segmentIndex += 1;
-          ops += 1;
-        }
-
-        if (pointIndex < newestIndex || segmentIndex < history.length - 1) {
+        if (markerIndex < markerNewestIndex) {
           try {
             requestAnimationFrame(renderBatch);
           } catch (error) {
@@ -2546,7 +2570,7 @@ function meshApp() {
           token,
           batches: batchCount,
           points: renderedPoints,
-          segments: renderedSegments,
+          segments: newestIndex,
           durationMs: Math.round(
             (
               (typeof performance !== "undefined" && typeof performance.now === "function"
