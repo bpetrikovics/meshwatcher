@@ -2414,12 +2414,12 @@ function meshApp() {
 
     getHistoryAgeColor(createdAt, nowMs, oldestMs) {
       if (!createdAt) return "#9ca3af";
-      const ageRangeMs = Math.max(nowMs - oldestMs, 0);
       const ageMs = nowMs - new Date(createdAt).getTime();
-      const ratio = ageRangeMs > 0 ? Math.min(Math.max(ageMs / ageRangeMs, 0), 1) : 0;
-      if (ratio < 0.33) return "#3b82f6";
-      if (ratio < 0.66) return "#8b5cf6";
-      return "#6b7280";
+      if (ageMs <  1 * 3600 * 1000) return "#06b6d4";   // < 1h    → cyan
+      if (ageMs <  6 * 3600 * 1000) return "#3b82f6";   // < 6h    → blue
+      if (ageMs < 24 * 3600 * 1000) return "#6366f1";   // < 24h   → indigo
+      if (ageMs < 72 * 3600 * 1000) return "#8b5cf6";   // < 3 days → violet
+      return "#6b7280";                                   // older   → gray
     },
 
     createHistoryTooltipHtml(pos) {
