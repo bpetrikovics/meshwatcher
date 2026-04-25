@@ -151,6 +151,7 @@ function meshApp() {
     },
     selectedNodeHistoryRequestSeq: 0,
     positionHistoryEnabled: false,
+    positionHistoryRangeHours: 24,
     telemetryWindow: 24,  // Default to 24 hours
 
     // Chart fetch concurrency limiting (avoid burst /metrics/series requests)
@@ -1737,6 +1738,16 @@ function meshApp() {
                 </label>
               </div>
             </div>
+            ${this.positionHistoryEnabled ? `
+            <div class="position-history-range-container mt-2 mb-1">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs text-gray-400">History window</span>
+                <span class="position-history-range-label text-xs font-medium text-blue-400">${this.formatHistoryRangeLabel(this.positionHistoryRangeHours)}</span>
+              </div>
+              <input type="range" class="position-history-range-slider w-full"
+                     min="1" max="168" step="1" value="${this.positionHistoryRangeHours}">
+            </div>
+            ` : ''}
             <div class="space-y-2 text-sm">
               ${position.latitude ? `
               <div class="flex justify-between">
@@ -2119,6 +2130,8 @@ function meshApp() {
           const handlePositionHistoryToggle = (e) => {
             this.positionHistoryEnabled = !!e.target.checked;
 
+            this._syncHistoryRangeSliderVisibility();
+
             if (!this.positionHistoryEnabled) {
               this.clearSelectedNodeHistoryLayer();
               return;
@@ -2134,6 +2147,8 @@ function meshApp() {
 
           toggle._handlePositionHistoryToggle = handlePositionHistoryToggle;
           toggle.addEventListener('change', handlePositionHistoryToggle);
+
+          this._wireHistoryRangeSlider();
         });
 
         if (this.positionHistoryEnabled) {
@@ -2176,6 +2191,8 @@ function meshApp() {
         const handlePositionHistoryToggle = (e) => {
           this.positionHistoryEnabled = !!e.target.checked;
 
+          this._syncHistoryRangeSliderVisibility();
+
           if (!this.positionHistoryEnabled) {
             this.clearSelectedNodeHistoryLayer();
             return;
@@ -2191,6 +2208,8 @@ function meshApp() {
 
         toggle._handlePositionHistoryToggle = handlePositionHistoryToggle;
         toggle.addEventListener('change', handlePositionHistoryToggle);
+
+        this._wireHistoryRangeSlider();
       });
 
       if (!node || !node.position) {
@@ -2462,10 +2481,70 @@ function meshApp() {
       });
     },
 
+    // Returns the subset of selectedNodeHistory within the current slider window.
+    filteredNodeHistory() {
+      const history = this.selectedNodeHistory || [];
+      const cutoffMs = Date.now() - this.positionHistoryRangeHours * 3600 * 1000;
+      return history.filter(p => p.created_at && new Date(p.created_at).getTime() >= cutoffMs);
+    },
+
+    formatHistoryRangeLabel(hours) {
+      if (hours < 24) return `${hours}h`;
+      if (hours === 168) return '1 week';
+      const days = Math.round(hours / 24);
+      return `${days} day${days !== 1 ? 's' : ''}`;
+    },
+
+    // Inject or remove the slider container depending on toggle state.
+    _syncHistoryRangeSliderVisibility() {
+      // Find the location card by looking for the toggle's ancestor card
+      const toggle = document.querySelector('.position-history-toggle');
+      const card = toggle?.closest('.card');
+      if (!card) return;
+      const existing = card.querySelector('.position-history-range-container');
+      const spaceDiv = card.querySelector('.space-y-2');
+      if (this.positionHistoryEnabled) {
+        if (!existing && spaceDiv) {
+          const container = document.createElement('div');
+          container.className = 'position-history-range-container mt-2 mb-1';
+          container.innerHTML = `
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs text-gray-400">History window</span>
+              <span class="position-history-range-label text-xs font-medium text-blue-400">${this.formatHistoryRangeLabel(this.positionHistoryRangeHours)}</span>
+            </div>
+            <input type="range" class="position-history-range-slider w-full"
+                   min="1" max="168" step="1" value="${this.positionHistoryRangeHours}">
+          `;
+          spaceDiv.parentNode.insertBefore(container, spaceDiv);
+          this._wireHistoryRangeSlider();
+        }
+      } else {
+        existing?.remove();
+      }
+    },
+
+    // Attach (or re-attach) the debounced input listener to the range slider.
+    _wireHistoryRangeSlider() {
+      const slider = document.querySelector('.position-history-range-slider');
+      if (!slider) return;
+      if (slider._rangeSliderHandler) {
+        slider.removeEventListener('input', slider._rangeSliderHandler);
+      }
+      let debounceTimer = null;
+      slider._rangeSliderHandler = (e) => {
+        this.positionHistoryRangeHours = parseInt(e.target.value, 10);
+        const label = document.querySelector('.position-history-range-label');
+        if (label) label.textContent = this.formatHistoryRangeLabel(this.positionHistoryRangeHours);
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => this.renderNodeHistory(), 100);
+      };
+      slider.addEventListener('input', slider._rangeSliderHandler);
+    },
+
     renderNodeHistory() {
       if (!this.map || !this.positionHistoryEnabled) return;
 
-      const history = this.selectedNodeHistory || [];
+      const history = this.filteredNodeHistory();
       if (!history.length) {
         this.clearSelectedNodeHistoryLayer();
         return;
@@ -2564,7 +2643,7 @@ function meshApp() {
           return;
         }
 
-        this.selectedNodeHistoryRenderState.lastRenderedLength = history.length;
+        this.selectedNodeHistoryRenderState.lastRenderedLength = this.selectedNodeHistory.length;
         this.selectedNodeHistoryRenderState.rendering = false;
         this.logHistoryPerf("render_complete", {
           token,
@@ -2650,13 +2729,25 @@ function meshApp() {
         return;
       }
 
+      // If the previous point is outside the current filter window, fall back to
+      // a full re-render so no segment is drawn from an invisible point to the new one.
+      const cutoffMs = Date.now() - this.positionHistoryRangeHours * 3600 * 1000;
+      if (prev.created_at && new Date(prev.created_at).getTime() < cutoffMs) {
+        this.renderNodeHistory();
+        return;
+      }
+
       const prevMarker = this.createHistoryPointLayer(prev);
       if (prevMarker) {
         this.selectedNodeHistoryLayer.addLayer(prevMarker);
       }
 
       const nowMs = Date.now();
-      const oldestMs = history[0]?.created_at ? new Date(history[0].created_at).getTime() : nowMs;
+      // Use cutoff as the oldest reference so age colors match the filtered renderNodeHistory view.
+      const oldestMs = Math.max(
+        cutoffMs,
+        history[0]?.created_at ? new Date(history[0].created_at).getTime() : cutoffMs,
+      );
       const latestSegment = this.createHistorySegmentLayer(prev, latest, nowMs, oldestMs);
       if (latestSegment) {
         this.selectedNodeHistoryLayer.addLayer(latestSegment);

@@ -143,6 +143,84 @@ header.bg-gray-800 h1 {
     text-align: right;
 }
 
+/* Position History Range Slider */
+.position-history-range-container {
+    padding: 0 2px;
+}
+
+.position-history-range-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.position-history-range-slider::-webkit-slider-track {
+    background: #e5e7eb;
+    height: 4px;
+    border-radius: 2px;
+    transition: background 0.2s ease;
+}
+
+.position-history-range-slider::-moz-range-track {
+    background: #e5e7eb;
+    height: 4px;
+    border-radius: 2px;
+    transition: background 0.2s ease;
+}
+
+.position-history-range-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    background: #3b82f6;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid #1e40af;
+    cursor: pointer;
+    margin-top: -5px;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.position-history-range-slider::-moz-range-thumb {
+    background: #3b82f6;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid #1e40af;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.position-history-range-slider:hover::-webkit-slider-thumb {
+    background: #2563eb;
+    transform: scale(1.15);
+    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4);
+}
+
+.position-history-range-slider:hover::-moz-range-thumb {
+    background: #2563eb;
+    transform: scale(1.15);
+    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4);
+}
+
+.position-history-range-slider:active::-webkit-slider-thumb {
+    background: #1d4ed8;
+    transform: scale(0.95);
+}
+
+.position-history-range-slider:active::-moz-range-thumb {
+    background: #1d4ed8;
+    transform: scale(0.95);
+}
+
 /* Sidebar Slider Styles */
 .panel .slider {
     -webkit-appearance: none;
