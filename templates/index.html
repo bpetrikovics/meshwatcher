@@ -98,8 +98,47 @@
                     </div>
                     
                     <div class="border-t pt-4">
-                        <h3 class="text-sm font-semibold mb-2">Node List & Filters</h3>
-                        <p class="text-gray-600">Node list, filters, and controls will go here.</p>
+                        <h3 class="text-sm font-semibold mb-2">Nodes</h3>
+
+                        <!-- Search input -->
+                        <div class="relative mb-2">
+                            <input type="text"
+                                   x-model="nodeSearchQuery"
+                                   placeholder="Search nodes…"
+                                   class="w-full pl-3 pr-7 py-1.5 text-sm rounded-lg border border-gray-200 bg-white/60 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                            <button x-show="nodeSearchQuery"
+                                    @click="nodeSearchQuery = ''"
+                                    class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm leading-none"
+                                    style="min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: flex-end; padding-right: 4px;">×</button>
+                        </div>
+
+                        <!-- Node count -->
+                        <p class="text-xs text-gray-500 mb-2"
+                           x-text="`${filteredNodes().length} of ${Object.keys(nodes).length} nodes`"></p>
+
+                        <!-- Node list -->
+                        <ul class="space-y-0.5 overflow-y-auto max-h-96">
+                            <template x-for="node in filteredNodes()" :key="node.id">
+                                <li @click="flyToNode(node.id)"
+                                    :class="selectedNodeId === node.id ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50 border-transparent'"
+                                    class="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer border text-sm transition-colors">
+                                    <!-- Status dot -->
+                                    <span class="w-2 h-2 rounded-full flex-shrink-0"
+                                          :class="{
+                                            'bg-green-500': node.info?.status === 'Active',
+                                            'bg-yellow-400': node.info?.status === 'Recently Active',
+                                            'bg-gray-400': !node.info?.status || node.info.status === 'Inactive'
+                                          }"></span>
+                                    <!-- Names -->
+                                    <span class="flex-1 min-w-0">
+                                        <span class="font-medium" x-text="node.short_name || node.id"></span>
+                                        <span class="text-gray-500 truncate block text-xs leading-tight" x-text="node.long_name || ''"></span>
+                                    </span>
+                                    <!-- Position indicator -->
+                                    <i x-show="node.position" class="mdi mdi-map-marker text-blue-400 flex-shrink-0 text-xs"></i>
+                                </li>
+                            </template>
+                        </ul>
                     </div>
                 </div>
             </aside>

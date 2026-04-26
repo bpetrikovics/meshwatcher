@@ -125,6 +125,7 @@ function meshApp() {
     // Node management
     nodes: {},
     nodeLayer: null,
+    nodeSearchQuery: "",
     networkLayer: null,
     traceLayer: null,
 
@@ -1438,12 +1439,61 @@ function meshApp() {
             console.warn("Failed to setup map bounds fitting:", error);
           }
         }
+        // Load nodes that have no position (not on map, but shown in node list)
+        await this.loadPositionlessNodes();
       } catch (error) {
         console.error("Failed to load initial nodes:", error);
         this.showError("NODE_LOAD_FAILED");
       } finally {
         this.loading.nodes = false;
       }
+    },
+
+    async loadPositionlessNodes() {
+      // Fetch all nodes (has_position=false means no filter), store only those
+      // not already loaded (i.e. nodes without any recorded position)
+      const url = this.buildApiUrl({
+        includes: ["info"],
+        filters: { has_position: false, active: false },
+      });
+      const response = await fetch(url);
+      const data = await response.json();
+
+      data.nodes.forEach((node) => {
+        if (!this.nodes[node.id]) {
+          this.nodes[node.id] = node;
+          this.invalidateRoleCache();
+        }
+      });
+
+      let hasMore = data.pagination.has_more;
+      let offset = data.pagination.next_offset;
+      const maxPages = 50;
+      let pageCount = 1;
+
+      while (hasMore && pageCount < maxPages) {
+        const pageUrl = this.buildApiUrl({
+          includes: ["info"],
+          filters: { has_position: false, active: false },
+          offset,
+        });
+        const pageResponse = await fetch(pageUrl);
+        const pageData = await pageResponse.json();
+
+        pageData.nodes.forEach((node) => {
+          if (!this.nodes[node.id]) {
+            this.nodes[node.id] = node;
+            this.invalidateRoleCache();
+          }
+        });
+
+        hasMore = pageData.pagination.has_more;
+        offset = pageData.pagination.next_offset;
+        pageCount++;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      console.log(`Loaded ${pageCount} page(s) of position-less nodes`);
     },
 
     async loadAllPages(initialData) {
@@ -1475,6 +1525,52 @@ function meshApp() {
         console.warn("Reached maximum page limit, stopping pagination");
       } else {
         console.log(`Loaded ${pageCount} pages total`);
+      }
+    },
+
+    filteredNodes() {
+      const query = (this.nodeSearchQuery || "").toLowerCase().trim();
+      let result = Object.values(this.nodes);
+      if (query) {
+        result = result.filter(
+          (n) =>
+            (n.short_name || "").toLowerCase().includes(query) ||
+            (n.long_name || "").toLowerCase().includes(query) ||
+            String(n.id || "").toLowerCase().includes(query),
+        );
+      }
+      return result.sort((a, b) => {
+        const aHasPos = !!a.position;
+        const bHasPos = !!b.position;
+        if (aHasPos !== bHasPos) return aHasPos ? -1 : 1;
+        return (a.long_name || "").localeCompare(b.long_name || "");
+      });
+    },
+
+    flyToNode(nodeId) {
+      const node = this.nodes[nodeId];
+      if (!node) return;
+
+      if (!node.position || !node.marker) {
+        // No map presence — just open the sidebar
+        this.selectNode(nodeId);
+        return;
+      }
+
+      const parent = this.nodeLayer.getVisibleParent(node.marker);
+      if (parent === node.marker) {
+        // Marker is visible (not inside a cluster)
+        const zoom = Math.max(this.map.getZoom(), 14);
+        this.map.flyTo(
+          [node.position.latitude, node.position.longitude],
+          zoom,
+        );
+        this.selectNode(nodeId);
+      } else {
+        // Marker is inside a cluster — expand it first, then select
+        this.nodeLayer.zoomToShowLayer(node.marker, () => {
+          this.selectNode(nodeId);
+        });
       }
     },
 
@@ -2213,6 +2309,8 @@ function meshApp() {
       });
 
       if (!node || !node.position) {
+        // Telemetry is independent from position and should load for position-less nodes too.
+        this.fetchTelemetrySummary(nodeId);
         if (this.positionHistoryEnabled) {
           this.loadNodeHistory(nodeId);
         }
@@ -2775,9 +2873,16 @@ function meshApp() {
         const response = await fetch(`/api/nodes/${encodeURIComponent(nodeId)}/telemetry/summary?since_hours=${hours}`);
         if (!response.ok) {
           console.warn(`Failed to fetch telemetry summary for node ${nodeId}:`, response.status);
+          if (this.selectedNodeId === nodeId) {
+            this.updateTelemetryChartsErrorDisplay();
+          }
           return;
         }
         const summary = await response.json();
+
+        if (this.selectedNodeId !== nodeId) {
+          return;
+        }
         
         // Update the telemetry charts display
         this.updateTelemetryChartsDisplay(summary);
@@ -2786,7 +2891,22 @@ function meshApp() {
         this.setupTelemetryWindowToggle(nodeId);
       } catch (error) {
         console.error(`Error fetching telemetry summary for node ${nodeId}:`, error);
+        if (this.selectedNodeId === nodeId) {
+          this.updateTelemetryChartsErrorDisplay();
+        }
       }
+    },
+
+    updateTelemetryChartsErrorDisplay() {
+      const chartsContainer = document.getElementById('telemetry-charts');
+      if (!chartsContainer) return;
+
+      chartsContainer.innerHTML = `
+        <div class="text-center text-red-500 py-8">
+          <i class="mdi mdi-alert-circle-outline text-2xl mb-2"></i>
+          <p>Failed to load telemetry data</p>
+        </div>
+      `;
     },
 
     // Set up the telemetry window toggle listener

@@ -355,8 +355,10 @@ def get_node_telemetry_summary(node_id):
     since_hours_val = min(max(since_hours_val, 0), 168)  # clamp to 0-7 days
 
     with db_session() as session:
-        # Get metrics from the requested window
+        # Filter by telemetry timestamp (ts) instead of row insertion time.
+        # This keeps summary behavior aligned with chart queries and existing data.
         since_time = datetime.now(timezone.utc) - timedelta(hours=since_hours_val)
+        since_ts = int(since_time.timestamp())
         
         # Query distinct metric types and metrics with their latest timestamps
         from sqlalchemy import func, desc
@@ -368,7 +370,7 @@ def get_node_telemetry_summary(node_id):
             func.max(Metric.ts).label('latest_ts')
         ).filter(
             Metric.node_id == node_id,
-            Metric.created_at >= since_time
+            Metric.ts >= since_ts
         ).group_by(
             Metric.metric_type,
             Metric.metric
@@ -429,13 +431,14 @@ def get_node_metrics_series(node_id):
     with db_session() as session:
         # Calculate since time
         since_time = datetime.now(timezone.utc) - timedelta(hours=since_hours_val)
+        since_ts = int(since_time.timestamp())
         
         # Query metrics
         query = session.query(Metric.ts, Metric.value).filter(
             Metric.node_id == node_id,
             Metric.metric_type == metric_type,
             Metric.metric == metric,
-            Metric.created_at >= since_time
+            Metric.ts >= since_ts
         ).order_by(Metric.ts.asc())
         
         results = query.all()
