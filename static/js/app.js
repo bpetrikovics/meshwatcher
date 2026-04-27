@@ -126,6 +126,12 @@ function meshApp() {
     nodes: {},
     nodeLayer: null,
     nodeSearchQuery: "",
+    nodeRoleFilters: {
+      client: false,
+      router: false,
+      tracker: false,
+      sensor: false,
+    },
     networkLayer: null,
     traceLayer: null,
 
@@ -1530,7 +1536,30 @@ function meshApp() {
 
     filteredNodes() {
       const query = (this.nodeSearchQuery || "").toLowerCase().trim();
+      const roleFilters = this.nodeRoleFilters || {};
+
+      const selectedRoleGroups = Object.entries(roleFilters)
+        .filter(([, enabled]) => !!enabled)
+        .map(([group]) => group);
+
+      const roleGroupMap = {
+        client: new Set(["CLIENT", "CLIENT_BASE", "CLIENT_MUTE"]),
+        router: new Set(["ROUTER", "ROUTER_LATE", "REPEATER"]),
+        tracker: new Set(["TRACKER", "TAK", "TAK_TRACKER"]),
+        sensor: new Set(["SENSOR"]),
+      };
+
       let result = Object.values(this.nodes);
+
+      if (selectedRoleGroups.length) {
+        result = result.filter((n) => {
+          const role = String(n.role || "CLIENT");
+          return selectedRoleGroups.some((group) =>
+            roleGroupMap[group]?.has(role),
+          );
+        });
+      }
+
       if (query) {
         result = result.filter(
           (n) =>

@@ -79,8 +79,8 @@
                     <h2 class="text-lg font-semibold mb-4">Map Controls</h2>
                     
                     <!-- Clustering Radius Slider -->
-                    <div class="mb-6">
-                        <label for="clustering-radius" class="block text-sm font-medium text-gray-200 mb-2">
+                    <div class="card p-4 mb-6">
+                        <label for="clustering-radius" class="block text-sm font-medium text-gray-700 mb-2">
                             Map Clustering Radius
                         </label>
                         <div class="flex items-center space-x-3">
@@ -97,19 +97,41 @@
                         <p class="text-xs text-gray-500 mt-1">Adjust the radius for clustering nearby nodes</p>
                     </div>
                     
-                    <div class="border-t pt-4">
-                        <h3 class="text-sm font-semibold mb-2">Nodes</h3>
+                    <div class="card p-4">
+                        <h3 class="text-sm font-semibold mb-2 text-gray-900">Nodes</h3>
 
                         <!-- Search input -->
                         <div class="relative mb-2">
                             <input type="text"
                                    x-model="nodeSearchQuery"
                                    placeholder="Search nodes…"
-                                   class="w-full pl-3 pr-7 py-1.5 text-sm rounded-lg border border-gray-200 bg-white/60 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                                    class="w-full pl-3 pr-7 py-1.5 text-sm rounded-lg border border-gray-200 bg-white/60 focus:outline-none focus:ring-1 focus:ring-blue-400">
                             <button x-show="nodeSearchQuery"
                                     @click="nodeSearchQuery = ''"
                                     class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm leading-none"
                                     style="min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: flex-end; padding-right: 4px;">×</button>
+                        </div>
+
+                        <!-- Role filters -->
+                        <div class="mb-2">
+                            <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-gray-700">
+                                <label class="inline-flex items-center gap-2 select-none">
+                                    <input type="checkbox" x-model="nodeRoleFilters.client" class="rounded border-gray-300">
+                                    <span>Client</span>
+                                </label>
+                                <label class="inline-flex items-center gap-2 select-none">
+                                    <input type="checkbox" x-model="nodeRoleFilters.router" class="rounded border-gray-300">
+                                    <span>Router</span>
+                                </label>
+                                <label class="inline-flex items-center gap-2 select-none">
+                                    <input type="checkbox" x-model="nodeRoleFilters.tracker" class="rounded border-gray-300">
+                                    <span>Tracker</span>
+                                </label>
+                                <label class="inline-flex items-center gap-2 select-none">
+                                    <input type="checkbox" x-model="nodeRoleFilters.sensor" class="rounded border-gray-300">
+                                    <span>Sensor</span>
+                                </label>
+                            </div>
                         </div>
 
                         <!-- Node count -->
@@ -243,17 +265,18 @@
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script id="app-config" type="application/json">{{ {
+        'STATUS_CURRENTLY_ACTIVE_HOURS': settings.status_currently_active_hours,
+        'STATUS_RECENTLY_ACTIVE_HOURS': settings.status_recently_active_hours,
+        'GIT_COMMIT': settings.git_commit,
+        'EVENT_ANIMATIONS_ENABLED': settings.event_animations_enabled,
+        'SOCKET_NAMESPACE_EVENTS': settings.namespace_events,
+        'EVENT_FLASH_MS': settings.event_flash_ms,
+        'CLUSTERING_RADIUS': settings.clustering_radius,
+        'HISTORY_MAX_MARKERS': settings.history_max_markers
+    } | tojson }}</script>
     <script>
-        window.APP_CONFIG = {
-            STATUS_CURRENTLY_ACTIVE_HOURS: {{ settings.status_currently_active_hours | tojson }},
-            STATUS_RECENTLY_ACTIVE_HOURS: {{ settings.status_recently_active_hours | tojson }},
-            GIT_COMMIT: {{ settings.git_commit | tojson }},
-            EVENT_ANIMATIONS_ENABLED: {{ settings.event_animations_enabled | tojson }},
-            SOCKET_NAMESPACE_EVENTS: {{ settings.namespace_events | tojson }},
-            EVENT_FLASH_MS: {{ settings.event_flash_ms | tojson }},
-            CLUSTERING_RADIUS: {{ settings.clustering_radius | tojson }},
-            HISTORY_MAX_MARKERS: {{ settings.history_max_markers | tojson }}
-        };
+        window.APP_CONFIG = JSON.parse(document.getElementById('app-config').textContent);
     </script>
     <script src="/static/js/app.js"></script>
 </body>
