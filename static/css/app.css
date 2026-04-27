@@ -409,6 +409,8 @@ header.bg-gray-800 h1 {
 
     footer.panel.fixed.bottom-0 {
         bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
     }
 
     aside.panel.fixed.left-0.top-16 {
@@ -417,8 +419,8 @@ header.bg-gray-800 h1 {
     
     /* Larger touch targets */
     .resize-handle-top {
-        height: 12px !important;
-        top: -6px !important;
+        height: 4px !important;
+        top: 0 !important;
         background: linear-gradient(to bottom, #374151, #6b7280) !important;
     }
     
@@ -505,7 +507,7 @@ header.bg-gray-800 h1 {
 /* Make bottom resize handle more visible */
 .resize-handle-top {
     position: absolute;
-    top: -2px;
+    top: 0;
     left: 0;
     right: 0;
     height: 4px;
@@ -548,7 +550,7 @@ body.modal-open #map {
 @media (hover: none) and (pointer: coarse) {
     .resize-handle-top {
         background: linear-gradient(to bottom, #374151, #6b7280) !important;
-        height: 12px !important;
+        height: 4px !important;
     }
     
     button:active {
@@ -620,6 +622,8 @@ aside.panel.fixed.right-0 {
 /* Bottom panel: gap from bottom edge */
 footer.panel.fixed.bottom-0 {
     bottom: var(--panel-gap);
+    left: var(--panel-gap);
+    right: var(--panel-gap);
 }
 
 /* Adjust vertical positioning for left/right panels to account for gap */
@@ -635,8 +639,7 @@ aside.panel.fixed.h-full {
 
 /* Ensure bottom panel has identical top border */
 footer.glass-panel {
-    border: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.45);
 }
 
 /* Node status colors */
