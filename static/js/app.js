@@ -1540,10 +1540,13 @@ function meshApp() {
         );
       }
       return result.sort((a, b) => {
-        const aHasPos = !!a.position;
-        const bHasPos = !!b.position;
-        if (aHasPos !== bHasPos) return aHasPos ? -1 : 1;
-        return (a.long_name || "").localeCompare(b.long_name || "");
+        const aKey = String(a.short_name || a.long_name || a.id || "");
+        const bKey = String(b.short_name || b.long_name || b.id || "");
+
+        const byName = aKey.localeCompare(bKey, undefined, { sensitivity: "base" });
+        if (byName !== 0) return byName;
+
+        return String(a.id || "").localeCompare(String(b.id || ""));
       });
     },
 
