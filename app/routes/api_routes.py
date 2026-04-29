@@ -289,39 +289,39 @@ def get_nodes():
 def get_node_positions(node_id):
     """Get all position history for a specific node."""
     
-    # Parse optional query params (future-ready for GUI controls)
     limit = request.args.get("limit")
-    since_hours = request.args.get("since_hours")
+    max_points = request.args.get("max_points")
+    since_hours = request.args.get("since_hours", "24")
+
+    try:
+        since_hours_val = float(since_hours)
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid since_hours parameter"}), 400
+
+    since_hours_val = min(max(since_hours_val, 0), 168)
+
+    max_points_raw = max_points if max_points is not None else limit
+    if max_points_raw is None:
+        max_points_val = 2000
+    else:
+        try:
+            max_points_val = int(max_points_raw)
+        except (ValueError, TypeError):
+            return jsonify({"error": "Invalid max_points parameter"}), 400
+
+    max_points_val = min(max(max_points_val, 1), 5000)
     
     # Use database session
     with db_session() as session:
         # Build base query
         query = session.query(Position).filter(Position.node_id == node_id)
-        
-        # Apply time filter if provided (future)
-        if since_hours:
-            try:
-                hours = float(since_hours)
-                since_time = datetime.now(timezone.utc) - timedelta(hours=hours)
-                query = query.filter(Position.created_at >= since_time)
-            except (ValueError, TypeError):
-                # Invalid parameter, ignore
-                pass
-        
-        # Order by creation time ascending
-        query = query.order_by(Position.created_at.asc())
-        
-        # Apply limit if provided (future)
-        if limit:
-            try:
-                limit_val = int(limit)
-                if limit_val > 0:
-                    query = query.limit(limit_val)
-            except (ValueError, TypeError):
-                # Invalid parameter, ignore
-                pass
-        
-        positions = query.all()
+
+        since_time = datetime.now(timezone.utc) - timedelta(hours=since_hours_val)
+        query = query.filter(Position.created_at >= since_time)
+
+        query = query.order_by(Position.created_at.desc()).limit(max_points_val)
+
+        positions = list(reversed(query.all()))
         
         # Serialize positions
         results = []

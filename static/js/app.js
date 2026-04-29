@@ -2470,7 +2470,13 @@ function meshApp() {
             : Date.now();
 
         const requestSeq = ++this.selectedNodeHistoryRequestSeq;
-        const response = await fetch(`/api/nodes/${encodeURIComponent(nodeId)}/positions`);
+        const sinceHours = Number.isFinite(this.positionHistoryRangeHours)
+          ? this.positionHistoryRangeHours
+          : 24;
+        const maxPoints = 2000;
+        const response = await fetch(
+          `/api/nodes/${encodeURIComponent(nodeId)}/positions?since_hours=${encodeURIComponent(sinceHours)}&max_points=${encodeURIComponent(maxPoints)}`
+        );
 
         if (requestSeq !== this.selectedNodeHistoryRequestSeq || this.selectedNodeId !== nodeId) {
           return;
@@ -2666,7 +2672,12 @@ function meshApp() {
         const label = document.querySelector('.position-history-range-label');
         if (label) label.textContent = this.formatHistoryRangeLabel(this.positionHistoryRangeHours);
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => this.renderNodeHistory(), 100);
+        debounceTimer = setTimeout(() => {
+          if (!this.selectedNodeId || !this.positionHistoryEnabled) {
+            return;
+          }
+          this.loadNodeHistory(this.selectedNodeId);
+        }, 100);
       };
       slider.addEventListener('input', slider._rangeSliderHandler);
     },
