@@ -32,6 +32,6 @@ ARG GIT_COMMIT
 ENV GIT_COMMIT=${GIT_COMMIT:-unknown}
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/ || exit 1
+    CMD curl -fsS http://localhost:8080/healthz || exit 1
 
 CMD ["gunicorn", "-c", "gunicorn_config.py", "main:app"]
