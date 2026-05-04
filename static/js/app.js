@@ -624,3 +624,5 @@ function meshApp() {
 
   };
 }
+
+window.meshApp = meshApp;
