@@ -1137,3 +1137,87 @@ footer.glass-panel {
     border-radius: 6px;
 }
 
+.raw-log {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.raw-log-row {
+    display: grid;
+    grid-template-columns: 150px 86px 1.3fr 1.3fr 110px 110px 70px 1.2fr 70px 44px;
+    gap: 8px;
+    padding: 3px 6px;
+    border-bottom: 1px solid rgba(229, 231, 235, 0.8);
+    white-space: nowrap;
+}
+
+.raw-log-row:last-child {
+    border-bottom: none;
+}
+
+.raw-log-row:hover {
+    background: rgba(243, 244, 246, 0.8);
+}
+
+.raw-log-cell {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+
+.raw-log-header {
+    border: 1px solid rgba(229, 231, 235, 1);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    overflow: hidden;
+    background: rgba(249, 250, 251, 0.85);
+}
+
+.raw-log-header-row {
+    font-size: 11px;
+    color: #6b7280;
+    font-weight: 600;
+    padding: 4px 6px;
+    border-bottom: 1px solid rgba(229, 231, 235, 1);
+}
+
+.raw-log {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
+.raw-log-right {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.raw-log-dup {
+    font-size: 11px;
+    color: #7c2d12;
+    background: rgba(251, 146, 60, 0.25);
+    border: 1px solid rgba(251, 146, 60, 0.35);
+    border-radius: 999px;
+    padding: 0 6px;
+    line-height: 18px;
+    height: 18px;
+}
+
+@media (max-width: 768px) {
+    .raw-log-row {
+        grid-template-columns: 96px 1fr 1fr 78px 44px;
+        gap: 6px;
+        padding: 3px 5px;
+    }
+
+    .raw-log-cell:nth-child(2),
+    .raw-log-cell:nth-child(5),
+    .raw-log-cell:nth-child(7),
+    .raw-log-cell:nth-child(8),
+    .raw-log-cell:nth-child(9) {
+        display: none;
+    }
+}
+

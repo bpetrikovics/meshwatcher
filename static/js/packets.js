@@ -533,6 +533,11 @@ function initializeEventListeners() {
 function initializeSocketHandlers() {
     socket.on('connect', () => {
         console.log('Connected to socket');
+        try {
+            socket.emit('subscribe_packets');
+        } catch (e) {
+            console.warn('Failed to subscribe to packets:', e);
+        }
     });
     
     socket.on('disconnect', () => {
@@ -550,6 +555,12 @@ function initializeApp() {
     initializeEventListeners();
     initializeSocketHandlers();
     initializeCommitDisplay();
+
+    window.addEventListener('beforeunload', () => {
+        try {
+            socket.emit('unsubscribe_packets');
+        } catch (e) {}
+    });
 }
 
 function initializeCommitDisplay() {

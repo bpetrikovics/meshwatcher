@@ -3,6 +3,9 @@ from typing import Union
 from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 
+
+PACKETS_SUBSCRIBERS_ROOM = "packets-subscribers"
+
 class Settings(BaseSettings):
 
     # Application

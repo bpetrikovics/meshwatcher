@@ -199,10 +199,45 @@
                  @touchstart="startResize('bottom', $event)"></div>
             
             <!-- Panel Content -->
-            <div class="flex-1 p-4 overflow-y-auto mt-2">
-                <h2 class="text-lg font-semibold mb-4">Bottom Panel</h2>
-                <p class="text-gray-600">Packet monitor, logs, and console output will go here.</p>
-                <p class="text-xs text-gray-500 mt-2">Drag the gray bar above to resize this panel.</p>
+            <div class="flex-1 p-2 pt-3 flex flex-col min-h-0">
+                <div class="flex items-center justify-between gap-2 mb-2">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="text-sm font-semibold text-gray-900 truncate">Raw packet log</div>
+                        <div class="text-xs text-gray-500" x-text="rawLogStatusText"></div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label class="inline-flex items-center gap-1 text-xs text-gray-700 select-none">
+                            <input type="checkbox" x-model="rawLogPauseWhenScrolledUp" class="rounded border-gray-300">
+                            <span>Pause on scroll</span>
+                        </label>
+                        <label class="inline-flex items-center gap-1 text-xs text-gray-700 select-none">
+                            <input type="checkbox" x-model="rawLogHideDuplicates" class="rounded border-gray-300" @change="rawLogRerender()">
+                            <span>Hide dups</span>
+                        </label>
+                        <button class="px-2 py-1 text-xs bg-white/70 hover:bg-white rounded border border-gray-200" @click="rawLogClear()">Clear</button>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between gap-2 mb-2" x-show="rawLogPaused">
+                    <div class="text-xs text-gray-600">Paused (<span x-text="rawLogBufferedCount"></span> buffered)</div>
+                    <button class="px-2 py-1 text-xs bg-blue-600 text-white hover:bg-blue-700 rounded" @click="rawLogResume()">Resume</button>
+                </div>
+
+                <div class="raw-log-header">
+                    <div class="raw-log-row raw-log-header-row">
+                        <div class="raw-log-cell">Received</div>
+                        <div class="raw-log-cell">ID</div>
+                        <div class="raw-log-cell">From</div>
+                        <div class="raw-log-cell">To</div>
+                        <div class="raw-log-cell">Channel</div>
+                        <div class="raw-log-cell">Port</div>
+                        <div class="raw-log-cell">Relay</div>
+                        <div class="raw-log-cell">MQTT Uplink</div>
+                        <div class="raw-log-cell">Next Hop</div>
+                        <div class="raw-log-cell"></div>
+                    </div>
+                </div>
+                <div id="raw-log" class="raw-log flex-1 min-h-0 overflow-y-auto rounded border border-gray-200 bg-white/50"></div>
             </div>
         </footer>
 
@@ -270,6 +305,7 @@
         'GIT_COMMIT': settings.git_commit,
         'EVENT_ANIMATIONS_ENABLED': settings.event_animations_enabled,
         'SOCKET_NAMESPACE_EVENTS': settings.namespace_events,
+        'SOCKET_NAMESPACE_PACKETS': settings.namespace_packets,
         'EVENT_FLASH_MS': settings.event_flash_ms,
         'CLUSTERING_RADIUS': settings.clustering_radius,
         'HISTORY_MAX_MARKERS': settings.history_max_markers

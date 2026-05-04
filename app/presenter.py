@@ -6,7 +6,7 @@ from flask_socketio import SocketIO
 from sqlmodel import select
 from typing import Callable, Dict, Any, Optional, Tuple
 
-from app.config import settings
+from app.config import PACKETS_SUBSCRIBERS_ROOM, settings
 from .models import MeshtasticPacket, NodeInfo, Position
 
 class Presenter:
@@ -112,7 +112,10 @@ class Presenter:
             payload["to_node"] = to_node_payload or {"id": to_id}
     
         self.socketio.emit(
-            "packets", payload, namespace=settings.namespace_packets
+            "packets",
+            payload,
+            namespace=settings.namespace_packets,
+            room=PACKETS_SUBSCRIBERS_ROOM,
         )
 
 

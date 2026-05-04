@@ -19,7 +19,7 @@ const CONFIG = {
     left: { default: 300, min: 200, max: 500 },
     right: { default: 350, min: 250, max: 600 },
     rightSheet: { default: 320, min: 160, max: 700 },
-    bottom: { default: 200, min: 100, max: 400 },
+    bottom: { default: 300, min: 100, max: 400 },
   },
   Z_INDEX: {
     dropdown: 1000,
@@ -73,6 +73,20 @@ function meshApp() {
     eventsSocket: null,
     eventsSocketHasConnectedOnce: false,
     markerFlashTimers: {},
+
+    packetsSocket: null,
+    packetsSocketConnected: false,
+    rawLogPauseWhenScrolledUp: true,
+    rawLogHideDuplicates: false,
+    rawLogPaused: false,
+    rawLogBufferedCount: 0,
+    rawLogStatusText: "",
+    rawLogMaxRows: 500,
+    rawLogRing: [],
+    rawLogPending: [],
+    rawLogFlushScheduled: false,
+    rawLogScrollHandler: null,
+    rawLogScrollAttachAttempts: 0,
 
     // Node selection state for precision circle
     selectedNodeId: null,
@@ -318,6 +332,8 @@ function meshApp() {
         this.eventsSocket = null;
       }
 
+      this.rawLogStop();
+
       Object.values(this.markerFlashTimers).forEach((t) => {
         try {
           clearTimeout(t);
@@ -372,9 +388,331 @@ function meshApp() {
     togglePanel(panelName) {
       this.panels[panelName].visible = !this.panels[panelName].visible;
 
+      if (panelName === "bottom") {
+        if (this.panels.bottom.visible) {
+          this.rawLogStart();
+        } else {
+          this.rawLogStop();
+        }
+      }
+
       if (this.map) {
         this.map.invalidateSize();
       }
+    },
+
+    rawLogStart() {
+      this.rawLogStatusText = "";
+      this.rawLogScrollAttachAttempts = 0;
+      this.rawLogEnsureScrollHandler();
+      this.rawLogEnsurePacketsSocket();
+    },
+
+    rawLogStop() {
+      this.rawLogTeardownScrollHandler();
+      this.rawLogDisconnectPacketsSocket();
+      this.rawLogPaused = false;
+      this.rawLogBufferedCount = 0;
+      this.rawLogPending = [];
+      this.rawLogFlushScheduled = false;
+      this.rawLogStatusText = "";
+      this.rawLogScrollAttachAttempts = 0;
+    },
+
+    rawLogEnsurePacketsSocket() {
+      const config = window.APP_CONFIG || {};
+      const namespace = config.SOCKET_NAMESPACE_PACKETS || "/packets";
+
+      if (this.packetsSocket && this.packetsSocket.connected) {
+        return;
+      }
+
+      if (typeof io === "undefined") {
+        this.rawLogStatusText = "Socket.IO missing";
+        return;
+      }
+
+      try {
+        console.log("Connecting to raw packet data");
+        this.packetsSocket = io(namespace);
+      } catch (e) {
+        this.rawLogStatusText = "Connect failed";
+        return;
+      }
+
+      this.packetsSocket.on("connect", () => {
+        this.packetsSocketConnected = true;
+        this.rawLogStatusText = "live";
+        try {
+          this.packetsSocket.emit("subscribe_packets");
+        } catch (e) {}
+      });
+
+      this.packetsSocket.on("disconnect", () => {
+        this.packetsSocketConnected = false;
+        this.rawLogStatusText = "offline";
+      });
+
+      this.packetsSocket.on("packets", (packet) => {
+        this.rawLogOnPacket(packet);
+      });
+    },
+
+    rawLogDisconnectPacketsSocket() {
+      if (!this.packetsSocket) return;
+      try {
+        this.packetsSocket.off("packets");
+        this.packetsSocket.off("connect");
+        this.packetsSocket.off("disconnect");
+      } catch (e) {}
+
+      try {
+        this.packetsSocket.emit("unsubscribe_packets");
+      } catch (e) {}
+
+      try {
+        console.log("Disconnecting from raw packet data");
+        this.packetsSocket.disconnect();
+      } catch (e) {}
+
+      this.packetsSocket = null;
+      this.packetsSocketConnected = false;
+    },
+
+    rawLogEnsureScrollHandler() {
+      if (this.rawLogScrollHandler) return;
+
+      this.rawLogScrollHandler = () => {
+        if (!this.rawLogPauseWhenScrolledUp) {
+          this.rawLogPaused = false;
+          this.rawLogBufferedCount = 0;
+          this.rawLogPending = [];
+          return;
+        }
+
+        const el = document.getElementById("raw-log");
+        if (!el) return;
+
+        const thresholdPx = 20;
+        const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        const atBottom = distanceFromBottom <= thresholdPx;
+
+        if (atBottom && this.rawLogPaused) {
+          return;
+        }
+
+        if (!atBottom) {
+          this.rawLogPaused = true;
+        }
+      };
+
+      const el = document.getElementById("raw-log");
+      if (el) {
+        el.addEventListener("scroll", this.rawLogScrollHandler, { passive: true });
+        return;
+      }
+
+      const maxAttempts = 10;
+      if (this.rawLogScrollAttachAttempts >= maxAttempts) {
+        return;
+      }
+      this.rawLogScrollAttachAttempts += 1;
+      requestAnimationFrame(() => this.rawLogEnsureScrollHandler());
+    },
+
+    rawLogTeardownScrollHandler() {
+      const el = document.getElementById("raw-log");
+      if (el && this.rawLogScrollHandler) {
+        try {
+          el.removeEventListener("scroll", this.rawLogScrollHandler);
+        } catch (e) {}
+      }
+      this.rawLogScrollHandler = null;
+    },
+
+    rawLogOnPacket(packet) {
+      if (!packet || typeof packet !== "object") return;
+
+      this.rawLogRing.push(packet);
+      if (this.rawLogRing.length > this.rawLogMaxRows) {
+        this.rawLogRing.splice(0, this.rawLogRing.length - this.rawLogMaxRows);
+      }
+
+      if (this.rawLogPaused && this.rawLogPauseWhenScrolledUp) {
+        this.rawLogPending.push(packet);
+        this.rawLogBufferedCount = this.rawLogPending.length;
+        return;
+      }
+
+      this.rawLogAppendPackets([packet]);
+    },
+
+    rawLogAppendPackets(packets) {
+      if (!Array.isArray(packets) || !packets.length) return;
+      const el = document.getElementById("raw-log");
+      if (!el) return;
+
+      if (this.rawLogFlushScheduled) {
+        this.rawLogPending.push(...packets);
+        this.rawLogBufferedCount = this.rawLogPending.length;
+        return;
+      }
+
+      const toRender = packets;
+      this.rawLogFlushScheduled = true;
+      requestAnimationFrame(() => {
+        try {
+          const frag = document.createDocumentFragment();
+          for (const p of toRender) {
+            if (this.rawLogHideDuplicates && p.is_duplicate === true) continue;
+            frag.appendChild(this.rawLogRenderLine(p));
+          }
+
+          el.appendChild(frag);
+          while (el.children.length > this.rawLogMaxRows) {
+            el.removeChild(el.firstChild);
+          }
+          el.scrollTop = el.scrollHeight;
+        } finally {
+          this.rawLogFlushScheduled = false;
+          if (this.rawLogPending.length) {
+            const more = this.rawLogPending.splice(0, this.rawLogPending.length);
+            this.rawLogBufferedCount = 0;
+            if (!this.rawLogPaused) {
+              this.rawLogAppendPackets(more);
+            } else {
+              this.rawLogPending.push(...more);
+              this.rawLogBufferedCount = this.rawLogPending.length;
+            }
+          }
+        }
+      });
+    },
+
+    rawLogRenderLine(p) {
+      const row = document.createElement("div");
+      row.className = "raw-log-row";
+
+      const safe = (v) => (v === null || v === undefined || v === "" ? "N/A" : String(v));
+
+      const toHex = (n, digits) => {
+        if (n === null || n === undefined) return null;
+        const num = +n;
+        if (!num && num !== 0) return null;
+        try {
+          return (BigInt(num)).toString(16).padStart(digits, "0");
+        } catch (e) {
+          return null;
+        }
+      };
+
+      const formatTimestamp = (timeValue) => {
+        if (!timeValue && timeValue !== 0) return "N/A";
+        try {
+          let date;
+          if (typeof timeValue === "number") {
+            date = new Date(timeValue * 1000);
+          } else if (typeof timeValue === "string") {
+            date = new Date(timeValue);
+          } else {
+            return "Invalid";
+          }
+          return date.toLocaleString();
+        } catch (e) {
+          return "Invalid";
+        }
+      };
+
+      const getNodeDisplayName = (nodeObj) => nodeObj?.name || nodeObj?.short_name || nodeObj?.long_name;
+
+      const formatNodeWithName = (idText, nameText) => (nameText ? `${idText} (${nameText})` : idText);
+
+      const fromHex = p?.from_ !== undefined ? toHex(p.from_, 8) : null;
+      const fromId = fromHex ? `!${fromHex}` : "N/A";
+
+      const toHexId = p?.to !== undefined ? toHex(p.to, 8) : null;
+      const toId = p?.to === 4294967295 ? "BROADCAST" : (toHexId ? `!${toHexId}` : "N/A");
+      const uplinkId = safe(p?.uplink);
+
+      const fromDisplay = formatNodeWithName(fromId, getNodeDisplayName(p?.from_node));
+      const toDisplay = toId === "BROADCAST" ? "BROADCAST" : formatNodeWithName(toId, getNodeDisplayName(p?.to_node));
+      const uplinkDisplay = formatNodeWithName(uplinkId, getNodeDisplayName(p?.uplink_node));
+
+      const processed = {
+        received: formatTimestamp(p?.created_at),
+        id_: safe(p?.id_),
+        fromDisplay: safe(fromDisplay),
+        toDisplay: safe(toDisplay),
+        channel_name: safe(p?.channel_name),
+        portnum: safe(p?.decoded?.portnum),
+        relay_node: p?.relay_node !== null && p?.relay_node !== undefined ? (toHex(p.relay_node, 2) || "N/A") : "N/A",
+        uplinkDisplay: safe(uplinkDisplay),
+        next_hop: p?.next_hop !== null && p?.next_hop !== undefined ? (toHex(p.next_hop, 2) || "N/A") : "N/A",
+      };
+
+      const fields = [
+        { label: "Received", value: processed.received },
+        { label: "Message ID", value: processed.id_ },
+        { label: "From", value: processed.fromDisplay },
+        { label: "To", value: processed.toDisplay },
+        { label: "Channel", value: processed.channel_name },
+        { label: "Port", value: processed.portnum },
+        { label: "Relay", value: processed.relay_node },
+        { label: "MQTT Uplink", value: processed.uplinkDisplay },
+        { label: "Next Hop", value: processed.next_hop },
+      ];
+
+      for (const f of fields) {
+        const cell = document.createElement("div");
+        cell.className = "raw-log-cell";
+
+        cell.textContent = safe(f.value);
+        row.appendChild(cell);
+      }
+
+      const dupCell = document.createElement("div");
+      dupCell.className = "raw-log-cell raw-log-right";
+      if (p?.is_duplicate === true) {
+        const badge = document.createElement("span");
+        badge.className = "raw-log-dup";
+        badge.textContent = "dup";
+        dupCell.appendChild(badge);
+      }
+      row.appendChild(dupCell);
+      return row;
+    },
+
+    rawLogClear() {
+      const el = document.getElementById("raw-log");
+      if (el) el.innerHTML = "";
+      this.rawLogRing = [];
+      this.rawLogPending = [];
+      this.rawLogBufferedCount = 0;
+      this.rawLogPaused = false;
+    },
+
+    rawLogResume() {
+      const el = document.getElementById("raw-log");
+      if (!el) return;
+
+      this.rawLogPaused = false;
+      const buffered = this.rawLogPending.splice(0, this.rawLogPending.length);
+      this.rawLogBufferedCount = 0;
+      if (buffered.length) {
+        this.rawLogAppendPackets(buffered);
+      } else {
+        el.scrollTop = el.scrollHeight;
+      }
+    },
+
+    rawLogRerender() {
+      const el = document.getElementById("raw-log");
+      if (!el) return;
+      el.innerHTML = "";
+      this.rawLogPaused = false;
+      this.rawLogBufferedCount = 0;
+      this.rawLogPending = [];
+      this.rawLogAppendPackets(this.rawLogRing);
     },
 
     startResize(panelName, event) {
