@@ -613,10 +613,27 @@ function meshApp() {
           if (typeof timeValue === "number") {
             date = new Date(timeValue * 1000);
           } else if (typeof timeValue === "string") {
-            date = new Date(timeValue);
+            // Backend uses UTC (`datetime.now(timezone.utc)`), but JSON may serialize
+            // datetimes without an explicit timezone. Normalize to UTC and then
+            // render using browser local time.
+            let s = timeValue.trim();
+
+            // Convert "YYYY-MM-DD HH:MM:SS" -> ISO "YYYY-MM-DDTHH:MM:SS"
+            if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/.test(s)) {
+              s = s.replace(" ", "T");
+            }
+
+            const hasTimezone = /([zZ]|[+-]\d{2}:?\d{2})$/.test(s);
+            if (!hasTimezone && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(s)) {
+              s = `${s}Z`;
+            }
+
+            date = new Date(s);
           } else {
             return "Invalid";
           }
+
+          if (Number.isNaN(date.getTime())) return "Invalid";
           return date.toLocaleString();
         } catch (e) {
           return "Invalid";
