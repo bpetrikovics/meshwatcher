@@ -283,6 +283,11 @@ class EventManager:
             self.logger.exception(exc)
             return
         
+        # Skip packets with no actual coordinates (e.g. node broadcasting before GPS fix)
+        if position.latitude_i is None or position.longitude_i is None:
+            self.logger.warning("Received position packet with missing coordinates from node %s, skipping", hex(packet.from_))
+            return
+
         node_id = f"!{packet.from_:08x}"
         position.node_id = node_id
 
