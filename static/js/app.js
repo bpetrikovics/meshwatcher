@@ -593,6 +593,17 @@ function meshApp() {
       const row = document.createElement("div");
       row.className = "raw-log-row";
 
+      const portClassMap = {
+        NODEINFO_APP: "port-nodeinfo",
+        TRACEROUTE_APP: "port-traceroute",
+        TEXT_MESSAGE_APP: "port-textmsg",
+        POSITION_APP: "port-position",
+        ROUTING_APP: "port-routing",
+        TELEMETRY_APP: "port-telemetry",
+      };
+      const portClass = portClassMap[p?.decoded?.portnum];
+      if (portClass) row.classList.add(portClass);
+
       const safe = (v) => (v === null || v === undefined || v === "" ? "N/A" : String(v));
 
       const toHex = (n, digits) => {
@@ -670,20 +681,40 @@ function meshApp() {
       const fields = [
         { label: "Received", value: processed.received },
         { label: "Message ID", value: processed.id_ },
-        { label: "From", value: processed.fromDisplay },
-        { label: "To", value: processed.toDisplay },
+        { label: "From", value: processed.fromDisplay, nodeId: p?.from_node?.id },
+        { label: "To", value: processed.toDisplay, nodeId: p?.to_node?.id },
         { label: "Channel", value: processed.channel_name },
         { label: "Port", value: processed.portnum },
         { label: "Relay", value: processed.relay_node },
-        { label: "MQTT Uplink", value: processed.uplinkDisplay },
+        { label: "MQTT Uplink", value: processed.uplinkDisplay, nodeId: p?.uplink_node?.id },
         { label: "Next Hop", value: processed.next_hop },
       ];
+
+      const canLinkToNodeId = (nodeId) => {
+        if (!nodeId || typeof nodeId !== "string") return false;
+        if (!/^![0-9a-fA-F]{8}$/.test(nodeId)) return false;
+        return !!this.nodes?.[nodeId];
+      };
 
       for (const f of fields) {
         const cell = document.createElement("div");
         cell.className = "raw-log-cell";
 
-        cell.textContent = safe(f.value);
+        if (canLinkToNodeId(f.nodeId)) {
+          const link = document.createElement("span");
+          link.className = "raw-log-node-link";
+          link.textContent = safe(f.value);
+          link.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+              this.flyToNode(f.nodeId);
+            } catch (err) {}
+          });
+          cell.appendChild(link);
+        } else {
+          cell.textContent = safe(f.value);
+        }
         row.appendChild(cell);
       }
 

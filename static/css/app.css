@@ -1157,7 +1157,8 @@ footer.glass-panel {
 }
 
 .raw-log-row:hover {
-    background: rgba(243, 244, 246, 0.8);
+    background-image: linear-gradient(rgba(0,0,0,0.03), rgba(0,0,0,0.03));
+    box-shadow: inset 0 0 0 1px rgba(107, 114, 128, 0.25);
 }
 
 .raw-log-cell {
@@ -1165,6 +1166,24 @@ footer.glass-panel {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+.raw-log-node-link {
+    cursor: pointer;
+}
+
+.raw-log-node-link:hover {
+    text-decoration-line: underline;
+    text-decoration-style: dashed;
+    text-underline-offset: 2px;
+}
+
+/* Message type pastel backgrounds (mirrors packets.html base colors, but lighter) */
+.raw-log-row.port-nodeinfo { background-color: rgba(234, 240, 196, 0.55); }
+.raw-log-row.port-traceroute { background-color: rgba(245, 221, 204, 0.55); }
+.raw-log-row.port-textmsg { background-color: rgba(209, 224, 248, 0.6); }
+.raw-log-row.port-position { background-color: rgba(208, 242, 225, 0.6); }
+.raw-log-row.port-routing { background-color: rgba(227, 219, 245, 0.6); }
+.raw-log-row.port-telemetry { background-color: rgba(207, 238, 245, 0.6); }
 
 
 .raw-log-header {
