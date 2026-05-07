@@ -468,7 +468,24 @@ function nodeDetailMixin() {
       this.refreshingNodeId = nodeId;
 
       try {
-        // Update the sidebar HTML
+        // Fetch fresh node data (position age + last seen are time-relative server computations)
+        const include = encodeURIComponent("positions,info");
+        const response = await fetch(
+          `/api/nodes?include=${include}&node_id=${encodeURIComponent(nodeId)}&limit=1`,
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          const freshNode = data?.nodes?.[0];
+          if (freshNode) {
+            // Preserve client-side fields (e.g. marker) by merging into the existing node object.
+            Object.assign(node, freshNode);
+            if (freshNode.position !== undefined) node.position = freshNode.position;
+            if (freshNode.info !== undefined) node.info = freshNode.info;
+          }
+        }
+
+        // Update the sidebar HTML using the updated node object
         this.selectedNodeDetailsHtml = this.createNodeSidebarHtml(node);
 
         // Fetch fresh telemetry data
