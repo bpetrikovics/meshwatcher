@@ -142,7 +142,11 @@ def serialize_node(node, include_params: List[str], session=None) -> Dict[str, A
         "hw_model": node.hw_model,
         "role": node.role or "CLIENT",
         "is_unmessagable": node.is_unmessagable,
-        "updated": node.updated.isoformat() if node.updated else None,
+        "updated": (
+            (node.updated.replace(tzinfo=timezone.utc) if node.updated.tzinfo is None else node.updated)
+        ).isoformat()
+        if node.updated
+        else None,
         "last_channel": node.last_channel,
         "last_channel_name": node.last_channel_name,
     }
@@ -171,7 +175,15 @@ def serialize_node(node, include_params: List[str], session=None) -> Dict[str, A
             "longitude": position.longitude,
             "altitude": position.altitude,
             "time": position.time,
-            "created_at": position.created_at.isoformat() if position.created_at else None,
+            "created_at": (
+                (
+                    position.created_at.replace(tzinfo=timezone.utc)
+                    if position.created_at.tzinfo is None
+                    else position.created_at
+                ).isoformat()
+                if position.created_at
+                else None
+            ),
             "ground_speed_kmph": position.ground_speed,
             "ground_track": position.ground_track,
             "precision_bits": position.precision_bits,
@@ -225,7 +237,11 @@ def serialize_node(node, include_params: List[str], session=None) -> Dict[str, A
         
         result["info"] = {
             "has_position": bool(hasattr(node, 'latitude_i') and node.latitude_i is not None and node.longitude_i is not None),
-            "last_seen": node.updated.isoformat() if node.updated else None,
+            "last_seen": (
+                (node.updated.replace(tzinfo=timezone.utc) if node.updated.tzinfo is None else node.updated)
+            ).isoformat()
+            if node.updated
+            else None,
             "status": status,
             "last_seen_hours_ago": last_seen_hours_ago,
             # Enhanced node metadata
@@ -326,11 +342,15 @@ def get_node_positions(node_id):
         # Serialize positions
         results = []
         for pos in positions:
+            created_at = pos.created_at
+            if created_at is not None and created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+
             # Use Position model's computed properties
             result = {
                 "latitude": pos.latitude,
                 "longitude": pos.longitude,
-                "created_at": pos.created_at.isoformat() if pos.created_at else None,
+                "created_at": created_at.isoformat() if created_at else None,
                 "altitude": pos.altitude,
                 "precision_bits": pos.precision_bits,
                 "radius": pos.radius,
