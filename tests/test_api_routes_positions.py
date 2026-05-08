@@ -75,7 +75,7 @@ def test_get_node_positions_success_ordering(app, mock_positions):
     newest_first = list(reversed(mock_positions))
 
     with patch("app.routes.api_routes.db_session", side_effect=lambda: _mock_db_session_with_query_results(newest_first)):
-        with app.test_request_context("/api/nodes/!test/positions?since_hours=24&max_points=2000"):
+        with app.test_request_context("/api/nodes/!test/positions?since_hours=24&max_points=2000", environ_base={"HTTP_ORIGIN": "http://localhost"}):
             resp = api_routes.get_node_positions("!test")
 
     assert resp.status_code == 200
@@ -92,7 +92,7 @@ def test_get_node_positions_empty(app):
     from app.routes import api_routes
 
     with patch("app.routes.api_routes.db_session", side_effect=lambda: _mock_db_session_with_query_results([])):
-        with app.test_request_context("/api/nodes/!empty/positions"):
+        with app.test_request_context("/api/nodes/!empty/positions", environ_base={"HTTP_ORIGIN": "http://localhost"}):
             resp = api_routes.get_node_positions("!empty")
 
     assert resp.status_code == 200
@@ -104,7 +104,7 @@ def test_get_node_positions_not_found_is_empty(app):
     from app.routes import api_routes
 
     with patch("app.routes.api_routes.db_session", side_effect=lambda: _mock_db_session_with_query_results([])):
-        with app.test_request_context("/api/nodes/!nonexistent/positions"):
+        with app.test_request_context("/api/nodes/!nonexistent/positions", environ_base={"HTTP_ORIGIN": "http://localhost"}):
             resp = api_routes.get_node_positions("!nonexistent")
 
     assert resp.status_code == 200
@@ -118,7 +118,7 @@ def test_get_node_positions_legacy_limit_param_alias(app, mock_positions):
     newest_first = list(reversed(mock_positions))
 
     with patch("app.routes.api_routes.db_session", side_effect=lambda: _mock_db_session_with_query_results(newest_first)):
-        with app.test_request_context("/api/nodes/!test/positions?since_hours=24&limit=3"):
+        with app.test_request_context("/api/nodes/!test/positions?since_hours=24&limit=3", environ_base={"HTTP_ORIGIN": "http://localhost"}):
             resp = api_routes.get_node_positions("!test")
 
     assert resp.status_code == 200
@@ -132,7 +132,7 @@ def test_get_node_positions_caps_since_hours_to_7_days(app, mock_positions):
     newest_first = list(reversed(mock_positions))
 
     with patch("app.routes.api_routes.db_session", side_effect=lambda: _mock_db_session_with_query_results(newest_first)):
-        with app.test_request_context("/api/nodes/!test/positions?since_hours=999&max_points=5000"):
+        with app.test_request_context("/api/nodes/!test/positions?since_hours=999&max_points=5000", environ_base={"HTTP_ORIGIN": "http://localhost"}):
             resp = api_routes.get_node_positions("!test")
 
     assert resp.status_code == 200
@@ -143,13 +143,13 @@ def test_get_node_positions_caps_since_hours_to_7_days(app, mock_positions):
 def test_get_node_positions_invalid_params_return_400(app):
     from app.routes import api_routes
 
-    with app.test_request_context("/api/nodes/!test/positions?since_hours=nope"):
+    with app.test_request_context("/api/nodes/!test/positions?since_hours=nope", environ_base={"HTTP_ORIGIN": "http://localhost"}):
         resp, status = api_routes.get_node_positions("!test")
         assert status == 400
         data = resp.get_json()
         assert "error" in data
 
-    with app.test_request_context("/api/nodes/!test/positions?since_hours=24&max_points=nope"):
+    with app.test_request_context("/api/nodes/!test/positions?since_hours=24&max_points=nope", environ_base={"HTTP_ORIGIN": "http://localhost"}):
         resp, status = api_routes.get_node_positions("!test")
         assert status == 400
         data = resp.get_json()
@@ -162,7 +162,7 @@ def test_get_node_positions_field_formats(app, mock_positions):
     newest_first = list(reversed(mock_positions[:1]))
 
     with patch("app.routes.api_routes.db_session", side_effect=lambda: _mock_db_session_with_query_results(newest_first)):
-        with app.test_request_context("/api/nodes/!test/positions?since_hours=24&max_points=1"):
+        with app.test_request_context("/api/nodes/!test/positions?since_hours=24&max_points=1", environ_base={"HTTP_ORIGIN": "http://localhost"}):
             resp = api_routes.get_node_positions("!test")
 
     assert resp.status_code == 200
@@ -177,3 +177,28 @@ def test_get_node_positions_field_formats(app, mock_positions):
     assert pos["heading"] is not None
     assert isinstance(pos["heading"], (float, type(None)))
     assert pos["ground_speed_kmph"] is not None
+
+
+def test_get_node_positions_authenticated_session_allowed(app, mock_positions):
+    from app.routes import api_routes
+    from flask import session
+
+    newest_first = list(reversed(mock_positions[:1]))
+
+    with patch("app.routes.api_routes.db_session", side_effect=lambda: _mock_db_session_with_query_results(newest_first)):
+        # No Origin, no API key — only a browser session cookie
+        with app.test_request_context("/api/nodes/!test/positions?since_hours=24&max_points=1"):
+            session['authenticated_browser'] = True
+            resp = api_routes.get_node_positions("!test")
+
+    assert resp.status_code == 200
+
+
+def test_get_node_positions_no_auth_returns_401(app):
+    from app.routes import api_routes
+
+    # No Origin, no session, no API key
+    with app.test_request_context("/api/nodes/!test/positions"):
+        resp, status = api_routes.get_node_positions("!test")
+        assert status == 401
+        assert resp.get_json()["error"] == "Unauthorized"

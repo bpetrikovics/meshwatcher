@@ -11,3 +11,10 @@ services:
       - "8080:8080"
 
     env_file: .env
+
+    # Mount API keys file and set path via env var (optional).
+    # Generate keys with: python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+    # environment:
+    #   API_KEYS_FILE: /run/secrets/api_keys.yaml
+    # volumes:
+    #   - ./api_keys.yaml:/run/secrets/api_keys.yaml:ro

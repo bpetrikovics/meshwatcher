@@ -1,10 +1,11 @@
 import logging
 
-from flask import request
+from flask import request, session
 from flask_socketio import join_room, leave_room
 
 from app.config import PACKETS_SUBSCRIBERS_ROOM, settings
 from app.extensions import socketio
+from app.api_keys import validate_key, is_origin_allowed
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +20,17 @@ def _handle_disconnect_default() -> None:
     pass
 
 
-def _handle_connect_packets() -> None:
+def _handle_connect_packets(auth=None) -> None:
     """Handle packets namespace connection."""
     sid = request.sid
+    origin = request.headers.get("Origin")
+    if not is_origin_allowed(origin) and not session.get('authenticated_browser'):
+        api_key = (auth or {}).get("api_key")
+        client = validate_key(api_key) if api_key else None
+        if not client:
+            logger.warning("Rejected packets connection from sid=%s origin='%s'", sid, origin)
+            return False
+        logger.debug("Packets connection granted to '%s' sid=%s", client, sid)
     logger.info("Client connected to packets with sid %s", sid)
 
 
@@ -45,9 +54,17 @@ def _handle_unsubscribe_packets() -> None:
     logger.info("sid %s unsubscribed from packets", sid)
 
 
-def _handle_connect_events() -> None:
+def _handle_connect_events(auth=None) -> None:
     """Handle events namespace connection."""
     sid = request.sid
+    origin = request.headers.get("Origin")
+    if not is_origin_allowed(origin) and not session.get('authenticated_browser'):
+        api_key = (auth or {}).get("api_key")
+        client = validate_key(api_key) if api_key else None
+        if not client:
+            logger.warning("Rejected events connection from sid=%s origin='%s'", sid, origin)
+            return False
+        logger.debug("Events connection granted to '%s' sid=%s", client, sid)
     logger.info("Client connected to events with sid %s", sid)
 
     # Emit version information for frontend comparison

@@ -1,4 +1,6 @@
-from flask import Blueprint, request, jsonify
+import functools
+import logging
+from flask import Blueprint, request, jsonify, session
 from sqlalchemy import desc, and_, or_, func
 from datetime import datetime, timezone, timedelta
 import math
@@ -7,6 +9,30 @@ from typing import Optional, List, Dict, Any
 from app.database import db_session
 from app.models import NodeInfo, Position, Telemetry, Metric, MeshtasticPacket
 from app.config import settings
+from app.api_keys import validate_key, is_origin_allowed
+
+logger = logging.getLogger(__name__)
+
+
+def _require_auth(fn):
+    """Allow trusted-origin, authenticated-session, or API-key requests."""
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        origin = request.headers.get("Origin")
+        if is_origin_allowed(origin):
+            return fn(*args, **kwargs)
+
+        if session.get('authenticated_browser'):
+            return fn(*args, **kwargs)
+
+        api_key = request.headers.get("X-API-Key")
+        client = validate_key(api_key) if api_key else None
+        if client:
+            logger.debug("API access granted to '%s'", client)
+            return fn(*args, **kwargs)
+        logger.warning("Unauthorized API request from origin='%s'", origin)
+        return jsonify({"error": "Unauthorized"}), 401
+    return wrapper
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -254,6 +280,7 @@ def serialize_node(node, include_params: List[str], session=None) -> Dict[str, A
 
 
 @bp.route("/nodes")
+@_require_auth
 def get_nodes():
     """Get nodes with configurable data inclusion and pagination."""
     
@@ -302,6 +329,7 @@ def get_nodes():
 
 
 @bp.route("/nodes/<string:node_id>/positions")
+@_require_auth
 def get_node_positions(node_id):
     """Get all position history for a specific node."""
     
@@ -363,6 +391,7 @@ def get_node_positions(node_id):
 
 
 @bp.route("/nodes/<string:node_id>/telemetry/summary")
+@_require_auth
 def get_node_telemetry_summary(node_id):
     """Get telemetry summary for a specific node (available metrics and recency)."""
     
@@ -426,6 +455,7 @@ def get_node_telemetry_summary(node_id):
 
 
 @bp.route("/nodes/<string:node_id>/metrics/series")
+@_require_auth
 def get_node_metrics_series(node_id):
     """Get time series data for a specific metric."""
     

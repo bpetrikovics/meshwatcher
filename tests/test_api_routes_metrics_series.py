@@ -34,7 +34,7 @@ def app():
 
 
 def test_metrics_series_requires_params(app):
-    with app.test_request_context("/api/nodes/!abc/metrics/series"):
+    with app.test_request_context("/api/nodes/!abc/metrics/series", environ_base={"HTTP_ORIGIN": "http://localhost"}):
         resp, status = api_routes.get_node_metrics_series("!abc")
         assert status == 400
         data = resp.get_json()
@@ -43,7 +43,8 @@ def test_metrics_series_requires_params(app):
 
 def test_metrics_series_invalid_params(app):
     with app.test_request_context(
-        "/api/nodes/!abc/metrics/series?metric_type=t&metric=m&since_hours=nope&max_points=10"
+        "/api/nodes/!abc/metrics/series?metric_type=t&metric=m&since_hours=nope&max_points=10",
+        environ_base={"HTTP_ORIGIN": "http://localhost"}
     ):
         resp, status = api_routes.get_node_metrics_series("!abc")
         assert status == 400
@@ -60,7 +61,8 @@ def test_metrics_series_enforces_max_points_contract(app):
 
     with patch("app.routes.api_routes.db_session", side_effect=lambda: _mock_db_session_with_results(results)):
         with app.test_request_context(
-            f"/api/nodes/{node_id}/metrics/series?metric_type=deviceMetrics&metric=batteryLevel&since_hours=24&max_points=100"
+            f"/api/nodes/{node_id}/metrics/series?metric_type=deviceMetrics&metric=batteryLevel&since_hours=24&max_points=100",
+            environ_base={"HTTP_ORIGIN": "http://localhost"}
         ):
             resp = api_routes.get_node_metrics_series(node_id)
             assert resp.status_code == 200
@@ -81,7 +83,8 @@ def test_metrics_series_caps_since_hours_to_7_days(app):
 
     with patch("app.routes.api_routes.db_session", side_effect=lambda: _mock_db_session_with_results(results)):
         with app.test_request_context(
-            f"/api/nodes/{node_id}/metrics/series?metric_type=deviceMetrics&metric=batteryLevel&since_hours=999&max_points=10"
+            f"/api/nodes/{node_id}/metrics/series?metric_type=deviceMetrics&metric=batteryLevel&since_hours=999&max_points=10",
+            environ_base={"HTTP_ORIGIN": "http://localhost"}
         ):
             resp = api_routes.get_node_metrics_series(node_id)
             assert resp.status_code == 200
