@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     namespace_packets: str = "/packets"
     namespace_events: str = "/events"
     event_flash_ms: int = 3000
+
+    # Rate limiting (set rate_limit_backend to "disabled" to turn off)
+    rate_limit_backend: str = "disabled"  # memory://, redis://host:port/db, or disabled
+    rate_limit_ip_rate: str = "60/minute"        # browser sessions + unauthenticated probes
+    rate_limit_api_key_rate: str = "600/minute"  # provisioned API key clients
     cors_allowed_origins: str = "*"
     
     # Map clustering (pixels) - sensible default can be 5

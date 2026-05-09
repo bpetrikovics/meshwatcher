@@ -10,6 +10,7 @@ from app.database import db_session
 from app.models import NodeInfo, Position, Telemetry, Metric, MeshtasticPacket
 from app.config import settings
 from app.api_keys import validate_key, is_origin_allowed
+from app.extensions import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -519,3 +520,12 @@ def get_node_metrics_series(node_id):
         }
         
         return jsonify(response)
+
+
+def _dynamic_limit() -> str:
+    """Higher rate for API-key clients; IP-based rate for everything else."""
+    return settings.rate_limit_api_key_rate if request.headers.get("X-API-Key") else settings.rate_limit_ip_rate
+
+
+# Apply rate limit to all routes in this blueprint
+limiter.limit(_dynamic_limit)(bp)

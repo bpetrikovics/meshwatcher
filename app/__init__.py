@@ -3,7 +3,7 @@ from flask_cors import CORS
 
 from .database import init_db
 from .config import settings
-from .extensions import init_socketio
+from .extensions import init_socketio, init_limiter
 from .api_keys import load_api_keys
 from .routes import register_blueprints
 from .websockets import register_socketio_handlers
@@ -26,6 +26,7 @@ def create_app() -> Flask:
 
     load_api_keys()
     init_socketio(app)
+    init_limiter(app)
     register_blueprints(app)
     register_socketio_handlers()
 

@@ -18,3 +18,25 @@ services:
     #   API_KEYS_FILE: /run/secrets/api_keys.yaml
     # volumes:
     #   - ./api_keys.yaml:/run/secrets/api_keys.yaml:ro
+
+# ---------------------------------------------------------------------------
+# nginx rate-limiting (recommended for production, no app code changes needed)
+# ---------------------------------------------------------------------------
+# Add to your nginx server block to limit requests before they reach Gunicorn:
+#
+#   limit_req_zone $binary_remote_addr zone=meshwatcher_ip:10m rate=60r/m;
+#   limit_req_zone $http_x_api_key     zone=meshwatcher_key:10m rate=600r/m;
+#
+#   server {
+#       location /api/ {
+#           # API-key clients get the higher key-based bucket; others use IP bucket
+#           limit_req zone=meshwatcher_key burst=20 nodelay;
+#           limit_req zone=meshwatcher_ip  burst=10 nodelay;
+#           proxy_pass http://127.0.0.1:8080;
+#           proxy_set_header X-Forwarded-For $remote_addr;
+#       }
+#   }
+#
+# When running behind nginx, set RATE_LIMIT_BACKEND=disabled (default) and let
+# nginx handle it. Set RATE_LIMIT_BACKEND=memory:// (or redis://...) to also
+# enforce limits at the application layer (defense in depth).
