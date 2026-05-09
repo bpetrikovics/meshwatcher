@@ -3,6 +3,7 @@ gunicorn[eventlet]
 flask
 flask-socketio
 flask-cors
+flask-limiter
 pydantic-settings
 sqlalchemy
 pymysql
