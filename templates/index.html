@@ -241,6 +241,15 @@
             </div>
         </footer>
 
+        <!-- Packet detail dialog (native, outside Alpine modal system) -->
+        <dialog id="packet-detail-dialog" class="packet-detail-dialog">
+            <div class="packet-detail-header">
+                <span class="packet-detail-title">Packet Details</span>
+                <button class="packet-detail-close" onclick="document.getElementById('packet-detail-dialog').close()" aria-label="Close">✕</button>
+            </div>
+            <pre class="packet-detail-body" id="packet-detail-body"></pre>
+        </dialog>
+
         <!-- Modal Container -->
         <div x-show="modal.visible" 
              x-transition:enter="transition ease-out duration-300"

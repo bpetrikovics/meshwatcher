@@ -732,6 +732,17 @@ function meshApp() {
         dupCell.appendChild(badge);
       }
       row.appendChild(dupCell);
+
+      row.style.cursor = "pointer";
+      row.addEventListener("click", () => {
+        const body = document.getElementById("packet-detail-body");
+        const dialog = document.getElementById("packet-detail-dialog");
+        if (body && dialog) {
+          body.textContent = JSON.stringify(p, null, 2);
+          dialog.showModal();
+        }
+      });
+
       return row;
     },
 
