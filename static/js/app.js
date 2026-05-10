@@ -77,7 +77,7 @@ function meshApp() {
     packetsSocket: null,
     packetsSocketConnected: false,
     rawLogPauseWhenScrolledUp: true,
-    rawLogHideDuplicates: false,
+    rawLogHideDuplicates: localStorage.getItem('rawLogHideDuplicates') === 'true',
     rawLogPaused: false,
     rawLogBufferedCount: 0,
     rawLogStatusText: "",
@@ -206,6 +206,11 @@ function meshApp() {
       }
       this.initialized = true;
       console.log("Initializing app...");
+
+      // Persist raw log preferences across sessions
+      this.$watch('rawLogHideDuplicates', value => {
+        localStorage.setItem('rawLogHideDuplicates', value);
+      });
 
       const config = window.APP_CONFIG || {};
       this.clusteringRadius = config.CLUSTERING_RADIUS ?? 5;
