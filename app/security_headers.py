@@ -1,6 +1,6 @@
 CSP_HEADER = (
     "default-src 'self'; "
-    "script-src 'self' https://cdn.tailwindcss.com/3.4.19 https://unpkg.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net 'sha256-Ivz1HqHz0902SyRgM1GT8czS+kDxFBzGC0OKtHeeJ+0=' 'unsafe-eval'; "
+    "script-src 'self' https://cdn.tailwindcss.com/3.4.17 https://unpkg.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net 'sha256-Ivz1HqHz0902SyRgM1GT8czS+kDxFBzGC0OKtHeeJ+0=' 'unsafe-eval'; "
     "style-src 'self' https://unpkg.com https://cdnjs.cloudflare.com 'unsafe-inline'; "
     "img-src 'self' https://*.tile.openstreetmap.org https://unpkg.com data:; "
     "font-src 'self' https://cdnjs.cloudflare.com; "
