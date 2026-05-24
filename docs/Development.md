@@ -70,7 +70,7 @@ Then commit both the `.in` and the regenerated `.txt` files together.
 
 ### CI enforcement
 
-The test workflow runs `pip-compile --check` before installing dependencies. This fails the build if the committed `.txt` files are out of sync with the `.in` files, preventing accidental hand-edits to the lock files from going unnoticed.
+The CI pipeline now enforces this with a step that recompiles the `.in` files and then runs `git diff --exit-code` to fail the build if the committed `.txt` files are out of sync with the `.in` files, preventing accidental hand-edits to the lock files from going unnoticed.
 
 ### Automated updates (Dependabot)
 
