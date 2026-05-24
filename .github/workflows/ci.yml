@@ -1,0 +1,12 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
