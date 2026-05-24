@@ -1,0 +1,11 @@
+gunicorn
+flask
+flask-socketio
+flask-cors
+flask-limiter
+pydantic-settings
+sqlalchemy
+pymysql
+sqlmodel
+pyyaml
+git+https://github.com/bpetrikovics/meshtastic-mqtt-json.git@multi-channel#egg=meshtastic-mqtt-json

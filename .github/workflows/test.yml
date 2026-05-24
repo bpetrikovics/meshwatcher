@@ -12,5 +12,11 @@ jobs:
         with:
           python-version: '3.x'
           cache: 'pip'
+      - name: Install pip-tools
+        run: pip install pip-tools
+      - name: Verify compiled files are up to date
+        run: |
+          pip-compile --check requirements.in
+          pip-compile --check test-requirements.in
       - run: pip install -r test-requirements.txt
       - run: ./unittest.sh
