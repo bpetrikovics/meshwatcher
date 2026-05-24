@@ -10,7 +10,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: '3.13'
           cache: 'pip'
       - name: Install pip-tools
         run: pip install pip-tools
@@ -18,6 +18,7 @@ jobs:
         run: |
           pip-compile requirements.in
           pip-compile test-requirements.in
-          git diff --exit-code requirements.txt test-requirements.txt
+          git diff --exit-code requirements.txt test-requirements.txt || \
+            { echo ""; echo "ERROR: Lock files are out of date. Run 'pip-compile requirements.in && pip-compile test-requirements.in' locally and commit the results."; exit 1; }
       - run: pip install -r test-requirements.txt
       - run: ./unittest.sh
