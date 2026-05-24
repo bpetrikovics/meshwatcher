@@ -283,6 +283,13 @@ function meshApp() {
       };
       document.addEventListener("touchend", this.touchEndHandler);
       document.addEventListener("touchcancel", this.touchEndHandler);
+
+      const closeBtn = document.querySelector(".packet-detail-close");
+      if (closeBtn) {
+        closeBtn.addEventListener("click", () => {
+          document.getElementById("packet-detail-dialog").close();
+        });
+      }
     },
 
     // Cleanup event listeners and map resources

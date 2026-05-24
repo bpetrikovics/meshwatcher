@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="shortcut icon" href="/static/favicon.ico">
-    <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"></script>
     <link rel="stylesheet" href="/static/css/packets.css">
 </head>
 <body>
@@ -25,12 +25,12 @@
     </div>
     <div id="log"></div>
 
+    <script id="app-config" type="application/json">{{ {
+        'SOCKET_NAMESPACE': settings.namespace_packets,
+        'GIT_COMMIT': settings.git_commit
+    } | tojson }}</script>
     <script>
-        // Configuration passed from Flask template
-        window.APP_CONFIG = {
-            SOCKET_NAMESPACE: '{{ settings.namespace_packets }}',
-            GIT_COMMIT: '{{ settings.git_commit | e }}'
-        };
+        window.APP_CONFIG = JSON.parse(document.getElementById('app-config').textContent);
     </script>
     <script src="/static/js/packets.js"></script>
 </body>
