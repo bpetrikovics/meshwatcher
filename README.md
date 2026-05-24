@@ -51,7 +51,7 @@ FLASK_SECRET_KEY=change-me-in-production
 
 **3. (Optional) Put it behind a reverse proxy:**
 
-MeshWatcher uses Socket.IO, so your proxy must support WebSocket upgrades.
+It's advisable to put your instance behind a reverse proxy such as Nginx. MeshWatcher uses Socket.IO, so your proxy must support WebSocket upgrades.
 
 *nginx:*
 ```nginx
