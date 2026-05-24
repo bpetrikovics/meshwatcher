@@ -7,7 +7,7 @@
     <link rel="shortcut icon" href="/static/favicon.ico">
 
     <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -245,7 +245,7 @@
         <dialog id="packet-detail-dialog" class="packet-detail-dialog">
             <div class="packet-detail-header">
                 <span class="packet-detail-title">Packet Details</span>
-                <button class="packet-detail-close" onclick="document.getElementById('packet-detail-dialog').close()" aria-label="Close">✕</button>
+                <button class="packet-detail-close" aria-label="Close">✕</button>
             </div>
             <pre class="packet-detail-body" id="packet-detail-body"></pre>
         </dialog>
@@ -307,7 +307,7 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-    <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"></script>
     <script id="app-config" type="application/json">{{ {
         'STATUS_CURRENTLY_ACTIVE_HOURS': settings.status_currently_active_hours,
         'STATUS_RECENTLY_ACTIVE_HOURS': settings.status_recently_active_hours,

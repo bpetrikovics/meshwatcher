@@ -1,6 +1,8 @@
 from flask import Flask
 from flask_cors import CORS
 
+from .security_headers import set_security_headers
+
 from .database import init_db
 from .config import settings
 from .extensions import init_socketio, init_limiter
@@ -29,5 +31,7 @@ def create_app() -> Flask:
     init_limiter(app)
     register_blueprints(app)
     register_socketio_handlers()
+
+    app.after_request(set_security_headers)
 
     return app
