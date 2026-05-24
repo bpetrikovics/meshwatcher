@@ -4,8 +4,28 @@ on:
   push:
     branches:
       - master
+    paths:
+      - 'app/**'
+      - 'tests/**'
+      - 'main.py'
+      - 'gunicorn_config.py'
+      - 'requirements.txt'
+      - 'test-requirements.txt'
+      - 'unittest.sh'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/test.yml'
   pull_request:
     types: [opened, synchronize, reopened]
+    paths:
+      - 'app/**'
+      - 'tests/**'
+      - 'main.py'
+      - 'gunicorn_config.py'
+      - 'requirements.txt'
+      - 'test-requirements.txt'
+      - 'unittest.sh'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/test.yml'
 
 jobs:
   test:
