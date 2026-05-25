@@ -9,7 +9,7 @@ A real-time web application for monitoring [Meshtastic](https://meshtastic.org/)
 - **Live map** — Visualize all active Meshtastic nodes on an interactive map with configurable clustering.
 - **Private channel tracking** — Track your own devices on your private, encrypted channel
 - **Node sidebar** — Browse and filter nodes by role (Client, Router, Tracker, Sensor) and monitor their last-seen status at a glance.
-- **Node detail panel** — Inspect per-node metadata, telemetry history, and position tracks color-coded by speed and signal strength.
+- **Node detail panel** — Inspect per-node metadata, telemetry history, and position tracks color-coded by speed and position age.
 - **Packet log** — Watch the raw MQTT stream in real time, with automatic duplicate filtering and expandable packet payloads.
 - **Auto-cleanup** — Define independent retention periods for each data type to keep your database lean.
 - **API + WebSocket** — Integrate with the REST API using optional key-based authentication, or subscribe to live events via Socket.IO.
