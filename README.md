@@ -1,17 +1,18 @@
 # MeshWatcher
 
-A real-time web app for monitoring [Meshtastic](https://meshtastic.org/) mesh networks. It listens to MQTT, decodes packets, and shows nodes, positions, telemetry, and messages on a live map.
+A real-time web application for monitoring [Meshtastic](https://meshtastic.org/) mesh networks. MeshWatcher subscribes to an MQTT broker, decodes incoming packets, and presents nodes, positions, telemetry, and messages on an interactive live map.
 
 ![Map view with nodes and telemetry panel](meshwatcher-screenshot.png)
 
 ## Features
 
-- **Live map** — Meshtastic nodes plotted on Leaflet with configurable clustering
-- **Node sidebar** — search/filter by role (Client, Router, Tracker, Sensor), see last-seen status
-- **Node detail panel** — metadata, telemetry, position history with color-coded speed/signal tracks
-- **Packet log** — real-time raw MQTT stream with duplicate filtering and expandable payloads
-- **Auto-cleanup** — configurable data retention per data type (nodes, messages, telemetry, etc.)
-- **API + WebSocket** — REST API with optional key authentication; Socket.IO for real-time updates
+- **Live map** — Visualize all active Meshtastic nodes on an interactive map with configurable clustering.
+- **Private channel tracking** — Track your own devices on your private, encrypted channel
+- **Node sidebar** — Browse and filter nodes by role (Client, Router, Tracker, Sensor) and monitor their last-seen status at a glance.
+- **Node detail panel** — Inspect per-node metadata, telemetry history, and position tracks color-coded by speed and signal strength.
+- **Packet log** — Watch the raw MQTT stream in real time, with automatic duplicate filtering and expandable packet payloads.
+- **Auto-cleanup** — Define independent retention periods for each data type to keep your database lean.
+- **API + WebSocket** — Integrate with the REST API using optional key-based authentication, or subscribe to live events via Socket.IO.
 
 ## Requirements
 
