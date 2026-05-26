@@ -730,6 +730,15 @@ function meshApp() {
         row.appendChild(cell);
       }
 
+      const dataCell = document.createElement("div");
+      dataCell.className = "raw-log-cell raw-log-data";
+      const dataText = this.rawLogDecodePacketData(p);
+      if (dataText) {
+        dataCell.textContent = dataText;
+        dataCell.title = dataText;
+      }
+      row.appendChild(dataCell);
+
       const dupCell = document.createElement("div");
       dupCell.className = "raw-log-cell raw-log-right";
       if (p?.is_duplicate === true) {
@@ -751,6 +760,54 @@ function meshApp() {
       });
 
       return row;
+    },
+
+    rawLogDecodePacketData(p) {
+      const portnum = p?.decoded?.portnum;
+      if (!portnum) return "";
+
+      let payload = p?.decoded?.payload;
+      if (typeof payload === "string") {
+        try { payload = JSON.parse(payload); } catch (e) { /* keep as string */ }
+      }
+
+      if (portnum === "TEXT_MESSAGE_APP") {
+        if (typeof payload === "string") return payload;
+        if (payload && typeof payload === "object" && payload.text) return payload.text;
+        return "";
+      }
+
+      if (portnum === "NODEINFO_APP") {
+        if (payload && typeof payload === "object") {
+          return payload.longName || payload.long_name || payload.shortName || payload.short_name || "";
+        }
+        return "";
+      }
+
+      if (portnum === "POSITION_APP") {
+        if (payload && typeof payload === "object") {
+          const latI = payload.latitudeI ?? payload.latitude_i;
+          const lonI = payload.longitudeI ?? payload.longitude_i;
+          if (latI != null && lonI != null) {
+            const lat = (latI / 1e7).toFixed(5);
+            const lon = (lonI / 1e7).toFixed(5);
+            let str = `${lat}, ${lon}`;
+            const speed = payload.groundSpeed ?? payload.ground_speed;
+            const track = payload.groundTrack ?? payload.ground_track;
+            if (speed != null) str += ` ${speed}km/h`;
+            if (track != null) str += ` ${(track / 1e5).toFixed(0)}°`;
+            return str;
+          }
+        }
+        return "";
+      }
+
+      if (portnum === "TELEMETRY_APP") {
+        if (payload != null) return JSON.stringify(payload);
+        return "";
+      }
+
+      return "";
     },
 
     rawLogClear() {
