@@ -1145,7 +1145,7 @@ footer.glass-panel {
 
 .raw-log-row {
     display: grid;
-    grid-template-columns: 150px 86px 1.3fr 1.3fr 110px 110px 70px 1.2fr 70px 44px;
+    grid-template-columns: 150px 86px 1fr 1fr 110px 110px 60px 1fr 55px 1.8fr 44px;
     gap: 8px;
     padding: 3px 6px;
     border-bottom: 1px solid rgba(229, 231, 235, 0.8);
@@ -1213,6 +1213,12 @@ footer.glass-panel {
     align-items: center;
 }
 
+.raw-log-data {
+    font-family: system-ui, -apple-system, sans-serif;
+    font-style: italic;
+    color: #4b5563;
+}
+
 .raw-log-dup {
     font-size: 11px;
     color: #7c2d12;
@@ -1235,7 +1241,8 @@ footer.glass-panel {
     .raw-log-cell:nth-child(5),
     .raw-log-cell:nth-child(7),
     .raw-log-cell:nth-child(8),
-    .raw-log-cell:nth-child(9) {
+    .raw-log-cell:nth-child(9),
+    .raw-log-cell:nth-child(10) {
         display: none;
     }
 }
