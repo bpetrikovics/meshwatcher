@@ -168,7 +168,25 @@
             <!-- Map Container -->
             <div class="flex-1 relative map-container">
                 <div id="map" class="w-full h-full"></div>
-                
+
+                <!-- Loading overlay -->
+                <div x-show="loading.nodes"
+                     x-transition:enter="transition ease-out duration-150"
+                     x-transition:enter-start="opacity-0"
+                     x-transition:enter-end="opacity-100"
+                     x-transition:leave="transition ease-in duration-200"
+                     x-transition:leave-start="opacity-100"
+                     x-transition:leave-end="opacity-0"
+                     class="absolute inset-0 flex items-center justify-center pointer-events-none"
+                     style="z-index: 1000;">
+                    <div class="flex items-center gap-2 bg-gray-900 bg-opacity-75 text-white text-sm font-medium px-4 py-2 rounded-full shadow-lg">
+                        <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        Loading nodes…
+                    </div>
+                </div>
             </div>
 
             <!-- Right Sidebar -->
