@@ -807,6 +807,35 @@ function meshApp() {
         return "";
       }
 
+      if (portnum === "TRACEROUTE_APP") {
+        const isResponse = !!(p?.decoded?.requestId);
+        if (!isResponse) return "↑";
+
+        const nodeHex = (n) => {
+          if (n == null) return "N/A";
+          if (n === 4294967295) return "N/A";
+          try { return `!${(BigInt(n)).toString(16).padStart(8, "0")}`; } catch (e) { return "N/A"; }
+        };
+
+        const fromName = p?.from_node?.short_name || nodeHex(p?.from_);
+        const toName   = p?.to_node?.short_name   || nodeHex(p?.to);
+
+        const buildPath = (startName, middleIds, endName, snrs) => {
+          const nodes = [startName, ...(middleIds || []).map(nodeHex), endName];
+          let s = nodes[0];
+          for (let i = 1; i < nodes.length; i++) {
+            const raw = (snrs || [])[i - 1];
+            const snrStr = (raw != null && raw !== -128) ? `${(raw / 4).toFixed(1)}dB` : "?";
+            s += ` →${snrStr}→ ${nodes[i]}`;
+          }
+          return s;
+        };
+
+        const fwd  = buildPath(fromName, payload?.route,      toName,   payload?.snrTowards);
+        const back = buildPath(toName,   payload?.routeBack,  fromName, payload?.snrBack);
+        return `↓ ${fwd} | ↑ ${back}`;
+      }
+
       return "";
     },
 
