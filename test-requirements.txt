@@ -119,7 +119,7 @@ requests==2.34.2
     # via meshtastic
 simple-websocket==1.1.0
     # via python-engineio
-sqlalchemy==2.0.49
+sqlalchemy==2.0.50
     # via
     #   -r requirements.in
     #   sqlmodel
