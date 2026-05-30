@@ -75,7 +75,7 @@ class TextMessageExtractor(PayloadExtractor):
         """
         text = packet.decoded.get("payload", "")
         if isinstance(text, (bytes, bytearray)):
-            text = text.decode()
+            text = text.decode(errors='replace')
         
         data = {
             "text": text,
@@ -121,7 +121,7 @@ class DefaultExtractor(PayloadExtractor):
             return class_to_extract.model_validate({})
 
         if isinstance(payload, (bytes, bytearray)):
-            payload = payload.decode()
+            payload = payload.decode(errors='replace')
 
         if isinstance(payload, str):
             return class_to_extract.model_validate_json(payload)

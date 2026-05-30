@@ -83,7 +83,21 @@ class DbCleanupManager:
 
         self.start()
 
+    # Allowlist of permitted table/column identifier pairs for cleanup queries.
+    # SQL identifiers cannot be parameterized, so this allowlist prevents injection
+    # if the method is ever called with a non-hardcoded value.
+    _ALLOWED_CLEANUP_IDENTIFIERS: frozenset = frozenset([
+        ('packets',   'createdAt'),
+        ('nodes',     'updated'),
+        ('messages',  'createdAt'),
+        ('telemetry', 'createdAt'),
+        ('metrics',   'createdAt'),
+    ])
+
     def _cleanup_table(self, session: Session, table: str, days: int, timestamp_col: str) -> Dict[str, Any]:
+        if (table, timestamp_col) not in self._ALLOWED_CLEANUP_IDENTIFIERS:
+            raise ValueError(f"Disallowed cleanup identifier pair: table={table!r}, col={timestamp_col!r}")
+
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
         self.logger.info("Starting cleanup for %s with cutoff %s", table, cutoff.strftime('%Y-%m-%d %H:%M %Z'))
 

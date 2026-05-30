@@ -287,8 +287,11 @@ def get_nodes():
     
     # Parse query parameters
     include_params = parse_include_params(request.args.get("include"))
-    limit = min(int(request.args.get("limit", 1000)), 5000)  # Max 5000
-    offset = int(request.args.get("offset", 0))
+    try:
+        limit = min(int(request.args.get("limit", 1000)), 5000)  # Max 5000
+        offset = int(request.args.get("offset", 0))
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid limit or offset parameter"}), 400
     node_id = request.args.get("node_id")
     has_position = request.args.get("has_position", "").lower() == "true"
     active = request.args.get("active", "").lower() == "true"
@@ -351,6 +354,8 @@ def get_node_positions(node_id):
     else:
         try:
             max_points_val = int(max_points_raw)
+            if max_points_val < 0:
+                raise ValueError("max_points must be non-negative")
         except (ValueError, TypeError):
             return jsonify({"error": "Invalid max_points parameter"}), 400
 
