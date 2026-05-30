@@ -73,6 +73,23 @@ def calculate_position_age(position_created_at: Optional[datetime]) -> Optional[
         return None
 
 
+def _count_nodes(filters: Dict[str, Any], session) -> int:
+    """Lightweight node count that avoids re-running window functions."""
+    count_q = session.query(func.count(NodeInfo.id_))
+    if filters.get("node_id"):
+        count_q = count_q.filter(NodeInfo.id_ == filters["node_id"])
+    if filters.get("has_position"):
+        count_q = count_q.filter(
+            session.query(Position.node_id)
+                   .filter(Position.node_id == NodeInfo.id_)
+                   .exists()
+        )
+    if filters.get("active"):
+        recent_time = datetime.now(timezone.utc) - timedelta(hours=24)
+        count_q = count_q.filter(NodeInfo.updated >= recent_time)
+    return count_q.scalar() or 0
+
+
 def build_nodes_query(include_params: List[str], filters: Dict[str, Any], session):
     """Build highly optimized query for nodes with conditional joins."""
     # Start with base query - select only needed columns
@@ -308,8 +325,8 @@ def get_nodes():
         # Build query
         query = build_nodes_query(include_params, filters, session)
         
-        # Get total count for pagination
-        total_count = query.count()
+        # Get total count for pagination (lightweight — avoids re-running window functions)
+        total_count = _count_nodes(filters, session)
         
         # Apply pagination
         nodes = query.offset(offset).limit(limit).all()

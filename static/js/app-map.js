@@ -377,6 +377,46 @@ function mapMixin() {
       }
     },
 
+    // Batch-add many nodes at once. Uses nodeLayer.addLayers() so MarkerClusterGroup
+    // only re-clusters once instead of once per marker.
+    addNodesToMapBatch(nodes) {
+      if (!this.map || !this.map._loaded || !this.nodeLayer) return;
+
+      const markers = [];
+      nodes.forEach((node) => {
+        if (!node.position) return;
+        // Skip nodes already on the map to avoid orphaned duplicate markers
+        if (this.nodes[node.id]?.marker) {
+          // Update data but reuse the existing marker
+          this.nodes[node.id] = { ...node, marker: this.nodes[node.id].marker };
+          return;
+        }
+        try {
+          this.nodes[node.id] = node;
+          const shouldShowDirection = this.isNodeMoving(node.position);
+          const marker = L.marker([node.position.latitude, node.position.longitude]);
+          marker.on("click", () => {
+            try {
+              if (!this.map) return;
+              this.selectNode(node.id);
+            } catch (error) {
+              console.error("Failed to handle marker click:", error);
+            }
+          });
+          node.marker = marker;
+          this.updateNodeIcon(node, shouldShowDirection);
+          markers.push(marker);
+        } catch (error) {
+          console.error("Failed to prepare node for map:", error);
+        }
+      });
+
+      if (markers.length > 0) {
+        this.nodeLayer.addLayers(markers);
+      }
+      this.invalidateRoleCache();
+    },
+
     createNodePopup(node) {
       const info = node.info || {};
       const position = node.position || {};

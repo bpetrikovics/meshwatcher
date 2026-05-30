@@ -46,10 +46,8 @@ function nodesMixin() {
 
         console.log(`Loaded ${data.nodes.length} nodes`);
 
-        // Add nodes to map
-        data.nodes.forEach((node) => {
-          this.addNodeToMap(node);
-        });
+        // Add nodes to map (batch for performance)
+        this.addNodesToMapBatch(data.nodes);
 
         // Handle pagination iteratively to prevent stack overflow
         await this.loadAllPages(data);
@@ -126,12 +124,17 @@ function nodesMixin() {
       const response = await fetch(url);
       const data = await response.json();
 
-      data.nodes.forEach((node) => {
-        if (!this.nodes[node.id]) {
-          this.nodes[node.id] = node;
-          this.invalidateRoleCache();
-        }
-      });
+      const addPositionless = (nodes) => {
+        let added = false;
+        nodes.forEach((node) => {
+          if (!this.nodes[node.id]) {
+            this.nodes[node.id] = node;
+            added = true;
+          }
+        });
+        if (added) this.invalidateRoleCache();
+      };
+      addPositionless(data.nodes);
 
       let hasMore = data.pagination.has_more;
       let offset = data.pagination.next_offset;
@@ -147,12 +150,7 @@ function nodesMixin() {
         const pageResponse = await fetch(pageUrl);
         const pageData = await pageResponse.json();
 
-        pageData.nodes.forEach((node) => {
-          if (!this.nodes[node.id]) {
-            this.nodes[node.id] = node;
-            this.invalidateRoleCache();
-          }
-        });
+        addPositionless(pageData.nodes);
 
         hasMore = pageData.pagination.has_more;
         offset = pageData.pagination.next_offset;
@@ -176,9 +174,7 @@ function nodesMixin() {
         const response = await fetch(url);
         const data = await response.json();
 
-        data.nodes.forEach((node) => {
-          this.addNodeToMap(node);
-        });
+        this.addNodesToMapBatch(data.nodes);
 
         hasMore = data.pagination.has_more;
         offset = data.pagination.next_offset;
@@ -202,9 +198,7 @@ function nodesMixin() {
         const response = await fetch(url);
         const data = await response.json();
 
-        data.nodes.forEach((node) => {
-          this.addNodeToMap(node);
-        });
+        this.addNodesToMapBatch(data.nodes);
 
         // Continue pagination if needed
         if (data.pagination.has_more) {
