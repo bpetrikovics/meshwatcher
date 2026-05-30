@@ -434,8 +434,8 @@ function rawLogMixin() {
           return s;
         };
 
-        const fwd  = buildPath(fromName, payload?.route,      toName,   payload?.snrTowards);
-        const back = buildPath(toName,   payload?.routeBack,  fromName, payload?.snrBack);
+        const fwd  = buildPath(toName,   payload?.route,      fromName, payload?.snrTowards);
+        const back = buildPath(fromName, payload?.routeBack,  toName,   payload?.snrBack);
         return `↓ ${fwd} | ↑ ${back}`;
       }
 
