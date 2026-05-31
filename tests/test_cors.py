@@ -14,6 +14,7 @@ def _mock_db_session_empty_nodes():
     query = Mock()
 
     query.count.return_value = 0
+    query.scalar.return_value = 0
     query.offset.return_value = query
     query.limit.return_value = query
     query.all.return_value = []
