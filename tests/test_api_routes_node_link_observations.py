@@ -265,10 +265,11 @@ def test_get_obs_requires_auth(app):
 
 def test_get_obs_authenticated_allowed(app):
     """Authenticated session should be allowed."""
-    with app.test_client() as client:
-        with client.session_transaction() as sess:
-            sess["authenticated_browser"] = True
-        resp = client.get(
-            "/api/nodes/!aabbccdd/links/neighbor_report/!ff0000ab/observations",
-        )
-        assert resp.status_code == 200
+    with patch("app.routes.api_routes.db_session", side_effect=lambda: _mock_db_session([])):
+        with app.test_client() as client:
+            with client.session_transaction() as sess:
+                sess["authenticated_browser"] = True
+            resp = client.get(
+                "/api/nodes/!aabbccdd/links/neighbor_report/!ff0000ab/observations",
+            )
+            assert resp.status_code == 200
