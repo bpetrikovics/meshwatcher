@@ -259,14 +259,17 @@ function nodeDetailMixin() {
                 <i class="mdi mdi-graph mr-2 text-purple-500"></i>
                 Connections
               </h4>
-              <div class="flex items-center gap-2">
-                <label class="relative inline-flex items-center cursor-pointer" title="Show connection card">
+              <div class="flex items-center gap-3">
+                <label class="relative inline-flex items-center cursor-pointer gap-1.5" title="Show connection card">
                   <input type="checkbox" class="sr-only peer links-card-toggle" checked>
                   <div class="w-10 h-5 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-500"></div>
+                  <span class="text-xs text-gray-500 select-none">Card</span>
                 </label>
-                <button type="button" class="links-map-toggle-btn w-7 h-7 flex items-center justify-center rounded-md text-sm border transition-all duration-150 ${this.showNodeLinksOnMap ? 'bg-purple-500 border-purple-500 text-white shadow-sm' : 'bg-white border-gray-300 text-gray-400 hover:bg-gray-50'}" title="Show edges on map">
-                  <i class="mdi mdi-vector-polyline"></i>
-                </button>
+                <label class="relative inline-flex items-center cursor-pointer gap-1.5" title="Show edges on map">
+                  <input type="checkbox" class="sr-only peer links-map-toggle" ${this.showNodeLinksOnMap ? 'checked' : ''}>
+                  <div class="w-10 h-5 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-500"></div>
+                  <span class="text-xs text-gray-500 select-none">Map</span>
+                </label>
               </div>
             </div>
             <!-- Edge-type filter buttons + min-obs indicator -->
@@ -1492,19 +1495,10 @@ function nodeDetailMixin() {
           if (content) content.classList.toggle("hidden", !visible);
           return;
         }
-        // Button/span controls only respond to click events
-        if (e.type !== "click") return;
-        // Map edges toggle (button)
-        const mapBtn = e.target.closest(".links-map-toggle-btn");
-        if (mapBtn) {
-          this.showNodeLinksOnMap = !this.showNodeLinksOnMap;
-          // classList.toggle does not accept space-separated tokens — toggle each class individually
-          ["bg-purple-500", "border-purple-500", "text-white", "shadow-sm"].forEach(
-            (cls) => mapBtn.classList.toggle(cls, this.showNodeLinksOnMap)
-          );
-          ["bg-white", "border-gray-300", "text-gray-400", "hover:bg-gray-50"].forEach(
-            (cls) => mapBtn.classList.toggle(cls, !this.showNodeLinksOnMap)
-          );
+        // Map edges toggle (checkbox) — handle on 'change' for reliable state
+        const mapToggle = e.target.closest(".links-map-toggle");
+        if (mapToggle) {
+          this.showNodeLinksOnMap = !!mapToggle.checked;
           if (this.showNodeLinksOnMap) {
             this.renderNodeLinksOnMap();
           } else {
@@ -1512,6 +1506,8 @@ function nodeDetailMixin() {
           }
           return;
         }
+        // Remaining controls only respond to click events
+        if (e.type !== "click") return;
         // Min-observation toggle (styled like filter buttons)
         const minObsBtn = e.target.closest(".link-min-obs-toggle");
         if (minObsBtn) {
