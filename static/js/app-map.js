@@ -748,11 +748,8 @@ function mapMixin() {
     },
 
     _edgeOpacity(edge) {
-      const count = edge.observation_count || 1;
-      const minOpacity = 0.15;
-      const maxOpacity = 1.0;
-      const saturationCount = 15;
-      return Math.min(maxOpacity, Math.max(minOpacity, count / saturationCount));
+      const count = Math.max(1, edge.observation_count || 1);
+      return Math.min(1.0, 0.4 + (count / 10) * 0.6);
     },
 
     _edgeConfidenceRank(edgeType) {
