@@ -729,6 +729,7 @@ function mapMixin() {
       const colors = {
         neighbor_report: "#8b5cf6",
         relay_to_uplink: "#f59e0b",
+        from_to_uplink: "#06b6d4",
         traceroute_hop: "#10b981",
         traceroute_hop_back: "#10b981",
         nexthop: "#6b7280",
@@ -753,11 +754,97 @@ function mapMixin() {
       return 0.4;
     },
 
+    _edgeConfidenceRank(edgeType) {
+      const ranks = {
+        nexthop: 0,
+        traceroute_hop_back: 1,
+        traceroute_hop: 2,
+        from_to_uplink: 3,
+        relay_to_uplink: 3,
+        neighbor_report: 4,
+      };
+      return ranks[edgeType] ?? 2;
+    },
+
+    _fanOutEdges(edges) {
+      const spreadPixels = 12;
+      const groups = new Map();
+      for (const edge of edges) {
+        const key = `${edge.src_node}||${edge.dst_node}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(edge);
+      }
+      const result = [];
+      for (const group of groups.values()) {
+        if (group.length === 1) {
+          result.push({ ...group[0], _bezierOffsetPx: 0 });
+        } else {
+          const sorted = [...group].sort(
+            (a, b) =>
+              this._edgeConfidenceRank(a.edge_type) -
+              this._edgeConfidenceRank(b.edge_type),
+          );
+          const count = sorted.length;
+          const step = spreadPixels / Math.max(count - 1, 1);
+          sorted.forEach((edge, index) => {
+            const offset = (index - (count - 1) / 2) * step;
+            result.push({ ...edge, _bezierOffsetPx: offset });
+          });
+        }
+      }
+      return result;
+    },
+
+    _bezierPoints(srcLatLng, dstLatLng, offsetPx) {
+      if (!this.map) return [srcLatLng, dstLatLng];
+      const srcPt = this.map.latLngToContainerPoint(srcLatLng);
+      const dstPt = this.map.latLngToContainerPoint(dstLatLng);
+      const dx = dstPt.x - srcPt.x;
+      const dy = dstPt.y - srcPt.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len === 0) return [srcLatLng, dstLatLng];
+      // Perpendicular unit vector (rotated 90° CCW in screen space)
+      const perpX = -dy / len;
+      const perpY = dx / len;
+      const midPt = L.point(
+        (srcPt.x + dstPt.x) / 2,
+        (srcPt.y + dstPt.y) / 2,
+      );
+      const ctrlPt = L.point(
+        midPt.x + perpX * offsetPx,
+        midPt.y + perpY * offsetPx,
+      );
+      if (len < 50) {
+        // Short line: shift midpoint only, no full curve
+        return [
+          srcLatLng,
+          this.map.containerPointToLatLng(ctrlPt),
+          dstLatLng,
+        ];
+      }
+      // Quadratic bezier with ~20 interpolated points
+      const N = 20;
+      const points = [];
+      for (let i = 0; i <= N; i++) {
+        const t = i / N;
+        const mt = 1 - t;
+        const x = mt * mt * srcPt.x + 2 * mt * t * ctrlPt.x + t * t * dstPt.x;
+        const y = mt * mt * srcPt.y + 2 * mt * t * ctrlPt.y + t * t * dstPt.y;
+        points.push(this.map.containerPointToLatLng(L.point(x, y)));
+      }
+      return points;
+    },
+
     renderNodeLinksOnMap() {
       this.clearNodeLinksMapLayer();
 
-      const edges = this.selectedNodeLinks || [];
-      if (!edges.length) return;
+      const rawEdges = this.selectedNodeLinks || [];
+      if (!rawEdges.length) return;
+
+      const filteredEdges = rawEdges.filter(
+        (e) => this.linkTypeFilters == null || this.linkTypeFilters[e.edge_type] !== false,
+      );
+      const edges = this._fanOutEdges(filteredEdges);
 
       for (const edge of edges) {
         const srcPos = this._getNodeLatLng(edge.src_node);
@@ -771,16 +858,30 @@ function mapMixin() {
         const isDotted = edge.edge_type === "nexthop";
         const dashArray = isDashed ? "10, 6" : isDotted ? "4, 4" : null;
 
-        const polyline = L.polyline([srcPos, dstPos], {
+        const offsetPx = edge._bezierOffsetPx || 0;
+        const polylinePoints =
+          offsetPx !== 0
+            ? this._bezierPoints(srcPos, dstPos, offsetPx)
+            : [srcPos, dstPos];
+
+        const polyline = L.polyline(polylinePoints, {
           color,
           weight,
           opacity,
           dashArray,
         }).addTo(this.networkLayer);
 
-        // Arrow marker at destination end
-        const midLat = (srcPos.lat + dstPos.lat) / 2;
-        const midLng = (srcPos.lng + dstPos.lng) / 2;
+        // Arrow marker at 80% along the line, following curve if bezier
+        let arrowLat, arrowLng;
+        if (offsetPx !== 0 && polylinePoints.length > 2) {
+          const idx = Math.floor(polylinePoints.length * 0.8);
+          const pt = polylinePoints[Math.min(idx, polylinePoints.length - 1)];
+          arrowLat = pt.lat;
+          arrowLng = pt.lng;
+        } else {
+          arrowLat = srcPos.lat * 0.2 + dstPos.lat * 0.8;
+          arrowLng = srcPos.lng * 0.2 + dstPos.lng * 0.8;
+        }
         const angleDeg =
           (Math.atan2(dstPos.lng - srcPos.lng, dstPos.lat - srcPos.lat) *
             180) /
@@ -788,12 +889,13 @@ function mapMixin() {
         const arrowIcon = L.divIcon({
           className: "",
           html: `<div class="link-arrow-marker" style="color:${color};transform:rotate(${angleDeg}deg);"></div>`,
-          iconSize: [12, 12],
-          iconAnchor: [6, 6],
+          iconSize: [16, 16],
+          iconAnchor: [8, 8],
         });
-        L.marker([midLat, midLng], { icon: arrowIcon, interactive: false }).addTo(
-          this.networkLayer,
-        );
+        L.marker([arrowLat, arrowLng], {
+          icon: arrowIcon,
+          interactive: false,
+        }).addTo(this.networkLayer);
 
         const snrLine =
           edge.avg_snr != null

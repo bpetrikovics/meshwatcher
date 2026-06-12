@@ -109,6 +109,14 @@ function meshApp() {
     selectedNodeConnectedIds: [],
     showNodeLinksOnMap: true,
     linkDetailObservations: {}, // keyed by "${peerId}|${edgeType}" → { data, loading, expanded }
+    linkTypeFilters: {
+      neighbor_report: true,
+      relay_to_uplink: true,
+      from_to_uplink: true,
+      traceroute_hop: true,
+      traceroute_hop_back: true,
+      nexthop: true,
+    },
 
     // Canvas renderer shared across history point markers (avoids N SVG elements)
     historyCanvasRenderer: null,

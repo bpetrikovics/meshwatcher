@@ -265,6 +265,29 @@ function nodeDetailMixin() {
                 <div class="w-10 h-5 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-500"></div>
               </label>
             </div>
+            <!-- Edge-type filter buttons -->
+            <div class="flex flex-wrap gap-1.5 mb-3" id="link-type-filters">
+              ${[
+                { key: 'neighbor_report',   label: 'Neighbor',  color: '#8b5cf6' },
+                { key: 'relay_to_uplink',   label: 'Relay',     color: '#f59e0b' },
+                { key: 'from_to_uplink',    label: 'Uplink',    color: '#06b6d4' },
+                { key: 'traceroute_hop',    label: 'Trace',     color: '#10b981' },
+                { key: 'traceroute_hop_back', label: 'TraceBack', color: '#10b981' },
+                { key: 'nexthop',           label: 'Nexthop',   color: '#6b7280' },
+              ].map(({ key, label, color }) => {
+                const active = this.linkTypeFilters[key];
+                return `<button class="link-type-filter-btn flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-colors"
+                          data-filter-key="${key}"
+                          style="${active
+                            ? `background-color:${color}20;border-color:${color};color:${color}`
+                            : 'background-color:transparent;border-color:#d1d5db;color:#9ca3af'}"
+                          title="Toggle ${label} edges on map">
+                          <span class="w-2 h-2 rounded-full inline-block flex-shrink-0"
+                                style="${active ? `background-color:${color}` : `border:1.5px solid #9ca3af;background:transparent`}"></span>
+                          ${label}
+                        </button>`;
+              }).join('')}
+            </div>
             <div id="connections-content"${this.showNodeLinksOnMap ? '' : ' class="hidden"'}>
               <div class="text-center text-gray-400 py-4">
                 <i class="mdi mdi-loading mdi-spin text-xl mb-1"></i>
@@ -1171,6 +1194,7 @@ function nodeDetailMixin() {
         this.selectedNodeConnectedIds = data.connected_nodes || [];
         this.renderNodeLinksSidebar();
         this.setupConnectionsMapToggle();
+        this.setupLinkTypeFilterButtons();
         if (this.showNodeLinksOnMap) {
           this.renderNodeLinksOnMap();
         }
@@ -1351,8 +1375,8 @@ function nodeDetailMixin() {
       container.innerHTML = `
         <div class="space-y-3">
           ${sectionHtml("Neighbors", "direct RF neighbors", "mdi-wifi", byType("neighbor_report"))}
-          ${sectionHtml("Relayed via", "relayed this node to gateway", "mdi-swap-horizontal-bold", byType("relay_to_uplink"))}
-          ${sectionHtml("Relayed from", "originated from this node", "mdi-swap-horizontal-bold", byType("from_to_uplink"))}
+          ${sectionHtml("Relayed via", "relayed this node to uplink", "mdi-swap-horizontal-bold", byType("relay_to_uplink"))}
+          ${sectionHtml("Uplinked from", "MQTT gateways", "mdi-swap-horizontal-bold", byType("from_to_uplink"))}
           ${sectionHtml("Traceroute", "mesh route hops", "mdi-routes", tracerouteEdges)}
           ${sectionHtml("Next hop", "routing hints (unconfirmed)", "mdi-arrow-decision", byType("nexthop"))}
         </div>`;
@@ -1451,6 +1475,60 @@ function nodeDetailMixin() {
 
         toggle._handleLinksMapToggle = handler;
         toggle.addEventListener("change", handler);
+      });
+    },
+
+    // Wire edge-type filter buttons in the Connections card
+    setupLinkTypeFilterButtons() {
+      queueMicrotask(() => {
+        const container = document.getElementById("link-type-filters");
+        if (!container) return;
+
+        const COLORS = {
+          neighbor_report:  '#8b5cf6',
+          relay_to_uplink:  '#f59e0b',
+          traceroute_hop:   '#10b981',
+          traceroute_hop_back: '#10b981',
+          from_to_uplink:   '#10b981',
+          nexthop:          '#6b7280',
+        };
+
+        const applyButtonStyle = (btn, active) => {
+          const key = btn.dataset.filterKey;
+          const color = COLORS[key] || '#6b7280';
+          const dot = btn.querySelector('span');
+          if (active) {
+            btn.style.backgroundColor = color + '20';
+            btn.style.borderColor = color;
+            btn.style.color = color;
+            dot.style.backgroundColor = color;
+            dot.style.border = 'none';
+          } else {
+            btn.style.backgroundColor = 'transparent';
+            btn.style.borderColor = '#d1d5db';
+            btn.style.color = '#9ca3af';
+            dot.style.backgroundColor = 'transparent';
+            dot.style.border = '1.5px solid #9ca3af';
+          }
+        };
+
+        const existing = container._linkTypeFilterHandler;
+        if (existing) container.removeEventListener('click', existing);
+
+        const handler = (e) => {
+          const btn = e.target.closest('.link-type-filter-btn');
+          if (!btn) return;
+          const key = btn.dataset.filterKey;
+          if (!(key in this.linkTypeFilters)) return;
+          this.linkTypeFilters[key] = !this.linkTypeFilters[key];
+          applyButtonStyle(btn, this.linkTypeFilters[key]);
+          if (this.showNodeLinksOnMap) {
+            this.renderNodeLinksOnMap();
+          }
+        };
+
+        container._linkTypeFilterHandler = handler;
+        container.addEventListener('click', handler);
       });
     },
 
