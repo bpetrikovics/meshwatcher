@@ -710,5 +710,210 @@ function mapMixin() {
         console.error("Failed to remove node from map:", error);
       }
     },
+
+    // ---- Node link graph map rendering ----
+
+    clearNodeLinksMapLayer() {
+      if (this.networkLayer) {
+        this.networkLayer.clearLayers();
+      }
+    },
+
+    _getNodeLatLng(nodeId) {
+      const node = this.nodes[nodeId];
+      if (node?.position?.latitude == null || node?.position?.longitude == null) return null;
+      return L.latLng(node.position.latitude, node.position.longitude);
+    },
+
+    _edgeColor(edge) {
+      const colors = {
+        neighbor_report: "#8b5cf6",
+        relay_to_uplink: "#f59e0b",
+        from_to_uplink: "#06b6d4",
+        traceroute_hop: "#10b981",
+        traceroute_hop_back: "#10b981",
+        nexthop: "#6b7280",
+      };
+      return colors[edge.edge_type] || "#6b7280";
+    },
+
+    _edgeWeight(edge) {
+      const base = edge.edge_type === "relay_to_uplink" ? 3 : 2;
+      if (edge.edge_type === "nexthop") return 1;
+      const snr = edge.avg_snr;
+      if (snr == null) return base;
+      if (snr >= -5) return base + 1;
+      if (snr <= -10) return Math.max(1, base - 1);
+      return base;
+    },
+
+    _edgeOpacity(edge) {
+      const count = Math.max(1, edge.observation_count || 1);
+      return Math.min(1.0, 0.4 + (count / 10) * 0.6);
+    },
+
+    _edgeConfidenceRank(edgeType) {
+      const ranks = {
+        nexthop: 0,
+        traceroute_hop_back: 1,
+        traceroute_hop: 2,
+        from_to_uplink: 3,
+        relay_to_uplink: 3,
+        neighbor_report: 4,
+      };
+      return ranks[edgeType] ?? 2;
+    },
+
+    _fanOutEdges(edges) {
+      const spreadPixels = 12;
+      const groups = new Map();
+      for (const edge of edges) {
+        const key = `${edge.src_node}||${edge.dst_node}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(edge);
+      }
+      const result = [];
+      for (const group of groups.values()) {
+        if (group.length === 1) {
+          result.push({ ...group[0], _bezierOffsetPx: 0 });
+        } else {
+          const sorted = [...group].sort(
+            (a, b) =>
+              this._edgeConfidenceRank(a.edge_type) -
+              this._edgeConfidenceRank(b.edge_type),
+          );
+          const count = sorted.length;
+          const step = spreadPixels / Math.max(count - 1, 1);
+          sorted.forEach((edge, index) => {
+            const offset = (index - (count - 1) / 2) * step;
+            result.push({ ...edge, _bezierOffsetPx: offset });
+          });
+        }
+      }
+      return result;
+    },
+
+    _bezierPoints(srcLatLng, dstLatLng, offsetPx) {
+      if (!this.map) return [srcLatLng, dstLatLng];
+      const srcPt = this.map.latLngToContainerPoint(srcLatLng);
+      const dstPt = this.map.latLngToContainerPoint(dstLatLng);
+      const dx = dstPt.x - srcPt.x;
+      const dy = dstPt.y - srcPt.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len === 0) return [srcLatLng, dstLatLng];
+      // Perpendicular unit vector (rotated 90° CCW in screen space)
+      const perpX = -dy / len;
+      const perpY = dx / len;
+      const midPt = L.point(
+        (srcPt.x + dstPt.x) / 2,
+        (srcPt.y + dstPt.y) / 2,
+      );
+      const ctrlPt = L.point(
+        midPt.x + perpX * offsetPx,
+        midPt.y + perpY * offsetPx,
+      );
+      if (len < 50) {
+        // Short line: shift midpoint only, no full curve
+        return [
+          srcLatLng,
+          this.map.containerPointToLatLng(ctrlPt),
+          dstLatLng,
+        ];
+      }
+      // Quadratic bezier with ~20 interpolated points
+      const N = 20;
+      const points = [];
+      for (let i = 0; i <= N; i++) {
+        const t = i / N;
+        const mt = 1 - t;
+        const x = mt * mt * srcPt.x + 2 * mt * t * ctrlPt.x + t * t * dstPt.x;
+        const y = mt * mt * srcPt.y + 2 * mt * t * ctrlPt.y + t * t * dstPt.y;
+        points.push(this.map.containerPointToLatLng(L.point(x, y)));
+      }
+      return points;
+    },
+
+    renderNodeLinksOnMap() {
+      this.clearNodeLinksMapLayer();
+
+      const rawEdges = this.selectedNodeLinks || [];
+      if (!rawEdges.length) return;
+
+      const minObs = this.linkMinObsForMap || 1;
+      const filteredEdges = rawEdges.filter(
+        (e) =>
+          (this.linkTypeFilters == null || this.linkTypeFilters[e.edge_type] !== false) &&
+          (e.observation_count || 1) >= minObs,
+      );
+      const edges = this._fanOutEdges(filteredEdges);
+
+      for (const edge of edges) {
+        const srcPos = this._getNodeLatLng(edge.src_node);
+        const dstPos = this._getNodeLatLng(edge.dst_node);
+        if (!srcPos || !dstPos) continue;
+
+        const color = this._edgeColor(edge);
+        const weight = this._edgeWeight(edge);
+        const opacity = this._edgeOpacity(edge);
+        const isDashed = edge.edge_type === "traceroute_hop_back";
+        const isDotted = edge.edge_type === "nexthop";
+        const dashArray = isDashed ? "10, 6" : isDotted ? "4, 4" : null;
+
+        const offsetPx = edge._bezierOffsetPx || 0;
+        const polylinePoints =
+          offsetPx !== 0
+            ? this._bezierPoints(srcPos, dstPos, offsetPx)
+            : [srcPos, dstPos];
+
+        const polyline = L.polyline(polylinePoints, {
+          color,
+          weight,
+          opacity,
+          dashArray,
+        }).addTo(this.networkLayer);
+
+        // Arrow marker at 80% along the line, following curve if bezier
+        let arrowLat, arrowLng;
+        if (offsetPx !== 0 && polylinePoints.length > 2) {
+          const idx = Math.floor(polylinePoints.length * 0.8);
+          const pt = polylinePoints[Math.min(idx, polylinePoints.length - 1)];
+          arrowLat = pt.lat;
+          arrowLng = pt.lng;
+        } else {
+          arrowLat = srcPos.lat * 0.2 + dstPos.lat * 0.8;
+          arrowLng = srcPos.lng * 0.2 + dstPos.lng * 0.8;
+        }
+        const angleDeg =
+          (Math.atan2(dstPos.lng - srcPos.lng, dstPos.lat - srcPos.lat) *
+            180) /
+          Math.PI;
+        const arrowIcon = L.divIcon({
+          className: "",
+          html: `<div class="link-arrow-marker" style="color:${color};transform:rotate(${angleDeg}deg);"></div>`,
+          iconSize: [16, 16],
+          iconAnchor: [8, 8],
+        });
+        L.marker([arrowLat, arrowLng], {
+          icon: arrowIcon,
+          interactive: false,
+        }).addTo(this.networkLayer);
+
+        const snrLine =
+          edge.avg_snr != null
+            ? `\nAvg SNR: ${edge.avg_snr.toFixed(1)} dB`
+            : "";
+        const latestSnrLine =
+          edge.latest?.rx_snr != null
+            ? `\nLatest SNR: ${edge.latest.rx_snr.toFixed(1)} dB`
+            : "";
+        polyline.bindTooltip(
+          `${edge.edge_type} · ${edge.observation_count}x observations` +
+            snrLine +
+            latestSnrLine +
+            `\n${edge.src_node} → ${edge.dst_node}`,
+          { sticky: true, className: "edge-tooltip" },
+        );
+      }
+    },
   };
 }

@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     metrics_retention_days: int = 7
     message_retention_days: int = 7
     telemetry_retention_days: int = 7
+    link_observations_retention_days: int = 7
     db_cleanup_period_minutes: int = 30
 
     # Performance

@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import time
 from typing import Callable, Any, Optional
 from pydantic import ValidationError
+from sqlalchemy import text, select
 from sqlalchemy.exc import IntegrityError
 
 from meshtastic_mqtt_json import MeshtasticMQTT
@@ -18,9 +19,11 @@ from .models import (
     Position,
     TextMessage,
     Routing,
+    LinkObservation,
 )
 from .presenter import Presenter
 from .config import settings
+from .link_resolver import NodeSuffixIndex
 
 
 class PayloadExtractor:
@@ -176,6 +179,9 @@ class EventManager:
         self.db_factory = db_factory
         self.presenter = presenter
 
+        self.suffix_index = NodeSuffixIndex()
+        raw_handler.stats.suffix_index = self.suffix_index
+
         self.mqtt.register_callback('TEXT_MESSAGE_APP', self.on_text_message)
         self.mqtt.register_callback('POSITION_APP', self.on_position)
         self.mqtt.register_callback('NODEINFO_APP', self.on_nodeinfo)
@@ -187,8 +193,22 @@ class EventManager:
 
         raw_handler.register_callback("raw", self.presenter.raw_packet_callback)
 
+        self._populate_suffix_index()
+
         self.mqtt.loop_start()
         self.logger.info("Initialized // version: %s", settings.git_commit)
+
+    def _populate_suffix_index(self) -> None:
+        """Pre-populate the suffix index from all nodes already stored in the database."""
+        try:
+            with self.db_factory() as db:
+                node_ids = [row[0] for row in db.execute(
+                    text("SELECT id FROM nodes")
+                ).fetchall()]
+            self.suffix_index.register_all(node_ids)
+            self.logger.info("Suffix index pre-populated with %d node(s) from database", len(node_ids))
+        except Exception as exc:
+            self.logger.warning("Could not pre-populate suffix index: %s", exc)
 
     def _update_node_last_seen(self, node_id: str, db, channel: Optional[int] = None, channel_name: Optional[str] = None):
         """Update node's last seen timestamp to current time and optionally channel info. Returns the node object."""
@@ -369,6 +389,45 @@ class EventManager:
                 self.logger.exception(exc)
 
         self.logger.debug("Node %s was upserted", nodeinfo.id_)
+        self.suffix_index.register(nodeinfo.id_)
+        self._resolve_deferred_observations(nodeinfo.id_)
+
+    def _resolve_deferred_observations(self, node_id: str) -> None:
+        """
+        Phase 7 — deferred resolution pass.
+
+        Called after a new node is registered in the suffix index.  If this
+        node's last byte now uniquely identifies a single known node (i.e.
+        the suffix is no longer ambiguous), back-fill all LinkObservation rows
+        that were stored with is_resolved=False and raw_suffix matching this
+        node's last byte.
+        """
+        raw_suffix_int = int(node_id.lstrip("!")[-2:], 16)
+        resolved_id, is_definitive = self.suffix_index.resolve(raw_suffix_int)
+        if not is_definitive:
+            return
+
+        try:
+            with self.db_factory() as db:
+                stmt = select(LinkObservation).where(
+                    LinkObservation.is_resolved == False,  # noqa: E712
+                    LinkObservation.raw_suffix == raw_suffix_int,
+                )
+                rows = db.execute(stmt).scalars().all()
+                if not rows:
+                    return
+                for row in rows:
+                    if row.edge_type == "nexthop":
+                        row.dst_node = resolved_id
+                    else:
+                        row.src_node = resolved_id
+                    row.is_resolved = True
+                self.logger.info(
+                    "Deferred resolution: back-filled %d LinkObservation(s) for suffix 0x%02x → %s",
+                    len(rows), raw_suffix_int, resolved_id,
+                )
+        except Exception as exc:
+            self.logger.exception("Deferred resolution failed for node %s: %s", node_id, exc)
 
     # If TR handler gets deduplicated packets, it will not receive all responses only the first
     @raw_handler.validate_packet(dedup=False)
@@ -399,9 +458,100 @@ class EventManager:
         """
 
         if packet.decoded_requestid:
-            self.logger.info("Packet %s traceroute is response to previous request %s", hex(packet.id_), hex(packet.decoded_requestid))
+            self.logger.info(
+                "Packet %s traceroute response to request %s",
+                hex(packet.id_), hex(packet.decoded_requestid),
+            )
         else:
-            self.logger.info("Not a TR response")
+            self.logger.info("Packet %s traceroute request (partial route may be present)", hex(packet.id_))
+
+        payload = packet.decoded.get("payload") or {}
+        if not isinstance(payload, dict):
+            return
+
+        route = payload.get("route")
+        if not route:
+            return
+
+        snr_towards = payload.get("snrTowards") or []
+        route_back = payload.get("routeBack") or []
+        snr_back = payload.get("snrBack") or []
+
+        _BROADCAST = 0xFFFFFFFF
+
+        # For a response the direction is: original requester (to) → intermediates → responder (from_).
+        # For a request captured mid-flight the direction is: originator (from_) → intermediates → destination (to).
+        if packet.decoded_requestid:
+            full_route = [f"!{n:08x}" for n in ([packet.to] + list(route) + [packet.from_])]
+        else:
+            full_route = [f"!{n:08x}" for n in ([packet.from_] + list(route) + [packet.to])]
+
+        for node_id in full_route:
+            self.suffix_index.register(node_id)
+
+        observed_at = datetime.now(timezone.utc)
+        observations = []
+        for i in range(len(full_route) - 1):
+            src = full_route[i]
+            dst = full_route[i + 1]
+            if src == "!ffffffff" or dst == "!ffffffff":
+                self.logger.debug(
+                    "Traceroute %s hop %d skipped: broadcast node id", hex(packet.id_), i
+                )
+                continue
+            # snrTowards values are raw integer SNR × 4
+            snr = snr_towards[i] / 4.0 if i < len(snr_towards) else None
+            observations.append(LinkObservation(
+                observed_at=observed_at,
+                packet_id=packet.id_,
+                src_node=src,
+                dst_node=dst,
+                edge_type="traceroute_hop",
+                hops_taken=i,
+                rx_snr=snr,
+                channel=packet.channel,
+                channel_name=packet.channel_name,
+                is_resolved=True,
+            ))
+
+        # --- Back-route hops (response packets only) -------------------------
+        # routeBack/snrBack describe the return path from responder to requester.
+        if packet.decoded_requestid and route_back:
+            # Back route direction: from_ (responder) → routeBack intermediates → to (requester)
+            full_route_back = [f"!{n:08x}" for n in ([packet.from_] + list(route_back) + [packet.to])]
+            for node_id in full_route_back:
+                self.suffix_index.register(node_id)
+            for i in range(len(full_route_back) - 1):
+                src = full_route_back[i]
+                dst = full_route_back[i + 1]
+                if src == "!ffffffff" or dst == "!ffffffff":
+                    self.logger.debug(
+                        "Traceroute %s back hop %d skipped: broadcast node id", hex(packet.id_), i
+                    )
+                    continue
+                snr = snr_back[i] / 4.0 if i < len(snr_back) else None
+                observations.append(LinkObservation(
+                    observed_at=observed_at,
+                    packet_id=packet.id_,
+                    src_node=src,
+                    dst_node=dst,
+                    edge_type="traceroute_hop_back",
+                    hops_taken=i,
+                    rx_snr=snr,
+                    channel=packet.channel,
+                    channel_name=packet.channel_name,
+                    is_resolved=True,
+                ))
+
+        self.logger.info(
+            "Traceroute %s: %d hop observation(s) recorded",
+            hex(packet.id_), len(observations),
+        )
+
+        node_id = f"!{packet.from_:08x}"
+        with self.db_factory() as db:
+            self._update_node_last_seen(node_id, db, packet.channel, packet.channel_name)
+            db.add_all(observations)
 
     @raw_handler.validate_packet
     def on_telemetry(self, packet: MeshtasticPacket):
@@ -455,7 +605,8 @@ class EventManager:
             if metric_rows:
                 db.add_all(metric_rows)
 
-    def on_neighborinfo(self, json_data):
+    @raw_handler.validate_packet
+    def on_neighborinfo(self, packet: MeshtasticPacket):
         """
         {'from': 3031777281, 'to': 1, 'channel': 8,
         'decoded': {
@@ -468,7 +619,46 @@ class EventManager:
             'bitfield': 1},
         'id': 3781190161, 'rxTime': 1734511540, 'priority': 'BACKGROUND', 'hopStart': 7} 
         """
-        pass
+        payload = packet.decoded.get("payload") or {}
+        if not isinstance(payload, dict):
+            return
+        neighbors = payload.get("neighbors")
+        if not neighbors:
+            return
+
+        src_node = f"!{packet.from_:08x}"
+        observed_at = datetime.now(timezone.utc)
+        self.suffix_index.register(src_node)
+
+        observations = []
+        for neighbor in neighbors:
+            node_id_int = neighbor.get("nodeId")
+            if node_id_int is None:
+                continue
+            dst_node = f"!{node_id_int:08x}"
+            self.suffix_index.register(dst_node)
+            observations.append(LinkObservation(
+                observed_at=observed_at,
+                packet_id=packet.id_,
+                src_node=src_node,
+                dst_node=dst_node,
+                edge_type="neighbor_report",
+                rx_snr=neighbor.get("snr"),
+                channel=packet.channel,
+                channel_name=packet.channel_name,
+                is_resolved=True,
+            ))
+
+        if not observations:
+            return
+
+        self.logger.info(
+            "Neighborinfo from %s: %d neighbor(s)", src_node, len(observations)
+        )
+
+        with self.db_factory() as db:
+            self._update_node_last_seen(src_node, db, packet.channel, packet.channel_name)
+            db.add_all(observations)
 
     @raw_handler.validate_packet
     def on_routing(self, packet: MeshtasticPacket):

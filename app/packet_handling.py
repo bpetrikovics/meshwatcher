@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class RawPacketHandler:
     def __init__(self):
-        self.stats = PacketStat()
+        self.stats = PacketStat(db_factory=db_session)
         self.callbacks = {}
 
     def register_callback(self, cb_type: str, callback: Callable):

@@ -104,6 +104,21 @@ function meshApp() {
     positionHistoryRangeHours: 24,
     telemetryWindow: 24,
 
+    // Node link graph state (populated by fetchNodeLinks on node select)
+    selectedNodeLinks: [],
+    selectedNodeConnectedIds: [],
+    showNodeLinksOnMap: true,
+    linkDetailObservations: {}, // keyed by "${peerId}|${edgeType}" → { data, loading, expanded }
+    linkTypeFilters: {
+      neighbor_report: true,
+      relay_to_uplink: true,
+      from_to_uplink: true,
+      traceroute_hop: true,
+      traceroute_hop_back: true,
+      nexthop: true,
+    },
+    linkMinObsForMap: 3,
+
     // Canvas renderer shared across history point markers (avoids N SVG elements)
     historyCanvasRenderer: null,
 

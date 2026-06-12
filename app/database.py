@@ -59,6 +59,7 @@ class DbCleanupManager:
         metrics_retention_days: int = settings.metrics_retention_days,
         message_retention_days: int = settings.message_retention_days,
         telemetry_retention_days: int = settings.telemetry_retention_days,
+        link_observations_retention_days: int = settings.link_observations_retention_days,
         cleanup_interval_minutes: int = settings.db_cleanup_period_minutes,
         batch_size: int = 5000,
         dry_run: bool = False,
@@ -69,6 +70,7 @@ class DbCleanupManager:
         self.metrics_retention_days = metrics_retention_days
         self.message_retention_days = message_retention_days
         self.telemetry_retention_days = telemetry_retention_days
+        self.link_observations_retention_days = link_observations_retention_days
         self.cleanup_interval_minutes = cleanup_interval_minutes
         self.batch_size = batch_size
         self.dry_run = dry_run
@@ -80,6 +82,7 @@ class DbCleanupManager:
         self.metrics_timestamp_col = 'createdAt'
         self.message_timestamp_col = 'createdAt'
         self.telemetry_timestamp_col = 'createdAt'
+        self.link_observations_timestamp_col = 'observedAt'
 
         self.start()
 
@@ -87,11 +90,12 @@ class DbCleanupManager:
     # SQL identifiers cannot be parameterized, so this allowlist prevents injection
     # if the method is ever called with a non-hardcoded value.
     _ALLOWED_CLEANUP_IDENTIFIERS: frozenset = frozenset([
-        ('packets',   'createdAt'),
-        ('nodes',     'updated'),
-        ('messages',  'createdAt'),
-        ('telemetry', 'createdAt'),
-        ('metrics',   'createdAt'),
+        ('packets',            'createdAt'),
+        ('nodes',              'updated'),
+        ('messages',           'createdAt'),
+        ('telemetry',          'createdAt'),
+        ('metrics',            'createdAt'),
+        ('link_observations',  'observedAt'),
     ])
 
     def _cleanup_table(self, session: Session, table: str, days: int, timestamp_col: str) -> Dict[str, Any]:
@@ -181,10 +185,13 @@ class DbCleanupManager:
             telemetry_stats = self._cleanup_table(session, 'telemetry', self.telemetry_retention_days, self.telemetry_timestamp_col)
             node_stats = self._cleanup_nodes(session, self.node_retention_days)
             packet_stats = self._cleanup_table(session, 'packets', self.packet_retention_days, self.packet_timestamp_col)
+            link_obs_stats = self._cleanup_table(session, 'link_observations', self.link_observations_retention_days, self.link_observations_timestamp_col)
 
             mode = "DRY-RUN" if self.dry_run else "LIVE"
             self.logger.info(
-                f"Cleanup cycle: {packet_stats.get('deleted', 0)} packets, {node_stats.get('deleted', 0)} nodes, {telemetry_stats.get('deleted', 0)} telemetry, {message_stats.get('deleted', 0)} messages deleted in {mode} mode, {self.cleanup_interval_minutes=}min"
+                f"Cleanup cycle: {packet_stats.get('deleted', 0)} packets, {node_stats.get('deleted', 0)} nodes, "
+                f"{telemetry_stats.get('deleted', 0)} telemetry, {message_stats.get('deleted', 0)} messages, "
+                f"{link_obs_stats.get('deleted', 0)} link_observations deleted in {mode} mode, {self.cleanup_interval_minutes=}min"
             )
 
     def start(self):

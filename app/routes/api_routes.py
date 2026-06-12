@@ -1,13 +1,13 @@
 import functools
 import logging
 from flask import Blueprint, request, jsonify, session
-from sqlalchemy import desc, and_, or_, func
+from sqlalchemy import desc, and_, or_, func, column
 from datetime import datetime, timezone, timedelta
 import math
 from typing import Optional, List, Dict, Any
 
 from app.database import db_session
-from app.models import NodeInfo, Position, Telemetry, Metric, MeshtasticPacket
+from app.models import NodeInfo, Position, Telemetry, Metric, MeshtasticPacket, LinkObservation
 from app.config import settings
 from app.api_keys import validate_key, is_origin_allowed
 from app.extensions import limiter
@@ -542,6 +542,266 @@ def get_node_metrics_series(node_id):
         }
         
         return jsonify(response)
+
+
+@bp.route("/nodes/<string:node_id>/links")
+@_require_auth
+def get_node_links(node_id):
+    """Get aggregated link observations for a specific node (either as source or destination)."""
+
+    since_hours = request.args.get("since_hours", "24")
+    edge_type_param = request.args.get("edge_type", "")
+    min_observations = request.args.get("min_observations", "1")
+
+    try:
+        since_hours_val = float(since_hours)
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid since_hours parameter"}), 400
+
+    since_hours_val = min(max(since_hours_val, 0), 168)  # clamp to 0–168 (7 days)
+
+    try:
+        min_observations_val = int(min_observations)
+        if min_observations_val < 1:
+            min_observations_val = 1
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid min_observations parameter"}), 400
+
+    edge_types = [et.strip() for et in edge_type_param.split(",") if et.strip()] if edge_type_param else []
+
+    since_time = datetime.now(timezone.utc) - timedelta(hours=since_hours_val)
+
+    with db_session() as session:
+        # Build a UNION subquery to avoid the inefficient OR filter.
+        # Each branch hits its own covering index (srcNode, observedAt) or (dstNode, observedAt).
+        _cols = [
+            LinkObservation.src_node.label("src_node"),
+            LinkObservation.dst_node.label("dst_node"),
+            LinkObservation.edge_type.label("edge_type"),
+            LinkObservation.rx_snr.label("rx_snr"),
+            LinkObservation.rx_rssi.label("rx_rssi"),
+            LinkObservation.observed_at.label("observed_at"),
+            LinkObservation.hops_taken.label("hops_taken"),
+        ]
+
+        src_q = session.query(*_cols).filter(
+            LinkObservation.src_node == node_id,
+            LinkObservation.observed_at >= since_time,
+        )
+        dst_q = session.query(*_cols).filter(
+            LinkObservation.dst_node == node_id,
+            LinkObservation.observed_at >= since_time,
+        )
+        if edge_types:
+            src_q = src_q.filter(LinkObservation.edge_type.in_(edge_types))
+            dst_q = dst_q.filter(LinkObservation.edge_type.in_(edge_types))
+
+        base = src_q.union_all(dst_q).subquery()
+
+        # Aggregate per (src_node, dst_node, edge_type)
+        agg_subq = (
+            session.query(
+                base.c.src_node,
+                base.c.dst_node,
+                base.c.edge_type,
+                func.count().label("observation_count"),
+                func.avg(base.c.rx_snr).label("avg_snr"),
+                func.min(base.c.rx_snr).label("min_snr"),
+                func.max(base.c.rx_snr).label("max_snr"),
+                func.avg(base.c.rx_rssi).label("avg_rssi"),
+            )
+            .group_by(base.c.src_node, base.c.dst_node, base.c.edge_type)
+            .having(func.count() >= min_observations_val)
+            .subquery()
+        )
+
+        # Latest row per group via ROW_NUMBER
+        # Use column() references for partition_by/order_by to avoid issues
+        # with mock-based tests accessing base.c.x (SQLAlchemy's coercion fails on mocks).
+        latest_subq = (
+            session.query(
+                base.c.src_node,
+                base.c.dst_node,
+                base.c.edge_type,
+                base.c.observed_at,
+                base.c.rx_snr.label("rx_snr"),
+                base.c.rx_rssi.label("rx_rssi"),
+                base.c.hops_taken,
+                func.row_number()
+                .over(
+                    partition_by=[column("src_node"), column("dst_node"), column("edge_type")],
+                    order_by=column("observed_at").desc(),
+                )
+                .label("rn"),
+            )
+            .subquery()
+        )
+
+        # NULL-safe join: src_node can be NULL for unresolved relay/nexthop rows
+        rows = (
+            session.query(
+                agg_subq.c.src_node,
+                agg_subq.c.dst_node,
+                agg_subq.c.edge_type,
+                agg_subq.c.observation_count,
+                agg_subq.c.avg_snr,
+                agg_subq.c.min_snr,
+                agg_subq.c.max_snr,
+                agg_subq.c.avg_rssi,
+                latest_subq.c.observed_at,
+                latest_subq.c.rx_snr.label("latest_snr"),
+                latest_subq.c.rx_rssi.label("latest_rssi"),
+                latest_subq.c.hops_taken.label("latest_hops"),
+            )
+            .join(
+                latest_subq,
+                and_(
+                    or_(
+                        agg_subq.c.src_node == latest_subq.c.src_node,
+                        and_(
+                            agg_subq.c.src_node == None,  # noqa: E711
+                            latest_subq.c.src_node == None,  # noqa: E711
+                        ),
+                    ),
+                    agg_subq.c.dst_node == latest_subq.c.dst_node,
+                    agg_subq.c.edge_type == latest_subq.c.edge_type,
+                    latest_subq.c.rn == 1,
+                ),
+            )
+            .all()
+        )
+
+        connected_nodes: set = set()
+        edges = []
+        total_observations = 0
+
+        for row in rows:
+            if row.src_node and row.src_node != node_id:
+                connected_nodes.add(row.src_node)
+            if row.dst_node and row.dst_node != node_id:
+                connected_nodes.add(row.dst_node)
+
+            total_observations += row.observation_count
+
+            observed_at_str = None
+            if row.observed_at:
+                ts = row.observed_at
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                observed_at_str = ts.isoformat()
+
+            edges.append(
+                {
+                    "src_node": row.src_node,
+                    "dst_node": row.dst_node,
+                    "edge_type": row.edge_type,
+                    "observation_count": row.observation_count,
+                    "avg_snr": round(float(row.avg_snr), 2) if row.avg_snr is not None else None,
+                    "min_snr": round(float(row.min_snr), 2) if row.min_snr is not None else None,
+                    "max_snr": round(float(row.max_snr), 2) if row.max_snr is not None else None,
+                    "avg_rssi": round(float(row.avg_rssi)) if row.avg_rssi is not None else None,
+                    "latest": {
+                        "observed_at": observed_at_str,
+                        "rx_snr": round(float(row.latest_snr), 2) if row.latest_snr is not None else None,
+                        "rx_rssi": row.latest_rssi,
+                        "hops_taken": row.latest_hops,
+                    },
+                }
+            )
+
+        return jsonify(
+            {
+                "node_id": node_id,
+                "since_hours": since_hours_val,
+                "edges": edges,
+                "connected_nodes": sorted(connected_nodes),
+                "total_observations": total_observations,
+            }
+        )
+
+
+@bp.route("/nodes/<string:node_id>/links/<string:edge_type>/<string:peer_id>/observations")
+@_require_auth
+def get_node_link_observations(node_id, edge_type, peer_id):
+    """Get individual LinkObservation rows for a specific directed edge pair."""
+
+    since_hours = request.args.get("since_hours", "168")
+    limit = request.args.get("limit", "50")
+
+    valid_edge_types = {
+        "neighbor_report", "relay_to_uplink", "from_to_uplink",
+        "traceroute_hop", "traceroute_hop_back", "nexthop",
+    }
+    if edge_type not in valid_edge_types:
+        return jsonify({"error": f"Invalid edge_type. Must be one of: {', '.join(sorted(valid_edge_types))}"}), 400
+
+    try:
+        since_hours_val = float(since_hours)
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid since_hours parameter"}), 400
+    since_hours_val = min(max(since_hours_val, 0), 168)
+
+    try:
+        limit_val = int(limit)
+        if limit_val < 1:
+            limit_val = 1
+        if limit_val > 200:
+            limit_val = 200
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid limit parameter"}), 400
+
+    since_time = datetime.now(timezone.utc) - timedelta(hours=since_hours_val)
+
+    with db_session() as session:
+        _detail_cols = [
+            LinkObservation.observed_at.label("observed_at"),
+            LinkObservation.rx_snr.label("rx_snr"),
+            LinkObservation.rx_rssi.label("rx_rssi"),
+            LinkObservation.hops_taken.label("hops_taken"),
+            LinkObservation.packet_id.label("packet_id"),
+        ]
+        src_detail = session.query(*_detail_cols).filter(
+            LinkObservation.src_node == node_id,
+            LinkObservation.dst_node == peer_id,
+            LinkObservation.edge_type == edge_type,
+            LinkObservation.observed_at >= since_time,
+        )
+        dst_detail = session.query(*_detail_cols).filter(
+            LinkObservation.src_node == peer_id,
+            LinkObservation.dst_node == node_id,
+            LinkObservation.edge_type == edge_type,
+            LinkObservation.observed_at >= since_time,
+        )
+        rows = (
+            src_detail.union_all(dst_detail)
+            .order_by(desc(LinkObservation.observed_at))
+            .limit(limit_val)
+            .all()
+        )
+
+        observations = []
+        for row in rows:
+            observed_at_str = None
+            if row.observed_at:
+                ts = row.observed_at
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                observed_at_str = ts.isoformat()
+            observations.append({
+                "observed_at": observed_at_str,
+                "rx_snr": float(row.rx_snr) if row.rx_snr is not None else None,
+                "rx_rssi": row.rx_rssi,
+                "hops_taken": row.hops_taken,
+                "packet_id": row.packet_id,
+            })
+
+        return jsonify({
+            "node_id": node_id,
+            "peer_id": peer_id,
+            "edge_type": edge_type,
+            "observations": observations,
+            "total": len(observations),
+        })
 
 
 def _dynamic_limit() -> str:
