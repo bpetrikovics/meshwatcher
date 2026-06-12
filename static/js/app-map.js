@@ -710,5 +710,107 @@ function mapMixin() {
         console.error("Failed to remove node from map:", error);
       }
     },
+
+    // ---- Node link graph map rendering ----
+
+    clearNodeLinksMapLayer() {
+      if (this.networkLayer) {
+        this.networkLayer.clearLayers();
+      }
+    },
+
+    _getNodeLatLng(nodeId) {
+      const node = this.nodes[nodeId];
+      if (node?.position?.latitude == null || node?.position?.longitude == null) return null;
+      return L.latLng(node.position.latitude, node.position.longitude);
+    },
+
+    _edgeColor(edge) {
+      const colors = {
+        neighbor_report: "#8b5cf6",
+        relay_to_uplink: "#f59e0b",
+        traceroute_hop: "#10b981",
+        traceroute_hop_back: "#10b981",
+        nexthop: "#6b7280",
+      };
+      return colors[edge.edge_type] || "#6b7280";
+    },
+
+    _edgeWeight(edge) {
+      const base = edge.edge_type === "relay_to_uplink" ? 3 : 2;
+      if (edge.edge_type === "nexthop") return 1;
+      const snr = edge.avg_snr;
+      if (snr == null) return base;
+      if (snr >= -5) return base + 1;
+      if (snr <= -10) return Math.max(1, base - 1);
+      return base;
+    },
+
+    _edgeOpacity(edge) {
+      const count = edge.observation_count || 1;
+      if (count >= 10) return 1.0;
+      if (count >= 3) return 0.7;
+      return 0.4;
+    },
+
+    renderNodeLinksOnMap() {
+      this.clearNodeLinksMapLayer();
+
+      const edges = this.selectedNodeLinks || [];
+      if (!edges.length) return;
+
+      for (const edge of edges) {
+        const srcPos = this._getNodeLatLng(edge.src_node);
+        const dstPos = this._getNodeLatLng(edge.dst_node);
+        if (!srcPos || !dstPos) continue;
+
+        const color = this._edgeColor(edge);
+        const weight = this._edgeWeight(edge);
+        const opacity = this._edgeOpacity(edge);
+        const isDashed = edge.edge_type === "traceroute_hop_back";
+        const isDotted = edge.edge_type === "nexthop";
+        const dashArray = isDashed ? "10, 6" : isDotted ? "4, 4" : null;
+
+        const polyline = L.polyline([srcPos, dstPos], {
+          color,
+          weight,
+          opacity,
+          dashArray,
+        }).addTo(this.networkLayer);
+
+        // Arrow marker at destination end
+        const midLat = (srcPos.lat + dstPos.lat) / 2;
+        const midLng = (srcPos.lng + dstPos.lng) / 2;
+        const angleDeg =
+          (Math.atan2(dstPos.lng - srcPos.lng, dstPos.lat - srcPos.lat) *
+            180) /
+          Math.PI;
+        const arrowIcon = L.divIcon({
+          className: "",
+          html: `<div class="link-arrow-marker" style="color:${color};transform:rotate(${angleDeg}deg);"></div>`,
+          iconSize: [12, 12],
+          iconAnchor: [6, 6],
+        });
+        L.marker([midLat, midLng], { icon: arrowIcon, interactive: false }).addTo(
+          this.networkLayer,
+        );
+
+        const snrLine =
+          edge.avg_snr != null
+            ? `\nAvg SNR: ${edge.avg_snr.toFixed(1)} dB`
+            : "";
+        const latestSnrLine =
+          edge.latest?.rx_snr != null
+            ? `\nLatest SNR: ${edge.latest.rx_snr.toFixed(1)} dB`
+            : "";
+        polyline.bindTooltip(
+          `${edge.edge_type} · ${edge.observation_count}x observations` +
+            snrLine +
+            latestSnrLine +
+            `\n${edge.src_node} → ${edge.dst_node}`,
+          { direction: "center", className: "edge-tooltip" },
+        );
+      }
+    },
   };
 }

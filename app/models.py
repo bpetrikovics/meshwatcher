@@ -654,3 +654,128 @@ class Routing(SQLModel, table=False):
         error_info = f" error={self.error_reason}" if self.error_reason else " success"
         request_info = f" req={hex(self.request_id)}" if self.request_id else ""
         return f"Routing {node}{error_info}{request_info} @ {self.timestamp}"
+
+
+class LinkObservation(SQLModel, table=True):
+    """
+    Records a single observed directed link between two mesh nodes.
+
+    Each row captures one evidence event — derived from relay_node/next_hop fields
+    in a regular packet, a NEIGHBORINFO_APP report, or a TRACEROUTE_APP response.
+
+    When relay_node or next_hop cannot be matched to a known full node ID at
+    observation time, src_node is left NULL and is_resolved=False; raw_suffix
+    stores the original 1-byte value so the row can be back-filled once the node
+    is seen (see Phase 7 — deferred resolution).
+    """
+
+    __tablename__ = "link_observations"
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="forbid",
+        from_attributes=True,
+    )
+
+    db_id: Optional[int] = Field(
+        default=None,
+        exclude=True,
+        sa_column=Column(Integer, primary_key=True, autoincrement=True),
+    )
+
+    observed_at: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column("observedAt", DateTime, nullable=False),
+    )
+
+    # FK to packets is nullable: NEIGHBORINFO / TRACEROUTE observations have no single
+    # originating packet stored in the packets table.
+    packet_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column("packetId", BigInteger, nullable=True),
+    )
+
+    # Full node ID (e.g. "!ab1234cd") when resolved; NULL when unknown.
+    src_node: Optional[str] = Field(
+        default=None,
+        sa_column=Column("srcNode", String(9), nullable=True),
+    )
+
+    # Destination: uplink gateway ID, or neighbor/traceroute target node ID.
+    dst_node: str = Field(
+        sa_column=Column("dstNode", String(9), nullable=False),
+    )
+
+    # How this observation was derived.
+    # Values: relay_to_uplink | from_to_uplink | nexthop | neighbor_report | traceroute_hop | traceroute_hop_back
+    edge_type: str = Field(
+        sa_column=Column("edgeType", String(24), nullable=False),
+    )
+
+    hops_taken: Optional[int] = Field(
+        default=None,
+        sa_column=Column("hopsTaken", Integer, nullable=True),
+    )
+
+    rx_snr: Optional[Decimal] = Field(
+        default=None,
+        sa_column=Column("rxSnr", Numeric(precision=4, scale=2), nullable=True),
+    )
+
+    rx_rssi: Optional[int] = Field(
+        default=None,
+        sa_column=Column("rxRssi", Integer, nullable=True),
+    )
+
+    channel: Optional[int] = Field(
+        default=None,
+        sa_column=Column("channel", Integer, nullable=True),
+    )
+
+    channel_name: Optional[str] = Field(
+        default=None,
+        sa_column=Column("channelName", String(12), nullable=True),
+    )
+
+    # Resolution state for relay_node / next_hop 1-byte values.
+    is_resolved: bool = Field(
+        default=False,
+        sa_column=Column("isResolved", Boolean, nullable=False),
+    )
+
+    # Original 1-byte relay_node or next_hop value; set when is_resolved=False.
+    raw_suffix: Optional[int] = Field(
+        default=None,
+        sa_column=Column("rawSuffix", Integer, nullable=True),
+    )
+
+    __table_args__ = (
+        # Edge history: who talked to whom over time
+        Index("ix_lo_src_dst_observed", "srcNode", "dstNode", "observedAt"),
+        # Fast lookup by source node + time
+        Index("ix_lo_src_observed", "srcNode", "observedAt"),
+        # Fast lookup by destination node + time
+        Index("ix_lo_dst_observed", "dstNode", "observedAt"),
+        # Time-range queries across all observations
+        Index("ix_lo_observed", "observedAt"),
+        # Filter by edge source type
+        Index("ix_lo_edge_type_observed", "edgeType", "observedAt"),
+        # Deferred resolution pass: find all unresolved rows quickly
+        Index("ix_lo_unresolved", "isResolved", "rawSuffix"),
+    )
+
+    @field_validator("rx_snr", mode="before")
+    @classmethod
+    def _coerce_rx_snr_decimal(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, Decimal):
+            return v
+        return Decimal(str(v))
+
+    def __str__(self) -> str:
+        src = self.src_node or (f"?{self.raw_suffix:02x}" if self.raw_suffix is not None else "?")
+        snr = f", snr={self.rx_snr}" if self.rx_snr is not None else ""
+        rssi = f", rssi={self.rx_rssi}" if self.rx_rssi is not None else ""
+        hops = f", hops={self.hops_taken}" if self.hops_taken is not None else ""
+        return f"LinkObservation [{self.edge_type}] {src} -> {self.dst_node}{snr}{rssi}{hops}"

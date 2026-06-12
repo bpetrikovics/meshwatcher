@@ -252,6 +252,27 @@ function nodeDetailMixin() {
             </div>
           </div>
 
+          <!-- Connections Card -->
+          <div class="card p-4">
+            <div class="flex items-center justify-between mb-3">
+              <h4 class="font-medium text-gray-900 flex items-center">
+                <i class="mdi mdi-graph mr-2 text-purple-500"></i>
+                Connections
+              </h4>
+              <label class="relative inline-flex items-center cursor-pointer" title="Show connections on map">
+                <input type="checkbox" class="sr-only peer links-map-toggle"
+                       ${this.showNodeLinksOnMap ? "checked" : ""}>
+                <div class="w-10 h-5 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-500"></div>
+              </label>
+            </div>
+            <div id="connections-content"${this.showNodeLinksOnMap ? '' : ' class="hidden"'}>
+              <div class="text-center text-gray-400 py-4">
+                <i class="mdi mdi-loading mdi-spin text-xl mb-1"></i>
+                <p class="text-sm">Loading connections...</p>
+              </div>
+            </div>
+          </div>
+
           <!-- Telemetry Section -->
           <div class="card p-4">
             <div class="flex items-center justify-between mb-4">
@@ -345,8 +366,9 @@ function nodeDetailMixin() {
         } else {
           this.clearSelectedNodeHistoryLayer();
         }
-        // Fetch telemetry for the sidebar
+        // Fetch telemetry and link graph for the sidebar
         this.fetchTelemetrySummary(nodeId);
+        this.fetchNodeLinks(nodeId);
         return;
       }
 
@@ -405,6 +427,7 @@ function nodeDetailMixin() {
       if (!node || !node.position) {
         // Telemetry is independent from position and should load for position-less nodes too.
         this.fetchTelemetrySummary(nodeId);
+        this.fetchNodeLinks(nodeId);
         if (this.positionHistoryEnabled) {
           this.loadNodeHistory(nodeId);
         }
@@ -430,8 +453,9 @@ function nodeDetailMixin() {
         this.loadNodeHistory(nodeId);
       }
 
-      // Fetch telemetry for the sidebar
+      // Fetch telemetry and link graph for the sidebar
       this.fetchTelemetrySummary(nodeId);
+      this.fetchNodeLinks(nodeId);
     },
 
     deselectNode() {
@@ -440,8 +464,12 @@ function nodeDetailMixin() {
       this.selectedNodeId = null;
       this.selectedNodeHistory = [];
       this.selectedNodeDetailsHtml = "";
+      this.selectedNodeLinks = [];
+      this.selectedNodeConnectedIds = [];
+      this.linkDetailObservations = {};
 
       this.clearSelectedNodeHistoryLayer();
+      this.clearNodeLinksMapLayer();
 
       if (!circle) return;
 
@@ -1124,6 +1152,306 @@ function nodeDetailMixin() {
           this.updateTelemetryChartsErrorDisplay();
         }
       }
+    },
+
+    // Fetch link graph observations for the selected node from the API
+    async fetchNodeLinks(nodeId) {
+      if (!nodeId || this.selectedNodeId !== nodeId) return;
+      const sinceHours = 24;
+      const edgeTypes =
+        "neighbor_report,relay_to_uplink,from_to_uplink,traceroute_hop,traceroute_hop_back,nexthop";
+      try {
+        const resp = await fetch(
+          `/api/nodes/${encodeURIComponent(nodeId)}/links?since_hours=${sinceHours}&edge_type=${encodeURIComponent(edgeTypes)}`,
+        );
+        if (!resp.ok) return;
+        if (this.selectedNodeId !== nodeId) return;
+        const data = await resp.json();
+        this.selectedNodeLinks = data.edges || [];
+        this.selectedNodeConnectedIds = data.connected_nodes || [];
+        this.renderNodeLinksSidebar();
+        this.setupConnectionsMapToggle();
+        if (this.showNodeLinksOnMap) {
+          this.renderNodeLinksOnMap();
+        }
+      } catch (error) {
+        console.error(`Error fetching node links for ${nodeId}:`, error);
+      }
+    },
+
+    // Render the Connections card content from this.selectedNodeLinks
+    renderNodeLinksSidebar() {
+      const container = document.getElementById("connections-content");
+      if (!container) return;
+
+      const edges = this.selectedNodeLinks || [];
+      const PAGE_SIZE = 10;
+
+      if (edges.length === 0) {
+        container.innerHTML =
+          '<p class="text-gray-400 text-sm text-center py-4">No connections observed</p>';
+        return;
+      }
+
+      const snrColorClass = (snr) => {
+        if (snr == null) return "text-gray-400";
+        if (snr >= -5) return "text-green-500";
+        if (snr >= -10) return "text-amber-500";
+        return "text-red-500";
+      };
+
+      const nodeNameFor = (nodeId) => {
+        if (!nodeId) return "Unknown";
+        const n = this.nodes[nodeId];
+        return sanitizeHtml(n?.short_name || nodeId);
+      };
+
+      const rowHtml = (edge) => {
+        const isOutgoing = edge.src_node === this.selectedNodeId;
+        const peerId = isOutgoing ? edge.dst_node : edge.src_node;
+        const peerName = nodeNameFor(peerId);
+        const safePeerId = sanitizeHtml(peerId || "");
+        const detailKey = `${safePeerId}|${edge.edge_type}`;
+        const detailState = this.linkDetailObservations[detailKey];
+        const isExpanded = detailState?.expanded || false;
+        const isLoading = detailState?.loading || false;
+        const dirIcon = isOutgoing
+          ? '<i class="mdi mdi-arrow-right-bold text-blue-500 flex-shrink-0"></i>'
+          : '<i class="mdi mdi-arrow-left-bold text-green-500 flex-shrink-0"></i>';
+        const snrClass = snrColorClass(edge.avg_snr);
+        const avgSnr = edge.avg_snr != null ? edge.avg_snr.toFixed(1) : "N/A";
+        const latestSnr =
+          edge.latest?.rx_snr != null ? edge.latest.rx_snr.toFixed(1) : "N/A";
+        const peerLabel = peerId
+          ? `<span class="peer-chip text-sm font-medium bg-gray-100 hover:bg-purple-100 text-gray-700 hover:text-purple-700 px-2 py-0.5 rounded-md cursor-pointer transition-colors"
+                    data-peer-id="${safePeerId}"
+                    title="View details for ${peerName}">
+              ${peerName}
+            </span>`
+          : `<span class="text-sm text-gray-400 italic">Unknown</span>`;
+
+        let detailHtml = "";
+        if (isExpanded) {
+          const obs = detailState?.data || [];
+          if (isLoading) {
+            detailHtml = `<div class="px-3 py-3 text-center text-xs text-gray-400"><i class="mdi mdi-loading mdi-spin mr-1"></i>Loading...</div>`;
+          } else if (obs.length === 0) {
+            detailHtml = `<div class="px-3 py-3 text-center text-xs text-gray-400">No observations found</div>`;
+          } else {
+            const currentPage = detailState?.page || 1;
+            const totalPages = Math.ceil(obs.length / PAGE_SIZE);
+            const pageObs = obs.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+            const snrCellClass = (snr) => {
+              if (snr == null) return "text-gray-400";
+              if (snr >= -5) return "text-green-500";
+              if (snr >= -10) return "text-amber-500";
+              return "text-red-500";
+            };
+            const rows = pageObs.map((o, i) => {
+              const d = o.observed_at ? new Date(o.observed_at) : null;
+              const ts = d ? `${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getDate().toString().padStart(2, "0")} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}` : "—";
+              const snr = o.rx_snr != null ? o.rx_snr.toFixed(1) : "—";
+              const rssi = o.rx_rssi != null ? o.rx_rssi : "—";
+              const hops = o.hops_taken != null ? o.hops_taken : "—";
+              const idx = (currentPage - 1) * PAGE_SIZE + i + 1;
+              return `<tr class="${i % 2 === 0 ? "bg-white" : "bg-gray-50"}">
+                <td class="px-2 py-1 text-gray-400">${idx}</td>
+                <td class="px-2 py-1 text-gray-700 whitespace-nowrap">${sanitizeHtml(ts)}</td>
+                <td class="px-2 py-1 text-right ${snrCellClass(o.rx_snr)}">${sanitizeHtml(snr)}</td>
+                <td class="px-2 py-1 text-right text-gray-600">${sanitizeHtml(rssi)}</td>
+                <td class="px-2 py-1 text-right text-gray-600">${sanitizeHtml(hops)}</td>
+              </tr>`;
+            }).join("");
+
+            const total = obs.length;
+            const pageControls = totalPages > 1
+              ? `<div class="flex items-center justify-between px-2 py-1.5 border-t border-gray-100 text-[11px] text-gray-500">
+                  <button class="page-btn px-2 py-0.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-default transition-colors"
+                          data-detail-key="${sanitizeHtml(detailKey)}"
+                          data-page-dir="prev"
+                          ${currentPage <= 1 ? "disabled" : ""}>
+                    <i class="mdi mdi-chevron-left"></i> Prev
+                  </button>
+                  <span>${currentPage} / ${totalPages}</span>
+                  <button class="page-btn px-2 py-0.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-default transition-colors"
+                          data-detail-key="${sanitizeHtml(detailKey)}"
+                          data-page-dir="next"
+                          ${currentPage >= totalPages ? "disabled" : ""}>
+                    Next <i class="mdi mdi-chevron-right"></i>
+                  </button>
+                </div>`
+              : `<div class="px-2 py-1.5 text-[10px] text-gray-400 text-right border-t border-gray-100">${total} observation${total !== 1 ? "s" : ""}</div>`;
+
+            detailHtml = `<div class="border-t border-gray-100 border-l-2 border-purple-300 ml-3 pl-2 bg-purple-50/30">
+              <table class="w-full text-xs">
+                <thead>
+                  <tr class="bg-gray-100 text-gray-500 uppercase tracking-wide text-[10px]">
+                    <th class="px-2 py-1.5 text-left font-semibold">#</th>
+                    <th class="px-2 py-1.5 text-left font-semibold">observed</th>
+                    <th class="px-2 py-1.5 text-right font-semibold">SNR</th>
+                    <th class="px-2 py-1.5 text-right font-semibold">RSSI</th>
+                    <th class="px-2 py-1.5 text-right font-semibold">hops</th>
+                  </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+              </table>
+              ${pageControls}
+            </div>`;
+          }
+        }
+
+        return `
+          <div class="connection-row py-2">
+            <div class="flex items-center justify-between px-3 accordion-trigger cursor-pointer"
+                 data-detail-key="${sanitizeHtml(detailKey)}"
+                 data-peer-id="${safePeerId}"
+                 data-edge-type="${sanitizeHtml(edge.edge_type)}">
+              <div class="flex items-center gap-2 min-w-0 cursor-default">
+                ${dirIcon}
+                ${peerLabel}
+              </div>
+              <div class="text-right flex-shrink-0 ml-2 flex items-center gap-1">
+                <div>
+                  <div class="text-xs ${snrClass}">
+                    ${edge.observation_count}x &middot; avg ${avgSnr} dB
+                  </div>
+                  <div class="text-xs text-gray-400">
+                    last: ${latestSnr} dB
+                  </div>
+                </div>
+                <i class="mdi ${isExpanded ? "mdi-chevron-up" : "mdi-chevron-down"} text-gray-400 text-lg transition-transform"></i>
+              </div>
+            </div>
+            ${detailHtml}
+          </div>`;
+      };
+
+      const sectionHtml = (title, subtitle, icon, typeEdges) => {
+        if (!typeEdges.length) return "";
+        return `
+          <div class="links-group border border-gray-200 rounded-lg overflow-hidden">
+            <h5 class="text-xs font-semibold text-gray-600 uppercase tracking-wide px-3 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+              <span><i class="mdi ${icon} mr-1"></i>${title}</span>
+              <span class="text-xs font-normal text-gray-400 lowercase normal-case">${subtitle}</span>
+            </h5>
+            <div class="px-3 divide-y divide-gray-100">
+              ${typeEdges.map(rowHtml).join("")}
+            </div>
+          </div>`;
+      };
+
+      const byType = (type) => edges.filter((e) => e.edge_type === type);
+
+      const tracerouteEdges = [
+        ...byType("traceroute_hop"),
+        ...byType("traceroute_hop_back"),
+      ];
+
+      container.innerHTML = `
+        <div class="space-y-3">
+          ${sectionHtml("Neighbors", "direct RF neighbors", "mdi-wifi", byType("neighbor_report"))}
+          ${sectionHtml("Relayed via", "relayed this node to gateway", "mdi-swap-horizontal-bold", byType("relay_to_uplink"))}
+          ${sectionHtml("Relayed from", "originated from this node", "mdi-swap-horizontal-bold", byType("from_to_uplink"))}
+          ${sectionHtml("Traceroute", "mesh route hops", "mdi-routes", tracerouteEdges)}
+          ${sectionHtml("Next hop", "routing hints (unconfirmed)", "mdi-arrow-decision", byType("nexthop"))}
+        </div>`;
+
+      // Wire event delegation (peer chips + accordion toggle)
+      if (container._connectionsClickHandler) {
+        container.removeEventListener("click", container._connectionsClickHandler);
+      }
+      container._connectionsClickHandler = (e) => {
+        const chip = e.target.closest(".peer-chip");
+        if (chip) {
+          const peerId = chip.dataset.peerId;
+          if (peerId) this.flyToNode(peerId);
+          return;
+        }
+        const pageBtn = e.target.closest(".page-btn[data-detail-key]");
+        if (pageBtn) {
+          const detailKey = pageBtn.dataset.detailKey;
+          const dir = pageBtn.dataset.pageDir;
+          if (detailKey && dir && this.linkDetailObservations[detailKey]) {
+            const state = this.linkDetailObservations[detailKey];
+            const totalPages = Math.ceil((state.data?.length || 0) / PAGE_SIZE);
+            const page = state.page || 1;
+            const newPage = dir === "prev" ? page - 1 : page + 1;
+            if (newPage >= 1 && newPage <= totalPages) {
+              this.linkDetailObservations[detailKey] = { ...state, page: newPage };
+              this.renderNodeLinksSidebar();
+            }
+          }
+          return;
+        }
+        const trigger = e.target.closest(".accordion-trigger");
+        if (!trigger) return;
+        const detailKey = trigger.dataset.detailKey;
+        const peerId = trigger.dataset.peerId;
+        const edgeType = trigger.dataset.edgeType;
+        if (!detailKey || !peerId || !edgeType) return;
+        this._toggleEdgeDetail(detailKey, peerId, edgeType);
+      };
+      container.addEventListener("click", container._connectionsClickHandler);
+    },
+
+    // Toggle accordion for an edge detail row
+    async _toggleEdgeDetail(detailKey, peerId, edgeType) {
+      const state = this.linkDetailObservations;
+      const current = state[detailKey];
+      if (current?.expanded) {
+        state[detailKey] = { ...current, expanded: false };
+        this.renderNodeLinksSidebar();
+        return;
+      }
+      if (current?.data) {
+        state[detailKey] = { ...current, expanded: true, page: current.page || 1 };
+        this.renderNodeLinksSidebar();
+        return;
+      }
+      state[detailKey] = { data: null, loading: true, expanded: true, page: 1 };
+      this.renderNodeLinksSidebar();
+      try {
+        const resp = await fetch(
+          `/api/nodes/${encodeURIComponent(this.selectedNodeId)}/links/${encodeURIComponent(edgeType)}/${encodeURIComponent(peerId)}/observations?since_hours=168&limit=50`,
+        );
+        if (!resp.ok) {
+          state[detailKey] = { data: [], loading: false, expanded: true, page: 1 };
+          this.renderNodeLinksSidebar();
+          return;
+        }
+        const result = await resp.json();
+        state[detailKey] = { data: result.observations || [], loading: false, expanded: true, page: 1 };
+      } catch {
+        state[detailKey] = { data: [], loading: false, expanded: true, page: 1 };
+      }
+      this.renderNodeLinksSidebar();
+    },
+
+    // Wire the "show on map" toggle inside the Connections card
+    setupConnectionsMapToggle() {
+      queueMicrotask(() => {
+        const toggle = document.querySelector(".links-map-toggle");
+        if (!toggle) return;
+
+        const existing = toggle._handleLinksMapToggle;
+        if (existing) toggle.removeEventListener("change", existing);
+
+        const handler = (e) => {
+          this.showNodeLinksOnMap = !!e.target.checked;
+          const content = document.getElementById("connections-content");
+          if (this.showNodeLinksOnMap) {
+            if (content) content.classList.remove("hidden");
+            this.fetchNodeLinks(this.selectedNodeId);
+          } else {
+            if (content) content.classList.add("hidden");
+            this.clearNodeLinksMapLayer();
+          }
+        };
+
+        toggle._handleLinksMapToggle = handler;
+        toggle.addEventListener("change", handler);
+      });
     },
 
     updateTelemetryChartsErrorDisplay() {

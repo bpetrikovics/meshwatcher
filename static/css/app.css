@@ -1312,3 +1312,23 @@ footer.glass-panel {
     min-height: 0;
 }
 
+
+/* ---- Node link graph (Phase 8) ---- */
+.edge-tooltip {
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-line;
+  background: rgba(30, 30, 30, 0.9);
+  color: #e5e7eb;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.link-arrow-marker {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 10px solid currentColor;
+}
