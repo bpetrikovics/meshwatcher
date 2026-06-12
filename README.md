@@ -9,10 +9,11 @@ A real-time web application for monitoring [Meshtastic](https://meshtastic.org/)
 - **Live map** — Visualize all active Meshtastic nodes on an interactive map with configurable clustering.
 - **Private channel tracking** — Track your own devices on your private, encrypted channel
 - **Node sidebar** — Browse and filter nodes by role (Client, Router, Tracker, Sensor) and monitor their last-seen status at a glance.
-- **Node detail panel** — Inspect per-node metadata, telemetry history, and position tracks color-coded by speed and position age.
+- **Node detail panel** — Inspect per-node metadata, telemetry history, position tracks, and a connections card showing neighbors, relay paths, traceroute hops, and next-hops with SNR stats
+- **Link graph** — Visualize connections between nodes on the map with directed polylines, fan-out curves for overlapping edge types, direction arrows, and edge-type filter buttons. A "Hide weak" toggle suppresses sparse edges to reduce clutter.
 - **Packet log** — Watch the raw MQTT stream in real time, with automatic duplicate filtering and expandable packet payloads.
-- **Auto-cleanup** — Define independent retention periods for each data type to keep your database lean.
-- **API + WebSocket** — Integrate with the REST API using optional key-based authentication, or subscribe to live events via Socket.IO.
+- **Auto-cleanup** — Define independent retention periods for each data type (nodes, packets, telemetry, messages, link observations) to keep your database lean.
+- **API + WebSocket** — Integrate with the REST API using optional key-based authentication, or subscribe to live events via Socket.IO. The API exposes endpoints for aggregated link data and per-observation detail.
 
 ## Requirements
 
@@ -109,7 +110,9 @@ All settings are read from `.env` (or environment variables). The key ones:
 | `PACKET_RETENTION_DAYS` | `7` | How long to keep raw packets |
 | `MESSAGE_RETENTION_DAYS` | `7` | How long to keep text messages |
 | `TELEMETRY_RETENTION_DAYS` | `7` | How long to keep telemetry |
+| `LINK_OBSERVATIONS_RETENTION_DAYS` | `7` | How long to keep link observations |
 | `DB_CLEANUP_PERIOD_MINUTES` | `30` | How often the cleanup job runs |
+| `CACHE_CLEANUP_INTERVAL` | `60` | Observation cache flush interval (seconds) |
 | `CORS_ALLOWED_ORIGINS` | `*` | Restrict to your domain in production |
 
 See [app/config.py](app/config.py) for the full list.

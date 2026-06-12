@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     db_cleanup_period_minutes: int = 30
 
     # Performance
-    cache_cleanup_interval: int = 60  # Cache cleanup interval (minutes)
+    cache_cleanup_interval: int = 60  # Cache cleanup interval (seconds)
     duplicate_detection_window: int = 30  # Duplicate packet detection (seconds)
     node_cache_ttl_seconds: int = 1800  # Node cache TTL
     history_max_markers: int = 500  # Max history hover markers rendered on map
