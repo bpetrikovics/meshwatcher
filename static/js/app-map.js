@@ -749,9 +749,10 @@ function mapMixin() {
 
     _edgeOpacity(edge) {
       const count = edge.observation_count || 1;
-      if (count >= 10) return 1.0;
-      if (count >= 3) return 0.7;
-      return 0.4;
+      const minOpacity = 0.15;
+      const maxOpacity = 1.0;
+      const saturationCount = 15;
+      return Math.min(maxOpacity, Math.max(minOpacity, count / saturationCount));
     },
 
     _edgeConfidenceRank(edgeType) {
