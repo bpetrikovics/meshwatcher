@@ -265,7 +265,7 @@ function nodeDetailMixin() {
                   <div class="w-10 h-5 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-500"></div>
                 </label>
                 <button type="button" class="links-map-toggle-btn w-7 h-7 flex items-center justify-center rounded-md text-sm border transition-all duration-150 ${this.showNodeLinksOnMap ? 'bg-purple-500 border-purple-500 text-white shadow-sm' : 'bg-white border-gray-300 text-gray-400 hover:bg-gray-50'}" title="Show edges on map">
-                  <i class="mdi mdi-layers"></i>
+                  <i class="mdi mdi-vector-polyline"></i>
                 </button>
               </div>
             </div>
@@ -560,6 +560,9 @@ function nodeDetailMixin() {
 
         // Fetch fresh telemetry data
         await this.fetchTelemetrySummary(nodeId);
+
+        // Fetch fresh link graph data
+        await this.fetchNodeLinks(nodeId);
       } finally {
         // Clear refreshing state
         this.refreshingNodeId = null;
