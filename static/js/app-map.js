@@ -768,7 +768,7 @@ function mapMixin() {
       const spreadPixels = 12;
       const groups = new Map();
       for (const edge of edges) {
-        const key = `${edge.src_node}||${edge.dst_node}`;
+        const key = [edge.src_node, edge.dst_node].sort().join("||");
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(edge);
       }
