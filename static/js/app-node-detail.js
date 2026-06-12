@@ -561,6 +561,11 @@ function nodeDetailMixin() {
         // Update the sidebar HTML using the updated node object
         this.selectedNodeDetailsHtml = this.createNodeSidebarHtml(node);
 
+        // Yield to let Alpine flush its x-html DOM update before we try
+        // to populate #connections-content. Otherwise a race between the
+        // DOM update and fast API responses can leave the spinner visible.
+        await new Promise((r) => requestAnimationFrame(r));
+
         // Fetch fresh telemetry data
         await this.fetchTelemetrySummary(nodeId);
 
