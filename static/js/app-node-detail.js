@@ -291,7 +291,16 @@ function nodeDetailMixin() {
                           ${label}
                         </button>`;
               }).join('')}
-              <span class="link-min-obs-toggle ml-auto text-xs text-gray-400 cursor-pointer hover:text-purple-600 select-none" title="Toggle minimum observation count filter">${this.linkMinObsForMap > 1 ? `min ${this.linkMinObsForMap}` : 'all'}</span>
+              <button class="link-type-filter-btn link-min-obs-toggle flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-colors"
+                      data-filter-key="__min_obs__"
+                      style="${this.linkMinObsForMap > 1
+                        ? 'background-color:#6b728020;border-color:#6b7280;color:#6b7280'
+                        : 'background-color:transparent;border-color:#d1d5db;color:#9ca3af'}"
+                      title="${this.linkMinObsForMap > 1 ? 'Hide sparse/unconfirmed edges on the map' : 'Show all edges including sparse ones'}">
+                <span class="w-2 h-2 rounded-full inline-block flex-shrink-0"
+                      style="${this.linkMinObsForMap > 1 ? 'background-color:#6b7280' : 'border:1.5px solid #9ca3af;background:transparent'}"></span>
+                ${this.linkMinObsForMap > 1 ? 'Hide weak' : 'Show all'}
+              </button>
             </div>
             <div id="connections-content">
               <div class="text-center text-gray-400 py-4">
@@ -1500,11 +1509,32 @@ function nodeDetailMixin() {
           }
           return;
         }
-        // Min-observation toggle
-        const minObsEl = e.target.closest(".link-min-obs-toggle");
-        if (minObsEl) {
+        // Min-observation toggle (styled like filter buttons)
+        const minObsBtn = e.target.closest(".link-min-obs-toggle");
+        if (minObsBtn) {
           this.linkMinObsForMap = this.linkMinObsForMap > 1 ? 1 : 3;
-          minObsEl.textContent = this.linkMinObsForMap > 1 ? `min ${this.linkMinObsForMap}` : 'all';
+          const active = this.linkMinObsForMap > 1;
+          const color = "#6b7280";
+          const dot = minObsBtn.querySelector("span");
+          if (active) {
+            minObsBtn.style.backgroundColor = color + "20";
+            minObsBtn.style.borderColor = color;
+            minObsBtn.style.color = color;
+            dot.style.backgroundColor = color;
+            dot.style.border = "none";
+            minObsBtn.title = "Hide sparse/unconfirmed edges on the map";
+            minObsBtn.textContent = "";
+            minObsBtn.append(dot, " Hide weak");
+          } else {
+            minObsBtn.style.backgroundColor = "transparent";
+            minObsBtn.style.borderColor = "#d1d5db";
+            minObsBtn.style.color = "#9ca3af";
+            dot.style.backgroundColor = "transparent";
+            dot.style.border = "1.5px solid #9ca3af";
+            minObsBtn.title = "Show all edges including sparse ones";
+            minObsBtn.textContent = "";
+            minObsBtn.append(dot, " Show all");
+          }
           if (this.showNodeLinksOnMap) this.renderNodeLinksOnMap();
         }
       };
