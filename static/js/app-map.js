@@ -898,20 +898,40 @@ function mapMixin() {
           interactive: false,
         }).addTo(this.networkLayer);
 
-        const snrLine =
-          edge.avg_snr != null
-            ? `\nAvg SNR: ${edge.avg_snr.toFixed(1)} dB`
-            : "";
-        const latestSnrLine =
-          edge.latest?.rx_snr != null
-            ? `\nLatest SNR: ${edge.latest.rx_snr.toFixed(1)} dB`
-            : "";
+        const edgeLabels = {
+          neighbor_report: "Neighbor",
+          relay_to_uplink: "Relay",
+          from_to_uplink: "Uplink",
+          traceroute_hop: "Trace",
+          traceroute_hop_back: "TraceBack",
+          nexthop: "Nexthop",
+        };
+        const label = edgeLabels[edge.edge_type] || edge.edge_type;
+        const hrsAgo = edge.latest?.observed_at
+          ? (Date.now() - new Date(edge.latest.observed_at).getTime()) / 3600000
+          : null;
+        const timeAgo = hrsAgo != null ? getTimeAgoText(hrsAgo) : null;
+        const rows = [];
+        if (edge.avg_snr != null) {
+          rows.push(`<span class="edge-tooltip-label">Avg SNR</span><span>${edge.avg_snr.toFixed(1)} dB</span>`);
+        }
+        if (edge.latest?.rx_snr != null) {
+          rows.push(`<span class="edge-tooltip-label">Latest SNR</span><span>${edge.latest.rx_snr.toFixed(1)} dB</span>`);
+        }
+        if (timeAgo) {
+          rows.push(`<span class="edge-tooltip-label">Last seen</span><span>${timeAgo}</span>`);
+        }
         polyline.bindTooltip(
-          `${edge.edge_type} · ${edge.observation_count}x observations` +
-            snrLine +
-            latestSnrLine +
-            `\n${edge.src_node} → ${edge.dst_node}`,
-          { sticky: true, className: "edge-tooltip" },
+          `<div class="edge-tooltip-inner" style="border-left:3px solid ${color}">` +
+            `<div class="edge-tooltip-title">` +
+              `<span class="edge-tooltip-dot" style="background:${color}"></span>` +
+              `<strong>${label}</strong>` +
+              `<span class="edge-tooltip-count">${edge.observation_count}x</span>` +
+            `</div>` +
+            rows.map((r) => `<div class="edge-tooltip-row">${r}</div>`).join("") +
+            `<div class="edge-tooltip-subtle">${edge.src_node} → ${edge.dst_node}</div>` +
+          `</div>`,
+          { sticky: true, className: "edge-tooltip", interactive: true },
         );
       }
     },
