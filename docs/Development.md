@@ -48,6 +48,34 @@ pip-compile --upgrade test-requirements.in
 pip-compile --upgrade-package flask requirements.in
 ```
 
+**Pin a single package to a minimum version (e.g. to address a CVE):**
+
+When a vulnerability requires a package to be at least a specific version, constrain it in
+`requirements.in` and then recompile:
+
+1. Open `requirements.in` and add or tighten the lower bound:
+   ```
+   # was:  requests
+   requests>=2.32.0   # CVE-2024-XXXXX — must be ≥ 2.32.0
+   ```
+2. Recompile, letting pip-compile upgrade only that package and anything that
+   depends on it:
+   ```bash
+   pip-compile --upgrade-package requests requirements.in
+   ```
+3. Verify the locked version satisfies the constraint:
+   ```bash
+   grep "^requests==" requirements.txt
+   ```
+   The output should show a version equal to or higher than your minimum.
+
+If the package appears only as a transitive dependency (it is not listed in
+`requirements.in` at all), add an explicit entry with the version floor before
+running `pip-compile`:
+```
+requests>=2.32.0   # transitive dep pinned for CVE-2024-XXXXX
+```
+
 After recompiling, reinstall and run the tests:
 
 ```bash
