@@ -117,6 +117,7 @@ function meshApp() {
       traceroute_hop_back: true,
       nexthop: true,
     },
+    linkMinObsForMap: 3,
 
     // Canvas renderer shared across history point markers (avoids N SVG elements)
     historyCanvasRenderer: null,

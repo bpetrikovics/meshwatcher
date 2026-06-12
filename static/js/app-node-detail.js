@@ -259,14 +259,18 @@ function nodeDetailMixin() {
                 <i class="mdi mdi-graph mr-2 text-purple-500"></i>
                 Connections
               </h4>
-              <label class="relative inline-flex items-center cursor-pointer" title="Show connections on map">
-                <input type="checkbox" class="sr-only peer links-map-toggle"
-                       ${this.showNodeLinksOnMap ? "checked" : ""}>
-                <div class="w-10 h-5 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-500"></div>
-              </label>
+              <div class="flex items-center gap-2">
+                <label class="relative inline-flex items-center cursor-pointer" title="Show connection card">
+                  <input type="checkbox" class="sr-only peer links-card-toggle" checked>
+                  <div class="w-10 h-5 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-500"></div>
+                </label>
+                <button type="button" class="links-map-toggle-btn w-7 h-7 flex items-center justify-center rounded-md text-sm border transition-all duration-150 ${this.showNodeLinksOnMap ? 'bg-purple-500 border-purple-500 text-white shadow-sm' : 'bg-white border-gray-300 text-gray-400 hover:bg-gray-50'}" title="Show edges on map">
+                  <i class="mdi mdi-layers"></i>
+                </button>
+              </div>
             </div>
-            <!-- Edge-type filter buttons -->
-            <div class="flex flex-wrap gap-1.5 mb-3" id="link-type-filters">
+            <!-- Edge-type filter buttons + min-obs indicator -->
+            <div class="flex flex-wrap gap-1.5 mb-3 items-center" id="link-type-filters">
               ${[
                 { key: 'neighbor_report',   label: 'Neighbor',  color: '#8b5cf6' },
                 { key: 'relay_to_uplink',   label: 'Relay',     color: '#f59e0b' },
@@ -287,8 +291,9 @@ function nodeDetailMixin() {
                           ${label}
                         </button>`;
               }).join('')}
+              <span class="link-min-obs-toggle ml-auto text-xs text-gray-400 cursor-pointer hover:text-purple-600 select-none" title="Toggle minimum observation count filter">${this.linkMinObsForMap > 1 ? `min ${this.linkMinObsForMap}` : 'all'}</span>
             </div>
-            <div id="connections-content"${this.showNodeLinksOnMap ? '' : ' class="hidden"'}>
+            <div id="connections-content">
               <div class="text-center text-gray-400 py-4">
                 <i class="mdi mdi-loading mdi-spin text-xl mb-1"></i>
                 <p class="text-sm">Loading connections...</p>
@@ -389,6 +394,8 @@ function nodeDetailMixin() {
         } else {
           this.clearSelectedNodeHistoryLayer();
         }
+        // Wire toggle handlers (must run even if API call fails)
+        this.setupConnectionsMapToggle();
         // Fetch telemetry and link graph for the sidebar
         this.fetchTelemetrySummary(nodeId);
         this.fetchNodeLinks(nodeId);
@@ -446,6 +453,9 @@ function nodeDetailMixin() {
 
         this._wireHistoryRangeSlider();
       });
+
+      // Wire toggle handlers (must run even if API call fails)
+      this.setupConnectionsMapToggle();
 
       if (!node || !node.position) {
         // Telemetry is independent from position and should load for position-less nodes too.
@@ -1452,30 +1462,55 @@ function nodeDetailMixin() {
       this.renderNodeLinksSidebar();
     },
 
-    // Wire the "show on map" toggle inside the Connections card
+    // Wire toggles inside the Connections card (event delegation on persistent container)
     setupConnectionsMapToggle() {
-      queueMicrotask(() => {
-        const toggle = document.querySelector(".links-map-toggle");
-        if (!toggle) return;
-
-        const existing = toggle._handleLinksMapToggle;
-        if (existing) toggle.removeEventListener("change", existing);
-
-        const handler = (e) => {
-          this.showNodeLinksOnMap = !!e.target.checked;
+      const container = document.getElementById("node-details-container");
+      if (!container) return;
+      const prev = container._handleConnectionsToggle;
+      if (prev) {
+        container.removeEventListener("click", prev);
+        container.removeEventListener("change", prev);
+      }
+      const handler = (e) => {
+        // Card content toggle (checkbox) — handle on 'change' for reliable state
+        const cardToggle = e.target.closest(".links-card-toggle");
+        if (cardToggle) {
+          const visible = !!cardToggle.checked;
           const content = document.getElementById("connections-content");
+          if (content) content.classList.toggle("hidden", !visible);
+          return;
+        }
+        // Button/span controls only respond to click events
+        if (e.type !== "click") return;
+        // Map edges toggle (button)
+        const mapBtn = e.target.closest(".links-map-toggle-btn");
+        if (mapBtn) {
+          this.showNodeLinksOnMap = !this.showNodeLinksOnMap;
+          // classList.toggle does not accept space-separated tokens — toggle each class individually
+          ["bg-purple-500", "border-purple-500", "text-white", "shadow-sm"].forEach(
+            (cls) => mapBtn.classList.toggle(cls, this.showNodeLinksOnMap)
+          );
+          ["bg-white", "border-gray-300", "text-gray-400", "hover:bg-gray-50"].forEach(
+            (cls) => mapBtn.classList.toggle(cls, !this.showNodeLinksOnMap)
+          );
           if (this.showNodeLinksOnMap) {
-            if (content) content.classList.remove("hidden");
-            this.fetchNodeLinks(this.selectedNodeId);
+            this.renderNodeLinksOnMap();
           } else {
-            if (content) content.classList.add("hidden");
             this.clearNodeLinksMapLayer();
           }
-        };
-
-        toggle._handleLinksMapToggle = handler;
-        toggle.addEventListener("change", handler);
-      });
+          return;
+        }
+        // Min-observation toggle
+        const minObsEl = e.target.closest(".link-min-obs-toggle");
+        if (minObsEl) {
+          this.linkMinObsForMap = this.linkMinObsForMap > 1 ? 1 : 3;
+          minObsEl.textContent = this.linkMinObsForMap > 1 ? `min ${this.linkMinObsForMap}` : 'all';
+          if (this.showNodeLinksOnMap) this.renderNodeLinksOnMap();
+        }
+      };
+      container._handleConnectionsToggle = handler;
+      container.addEventListener("click", handler);
+      container.addEventListener("change", handler);
     },
 
     // Wire edge-type filter buttons in the Connections card

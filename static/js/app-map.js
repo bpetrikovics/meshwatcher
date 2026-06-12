@@ -839,8 +839,11 @@ function mapMixin() {
       const rawEdges = this.selectedNodeLinks || [];
       if (!rawEdges.length) return;
 
+      const minObs = this.linkMinObsForMap || 1;
       const filteredEdges = rawEdges.filter(
-        (e) => this.linkTypeFilters == null || this.linkTypeFilters[e.edge_type] !== false,
+        (e) =>
+          (this.linkTypeFilters == null || this.linkTypeFilters[e.edge_type] !== false) &&
+          (e.observation_count || 1) >= minObs,
       );
       const edges = this._fanOutEdges(filteredEdges);
 
@@ -908,7 +911,7 @@ function mapMixin() {
             snrLine +
             latestSnrLine +
             `\n${edge.src_node} → ${edge.dst_node}`,
-          { direction: "center", className: "edge-tooltip" },
+          { sticky: true, className: "edge-tooltip" },
         );
       }
     },
