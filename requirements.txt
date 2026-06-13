@@ -36,7 +36,7 @@ flask==3.1.3
     #   flask-cors
     #   flask-limiter
     #   flask-socketio
-flask-cors==6.0.2
+flask-cors==6.0.5
     # via -r requirements.in
 flask-limiter==4.1.1
     # via -r requirements.in
