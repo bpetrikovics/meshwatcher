@@ -119,12 +119,29 @@ class DbCleanupManager:
                 self.logger.info("dry_run is true, returning")
                 return {'table': table, 'count_before': count_before, 'deleted': 0}
 
-            delete_query = text(f"DELETE FROM `{table}` WHERE `{timestamp_col}` < :cutoff LIMIT :batch_size")
-            delete_result = session.execute(delete_query, {'cutoff': cutoff, 'batch_size': self.batch_size})
-            deleted = delete_result.rowcount or 0
+            total_deleted = 0
+            batch_no = 0
+            while True:
+                batch_no += 1
+                delete_query = text(
+                    f"DELETE FROM `{table}` "
+                    f"WHERE `{timestamp_col}` < :cutoff "
+                    f"ORDER BY `{timestamp_col}` ASC "
+                    f"LIMIT :batch_size"
+                )
+                delete_result = session.execute(delete_query, {'cutoff': cutoff, 'batch_size': self.batch_size})
+                batch_deleted = delete_result.rowcount or 0
+                total_deleted += batch_deleted
+                session.commit()
+                if batch_no % 10 == 0:
+                    self.logger.info(
+                        "%s cleanup progress: %d rows deleted so far (batch %d)",
+                        table, total_deleted, batch_no,
+                    )
+                if batch_deleted < self.batch_size:
+                    break
 
-            # No explicit commit, will be handled by context manager in _cleanup_cycle()
-            return {'table': table, 'count_before': count_before, 'deleted': deleted}
+            return {'table': table, 'count_before': count_before, 'deleted': total_deleted}
 
         except Exception as e:
             self.logger.exception(e)
@@ -151,20 +168,34 @@ class DbCleanupManager:
 
             # Delete nodes that have no dependent messages or telemetry records
             # This prevents foreign key constraint violations
-            delete_query = text("""
-                DELETE FROM `nodes` 
-                WHERE `updated` < :cutoff 
-                AND `id` NOT IN (
-                    SELECT DISTINCT `nodeId` FROM `messages`
-                    UNION
-                    SELECT DISTINCT `nodeId` FROM `telemetry`
-                )
-                LIMIT :batch_size
-            """)
-            delete_result = session.execute(delete_query, {'cutoff': cutoff, 'batch_size': self.batch_size})
-            deleted = delete_result.rowcount or 0
+            total_deleted = 0
+            batch_no = 0
+            while True:
+                batch_no += 1
+                delete_query = text("""
+                    DELETE FROM `nodes`
+                    WHERE `updated` < :cutoff
+                    AND `id` NOT IN (
+                        SELECT DISTINCT `nodeId` FROM `messages`
+                        UNION
+                        SELECT DISTINCT `nodeId` FROM `telemetry`
+                    )
+                    ORDER BY `updated` ASC
+                    LIMIT :batch_size
+                """)
+                delete_result = session.execute(delete_query, {'cutoff': cutoff, 'batch_size': self.batch_size})
+                batch_deleted = delete_result.rowcount or 0
+                total_deleted += batch_deleted
+                session.commit()
+                if batch_no % 10 == 0:
+                    self.logger.info(
+                        "nodes cleanup progress: %d rows deleted so far (batch %d)",
+                        total_deleted, batch_no,
+                    )
+                if batch_deleted < self.batch_size:
+                    break
 
-            return {'table': 'nodes', 'count_before': count_before, 'deleted': deleted}
+            return {'table': 'nodes', 'count_before': count_before, 'deleted': total_deleted}
 
         except Exception as e:
             self.logger.exception(e)
