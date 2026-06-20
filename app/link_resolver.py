@@ -59,6 +59,32 @@ class NodeSuffixIndex:
             self.register(node_id)
         self.logger.info("NodeSuffixIndex: registered %d node(s)", len(node_ids))
 
+    def prune(self, active_ids: set[str]) -> int:
+        """
+        Remove all node IDs from the index that are not in *active_ids*.
+
+        Returns the number of entries removed.
+        """
+        removed = 0
+        stale_suffixes: list[str] = []
+        for suffix, bucket in self._index.items():
+            stale = [nid for nid in bucket if nid not in active_ids]
+            if stale:
+                for nid in stale:
+                    bucket.remove(nid)
+                    removed += 1
+                    self.logger.debug("Pruned stale node %s with suffix %s", nid, suffix)
+            if not bucket:
+                stale_suffixes.append(suffix)
+        for suffix in stale_suffixes:
+            del self._index[suffix]
+        if removed:
+            self.logger.info(
+                "NodeSuffixIndex: pruned %d stale node(s), %d remaining",
+                removed, len(self),
+            )
+        return removed
+
     # ------------------------------------------------------------------
     # Resolution
     # ------------------------------------------------------------------

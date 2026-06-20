@@ -83,6 +83,7 @@ class DbCleanupManager:
         self.message_timestamp_col = 'createdAt'
         self.telemetry_timestamp_col = 'createdAt'
         self.link_observations_timestamp_col = 'observedAt'
+        self._suffix_index = None
 
         self.start()
 
@@ -225,6 +226,16 @@ class DbCleanupManager:
                 f"{link_obs_stats.get('deleted', 0)} link_observations deleted in {mode} mode, {self.cleanup_interval_minutes=}min"
             )
 
+        # Prune suffix index to remove nodes that were cleaned up from DB
+        if self._suffix_index is not None:
+            try:
+                with db_session() as db:
+                    result = db.execute(text("SELECT id FROM nodes"))
+                    active_ids = {row[0] for row in result.fetchall()}
+                self._suffix_index.prune(active_ids)
+            except Exception as e:
+                self.logger.exception("Failed to prune suffix index")
+
     def start(self):
         if self._running:
             return
@@ -253,6 +264,10 @@ class DbCleanupManager:
         self._running = False
         # Thread is daemon=True, so it will be cleaned up automatically on exit
         # No need to join() which causes eventlet conflicts during shutdown
+
+    def set_suffix_index(self, index) -> None:
+        """Set the NodeSuffixIndex to prune stale node entries after each cleanup cycle."""
+        self._suffix_index = index
 
     def status(self) -> Dict[str, Any]:
         return {

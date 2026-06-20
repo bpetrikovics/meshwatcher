@@ -23,6 +23,7 @@ from .models import (
 )
 from .presenter import Presenter
 from .config import settings
+from .database import get_cleanup_manager
 from .link_resolver import NodeSuffixIndex
 
 
@@ -197,6 +198,8 @@ class EventManager:
 
         self.mqtt.loop_start()
         self.logger.info("Initialized // version: %s", settings.git_commit)
+
+        get_cleanup_manager().set_suffix_index(self.suffix_index)
 
     def _populate_suffix_index(self) -> None:
         """Pre-populate the suffix index from all nodes already stored in the database."""
