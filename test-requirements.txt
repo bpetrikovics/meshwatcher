@@ -24,8 +24,10 @@ click==8.4.1
     # via
     #   flask
     #   flask-socketio
-cryptography==48.0.0
-    # via meshtastic-mqtt-json
+cryptography==49.0.0
+    # via
+    #   -r requirements.in
+    #   meshtastic-mqtt-json
 dbus-fast==5.0.16
     # via bleak
 deprecated==1.3.1
