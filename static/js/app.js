@@ -108,6 +108,7 @@ function meshApp() {
     selectedNodeLinks: [],
     selectedNodeConnectedIds: [],
     showNodeLinksOnMap: true,
+    showNodeLinksCard: true,
     linkDetailObservations: {}, // keyed by "${peerId}|${edgeType}" → { data, loading, expanded }
     linkTypeFilters: {
       neighbor_report: true,

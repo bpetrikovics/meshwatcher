@@ -261,7 +261,7 @@ function nodeDetailMixin() {
               </h4>
               <div class="flex items-center gap-3">
                 <label class="relative inline-flex items-center cursor-pointer gap-1.5" title="Show connection card">
-                  <input type="checkbox" class="sr-only peer links-card-toggle" checked>
+                  <input type="checkbox" class="sr-only peer links-card-toggle" ${this.showNodeLinksCard ? 'checked' : ''}>
                   <div class="w-10 h-5 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-500"></div>
                   <span class="text-xs text-gray-500 select-none">Card</span>
                 </label>
@@ -305,7 +305,7 @@ function nodeDetailMixin() {
                 ${this.linkMinObsForMap > 1 ? 'Hide weak' : 'Show all'}
               </button>
             </div>
-            <div id="connections-content">
+            <div id="connections-content" class="${this.showNodeLinksCard ? '' : 'hidden'}">
               <div class="text-center text-gray-400 py-4">
                 <i class="mdi mdi-loading mdi-spin text-xl mb-1"></i>
                 <p class="text-sm">Loading connections...</p>
@@ -1496,6 +1496,7 @@ function nodeDetailMixin() {
         const cardToggle = e.target.closest(".links-card-toggle");
         if (cardToggle) {
           const visible = !!cardToggle.checked;
+          this.showNodeLinksCard = visible;
           const content = document.getElementById("connections-content");
           if (content) content.classList.toggle("hidden", !visible);
           return;
