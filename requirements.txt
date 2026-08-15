@@ -24,7 +24,7 @@ click==8.4.1
     # via
     #   flask
     #   flask-socketio
-cryptography==49.0.0
+cryptography==50.0.0
     # via
     #   -r requirements.in
     #   meshtastic-mqtt-json
@@ -112,7 +112,7 @@ requests==2.34.2
     # via meshtastic
 simple-websocket==1.1.0
     # via python-engineio
-sqlalchemy==2.0.51
+sqlalchemy==2.0.52
     # via
     #   -r requirements.in
     #   sqlmodel
