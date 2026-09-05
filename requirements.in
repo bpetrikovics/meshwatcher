@@ -9,5 +9,5 @@ pymysql
 sqlmodel
 pyyaml
 git+https://github.com/bpetrikovics/meshtastic-mqtt-json.git@multi-channel#egg=meshtastic-mqtt-json
-cryptography>=48.0.1    # transitive dep pinned for CVE
+cryptography>=50.0.1    # transitive dep pinned for CVE
 pydantic-settings>=2.14.2    # CVE
