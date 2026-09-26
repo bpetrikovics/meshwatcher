@@ -24,7 +24,7 @@ click==8.4.1
     # via
     #   flask
     #   flask-socketio
-cryptography==49.0.0
+cryptography==50.0.1
     # via
     #   -r requirements.in
     #   meshtastic-mqtt-json
@@ -46,7 +46,7 @@ flask-socketio==5.6.1
     # via -r requirements.in
 greenlet==3.5.1
     # via sqlalchemy
-gunicorn==26.0.0
+gunicorn==26.2.0
     # via -r requirements.in
 h11==0.16.0
     # via wsproto
@@ -73,7 +73,6 @@ ordered-set==4.1.0
     # via flask-limiter
 packaging==24.2
     # via
-    #   gunicorn
     #   limits
     #   meshtastic
 paho-mqtt==2.1.0
@@ -92,7 +91,7 @@ pydantic-core==2.46.4
     # via pydantic
 pydantic-settings==2.14.2
     # via -r requirements.in
-pymysql==1.2.0
+pymysql==1.2.3
     # via -r requirements.in
 pypubsub==4.0.7
     # via meshtastic
@@ -112,11 +111,11 @@ requests==2.34.2
     # via meshtastic
 simple-websocket==1.1.0
     # via python-engineio
-sqlalchemy==2.0.51
+sqlalchemy==2.0.54
     # via
     #   -r requirements.in
     #   sqlmodel
-sqlmodel==0.0.39
+sqlmodel==0.0.47
     # via -r requirements.in
 tabulate==0.9.0
     # via meshtastic
